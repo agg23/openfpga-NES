@@ -3,9 +3,9 @@
         "magic": "APF_VER_1",
         "metadata": {
             "platform_ids": [],
-            "shortname": "template",
+            "shortname": "nes",
             "description": "Core template. Displays gray test screen.",
-            "author": "Developer",
+            "author": "agg23",
             "url": "https://github.com/open-fpga/core-template",
             "version": "1.0",
             "date_release": "2022-06-30"
