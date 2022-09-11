@@ -486,8 +486,8 @@ module core_top (
   reg video_vs_reg;
   reg [23:0] video_rgb_reg;
 
-  assign video_rgb_clock = clk_ppu_21_47;
-  assign video_rgb_clock_90 = clk_video_21_47_90deg;
+  assign video_rgb_clock = clk_video_5_37;
+  assign video_rgb_clock_90 = clk_video_5_37_90deg;
   assign video_de = video_de_reg;
   assign video_hs = video_hs_reg;
   assign video_vs = video_vs_reg;
@@ -497,7 +497,7 @@ module core_top (
   reg [2:0] hs_delay;
   reg vs_prev;
 
-  always @(posedge clk_ppu_21_47) begin
+  always @(posedge clk_video_5_37) begin
     video_hs_reg  <= 0;
     video_de_reg  <= 0;
     video_rgb_reg <= 24'h0;
@@ -600,7 +600,8 @@ module core_top (
 
   wire clk_85_9;
   wire clk_ppu_21_47;
-  wire clk_video_21_47_90deg;
+  wire clk_video_5_37;
+  wire clk_video_5_37_90deg;
 
   wire pll_core_locked;
 
@@ -610,7 +611,8 @@ module core_top (
 
       .outclk_0(clk_85_9),
       .outclk_1(clk_ppu_21_47),
-      .outclk_2(clk_video_21_47_90deg),
+      .outclk_2(clk_video_5_37),
+      .outclk_3(clk_video_5_37_90deg),
 
       .locked(pll_core_locked)
   );
