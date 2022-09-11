@@ -1,6 +1,14 @@
 {
-    "data": {
-        "magic": "APF_VER_1",
-        "data_slots": []
-    }
+  "data": {
+    "magic": "APF_VER_1",
+    "data_slots": [
+      {
+        "name": "NES",
+        "required": true,
+        "parameters": 257,
+        "extensions": ["nes"],
+        "address": "0x00000000"
+      }
+    ]
+  }
 }

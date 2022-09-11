@@ -737,6 +737,9 @@ set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 
 # end ENTITY(mf_pllbase_0002)
 # ---------------------------
+set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/gameloader.sv
+set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/main.sv
+set_global_assignment -name VERILOG_FILE core/rtl/mister_top/data_loader_8.v
 set_global_assignment -name VERILOG_FILE core/sys/iir_filter.v
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mappers/VRC.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mappers/Sunsoft.sv
@@ -787,7 +790,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/regs_savestates.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/ppu.sv
 set_global_assignment -name VERILOG_FILE core/rtl/nes.v
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/miracle.sv
-set_global_assignment -name VERILOG_FILE core/rtl/main.v
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/EEPROM_24C0x.sv
 set_global_assignment -name VERILOG_FILE core/rtl/dsp.v
 set_global_assignment -name VHDL_FILE core/rtl/dpram.vhd
