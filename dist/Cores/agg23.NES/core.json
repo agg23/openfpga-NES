@@ -6,9 +6,9 @@
       "shortname": "nes",
       "description": "Nintendo Entertainment System",
       "author": "agg23",
-      "url": "https://github.com/open-fpga/core-template",
-      "version": "1.0",
-      "date_release": "2022-06-30"
+      "url": "https://github.com/agg23/openFPGA-NES",
+      "version": "0.1.0-pre",
+      "date_release": "2022-09-20"
     },
     "framework": {
       "target_product": "Analogue Pocket",
@@ -27,7 +27,7 @@
       {
         "name": "default",
         "id": 0,
-        "filename": "bitstream.rbf_r"
+        "filename": "nes.rev"
       }
     ]
   }

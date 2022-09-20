@@ -1,1 +1,7 @@
-bitstream.rbf_r
+*.rbf_r
+*.zip
+dist/**/*.rev
+src/sim/work/
+src/sim/*.hex
+src/sim/*.mem
+src/sim/*.bin
