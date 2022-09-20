@@ -21,6 +21,12 @@ module MAIN_NES (
     input wire [7:0] ioctl_dout,
     input wire       ioctl_download,
 
+    // Save data
+    input wire sd_wr,
+    input wire [14:0] sd_buff_addr,
+    output wire [7:0] sd_buff_din,
+    input wire [7:0] sd_buff_dout,
+
     // SDRAM
     output wire [12:0] dram_a,
     output wire [ 1:0] dram_ba,
@@ -455,14 +461,7 @@ module MAIN_NES (
       .SDRAM_CKE(dram_cke)
   );
 
-  reg  [31:0] sd_lba = 0;
-  wire        sd_ack;
-  wire [ 8:0] sd_buff_addr;
-  wire [ 7:0] sd_buff_dout;
-  wire [ 7:0] sd_buff_din;
-  wire        sd_buff_wr;
-
-  wire [ 7:0] eeprom_dout;
+  wire sd_ack = 1;
 
   dpram #(" ", 11) eeprom (
       .clock_a(clk_85_9),
@@ -472,10 +471,10 @@ module MAIN_NES (
       .q_a(bram_din),
 
       .clock_b(clk_ppu_21_47),
-      .address_b({sd_lba[1:0], sd_buff_addr}),
+      .address_b(sd_buff_addr),
       .data_b(sd_buff_dout),
-      .wren_b(sd_buff_wr & sd_ack),
-      .q_b(eeprom_dout)
+      .wren_b(sd_wr & sd_ack),
+      .q_b(sd_buff_din)
   );
 
   wire hold_reset;

@@ -8,6 +8,16 @@
         "parameters": "0x108",
         "extensions": ["nes"],
         "address": "0x10000000"
+      },
+      {
+        "name": "Save",
+        "id": 10,
+        "required": false,
+        "parameters": "0x84",
+        "nonvolatile": true,
+        "extensions": ["sav", "srm"],
+        "address": "0x20000000",
+        "size_maximum": "0x20000"
       }
     ]
   }

@@ -390,6 +390,50 @@ module core_top (
       .write_data(ioctl_dout)
   );
 
+  wire [31:0] sd_read_data;
+
+  wire sd_wr;
+
+  wire [14:0] sd_buff_addr_in;
+  wire [14:0] sd_buff_addr_out;
+
+  wire [14:0] sd_buff_addr = sd_wr ? sd_buff_addr_in : sd_buff_addr_out;
+
+  wire [7:0] sd_buff_din;
+  wire [7:0] sd_buff_dout;
+
+  data_unloader #(
+      .ADDRESS_MASK_UPPER_4(4'h2)
+  ) save_data_unloader (
+      .clk_74a(clk_74a),
+      .clk_memory(clk_ppu_21_47),
+
+      .bridge_rd(bridge_rd),
+      .bridge_endian_little(bridge_endian_little),
+      .bridge_addr(bridge_addr),
+      .bridge_rd_data(sd_read_data),
+
+      // .read_en  (sd_rd), // Unused
+      .read_addr(sd_buff_addr_out),
+      .read_data(sd_buff_din)
+  );
+
+  data_loader #(
+      .ADDRESS_MASK_UPPER_4(4'h2)
+  ) save_data_loader (
+      .clk_74a(clk_74a),
+      .clk_memory(clk_ppu_21_47),
+
+      .bridge_wr(bridge_wr),
+      .bridge_endian_little(bridge_endian_little),
+      .bridge_addr(bridge_addr),
+      .bridge_wr_data(bridge_wr_data),
+
+      .write_en  (sd_wr),
+      .write_addr(sd_buff_addr_in),
+      .write_data(sd_buff_dout)
+  );
+
   wire [15:0] audio;
 
   MAIN_NES nes (
@@ -414,6 +458,12 @@ module core_top (
       .ioctl_wr(ioctl_wr),
       .ioctl_dout(ioctl_dout),
       .ioctl_download(ioctl_download),
+
+      // Save data
+      .sd_wr(sd_wr),
+      .sd_buff_addr(sd_buff_addr),
+      .sd_buff_din(sd_buff_din),
+      .sd_buff_dout(sd_buff_dout),
 
       // SDRAM
       .dram_a(dram_a),
