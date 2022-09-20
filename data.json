@@ -5,9 +5,9 @@
       {
         "name": "NES",
         "required": true,
-        "parameters": 257,
+        "parameters": "0x108",
         "extensions": ["nes"],
-        "address": "0x00000000"
+        "address": "0x10000000"
       }
     ]
   }

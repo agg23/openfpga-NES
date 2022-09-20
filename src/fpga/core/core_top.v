@@ -335,7 +335,7 @@ module core_top (
 
   wire dataslot_allcomplete;
 
-  wire savestate_supported;
+  wire savestate_supported = 0;
   wire [31:0] savestate_addr;
   wire [31:0] savestate_size;
   wire [31:0] savestate_maxloadsize;
@@ -363,12 +363,32 @@ module core_top (
   wire [31:0] datatable_data;
   wire [31:0] datatable_q;
 
-  reg downloading = 0;
+  reg ioctl_download = 0;
 
   always @(posedge clk_74a) begin
-    if (dataslot_requestwrite) downloading <= 1;
-    else if (dataslot_allcomplete) downloading <= 0;
+    if (dataslot_requestwrite) ioctl_download <= 1;
+    else if (dataslot_allcomplete) ioctl_download <= 0;
   end
+
+  // Data Loader 8
+  wire ioctl_wr;
+  wire [7:0] ioctl_dout;
+
+  data_loader #(
+      .ADDRESS_MASK_UPPER_4(4'h1)
+  ) data_loader (
+      .clk_74a(clk_74a),
+      .clk_memory(clk_ppu_21_47),
+
+      .bridge_wr(bridge_wr),
+      .bridge_endian_little(bridge_endian_little),
+      .bridge_addr(bridge_addr),
+      .bridge_wr_data(bridge_wr_data),
+
+      .write_en  (ioctl_wr),
+      //   .write_addr(apf_write_addr), // Unused
+      .write_data(ioctl_dout)
+  );
 
   wire [15:0] audio;
 
@@ -391,12 +411,9 @@ module core_top (
       .dpad_right(cont1_key[3]),
 
       // APF
-      .bridge_endian_little(bridge_endian_little),
-      .bridge_addr(bridge_addr),
-      .bridge_wr(bridge_wr),
-      .bridge_wr_data(bridge_wr_data),
-
-      .downloading(downloading),
+      .ioctl_wr(ioctl_wr),
+      .ioctl_dout(ioctl_dout),
+      .ioctl_download(ioctl_download),
 
       // SDRAM
       .dram_a(dram_a),
@@ -527,73 +544,17 @@ module core_top (
     vs_prev <= video_vs_nes;
   end
 
-  //
-  // audio i2s generator
-  //
+  sound_i2s sound_i2s (
+      .clk_74a  (clk_74a),
+      .clk_audio(clk_ppu_21_47),
 
-  assign audio_mclk = audgen_mclk;
-  assign audio_dac  = audgen_dac;
-  assign audio_lrck = audgen_lrck;
+      .audio_l(audio[15:1]),
+      .audio_r(audio[15:1]),
 
-  reg        audgen_nextsamp;
-
-  // generate MCLK = 12.288mhz with fractional accumulator
-  reg [21:0] audgen_accum;
-  reg        audgen_mclk;
-  parameter [20:0] CYCLE_48KHZ = 21'd122880 * 2;
-  always @(posedge clk_74a) begin
-    audgen_accum <= audgen_accum + CYCLE_48KHZ;
-    if (audgen_accum >= 21'd742500) begin
-      audgen_mclk  <= ~audgen_mclk;
-      audgen_accum <= audgen_accum - 21'd742500 + CYCLE_48KHZ;
-    end
-  end
-
-  // generate SCLK = 3.072mhz by dividing MCLK by 4
-  reg                                                          [1:0] aud_mclk_divider;
-  wire audgen_sclk = aud_mclk_divider[1]  /* synthesis keep*/;
-  always @(posedge audgen_mclk) begin
-    aud_mclk_divider <= aud_mclk_divider + 1'b1;
-  end
-
-  // shift out audio data as I2S
-  // 32 total bits per channel, but only 16 active bits at the start and then 16 dummy bits
-  //
-  // synchronize audio samples coming from the core
-
-  wire [31:0] audgen_sampdata = {1'b0, audio[15:1], 1'b0, audio[15:1]};
-  wire [31:0] audgen_sampdata_s;
-  synch_3 #(
-      .WIDTH(32)
-  ) s5 (
-      audgen_sampdata,
-      audgen_sampdata_s,
-      audgen_sclk
+      .audio_mclk(audio_mclk),
+      .audio_lrck(audio_lrck),
+      .audio_dac (audio_dac)
   );
-  reg  [31:0] audgen_sampshift;
-  reg  [4:0] audgen_lrck_cnt;
-  reg    audgen_lrck;
-  reg    audgen_dac;
-  always @(negedge audgen_sclk) begin
-    // output the next bit
-    audgen_dac <= audgen_sampshift[31];
-
-    // 48khz * 64
-    audgen_lrck_cnt <= audgen_lrck_cnt + 1'b1;
-    if (audgen_lrck_cnt == 31) begin
-      // switch channels
-      audgen_lrck <= ~audgen_lrck;
-
-      // Reload sample shifter
-      if (~audgen_lrck) begin
-        audgen_sampshift <= audgen_sampdata_s;
-      end
-    end else if (audgen_lrck_cnt < 16) begin
-      // only shift for 16 clocks per channel
-      audgen_sampshift <= {audgen_sampshift[30:0], 1'b0};
-    end
-  end
-
 
   ///////////////////////////////////////////////
 

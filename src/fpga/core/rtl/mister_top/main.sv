@@ -16,13 +16,10 @@ module MAIN_NES (
     input wire dpad_left,
     input wire dpad_right,
 
-    // APF
-    input wire        bridge_endian_little,
-    input wire [31:0] bridge_addr,
-    input wire        bridge_wr,
-    input wire [31:0] bridge_wr_data,
-
-    input wire downloading,
+    // Data in
+    input wire       ioctl_wr,
+    input wire [7:0] ioctl_dout,
+    input wire       ioctl_download,
 
     // SDRAM
     output wire [12:0] dram_a,
@@ -130,6 +127,8 @@ module MAIN_NES (
   wire ss_req;
   wire [7:0] ss_be;
   wire ss_ack = 0;
+
+  wire downloading = ioctl_download;
 
   NES nes (
       .clk           (clk_ppu_21_47),
@@ -275,10 +274,10 @@ module MAIN_NES (
   end
 
   // Loading
-  wire [7:0] file_input = apf_write_data;
+  wire [7:0] file_input = ioctl_dout;
   //   wire [7:0] loader_input = (loader_busy && !downloading) ? !nsf ? bios_data : nsf_data : file_input;
   wire [7:0] loader_input = file_input;
-  wire loader_clk = apf_write_en;
+  wire loader_clk = ioctl_wr;
   wire [24:0] loader_addr;
   wire [7:0] loader_write_data;
   reg loader_reset;
@@ -291,29 +290,6 @@ module MAIN_NES (
   wire [3:0] prg_nvram = mapper_flags[34:31];
   wire loader_busy, loader_done, loader_fail;
   wire [9:0] prg_mask, chr_mask;
-
-  // Data Loader 8
-  wire apf_write_en;
-  wire [7:0] apf_write_data;
-
-  data_loader_8 #(
-      .ADDRESS_MASK_UPPER_4 (4'h0),
-      .WRITE_MEM_CLOCK_DELAY(7)
-  ) data_loader_8 (
-      .clk_74a(clk_74a),
-      .clk_memory(clk_ppu_21_47),
-
-      .reset_n(~loader_reset),
-
-      .bridge_wr(bridge_wr),
-      .bridge_endian_little(bridge_endian_little),
-      .bridge_addr(bridge_addr),
-      .bridge_wr_data(bridge_wr_data),
-
-      .write_en  (apf_write_en),
-      //   .write_addr(apf_write_addr), // Unused
-      .write_data(apf_write_data)
-  );
 
   GameLoader loader (
       .clk         (clk_ppu_21_47),
