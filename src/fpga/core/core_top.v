@@ -308,6 +308,10 @@ module core_top (
         bridge_rd_data <= cmd_bridge_rd_data;
       end
     endcase
+
+    if (bridge_addr[31:28] == 4'h2) begin
+      bridge_rd_data <= sd_read_data;
+    end
   end
 
 
@@ -355,6 +359,57 @@ module core_top (
   // bridge target commands
   // synchronous to clk_74a
 
+  core_bridge_cmd icb (
+
+      .clk    (clk_74a),
+      .reset_n(reset_n),
+
+      .bridge_endian_little(bridge_endian_little),
+      .bridge_addr         (bridge_addr),
+      .bridge_rd           (bridge_rd),
+      .bridge_rd_data      (cmd_bridge_rd_data),
+      .bridge_wr           (bridge_wr),
+      .bridge_wr_data      (bridge_wr_data),
+
+      .status_boot_done (status_boot_done),
+      .status_setup_done(status_setup_done),
+      .status_running   (status_running),
+
+      .dataslot_requestread    (dataslot_requestread),
+      .dataslot_requestread_id (dataslot_requestread_id),
+      .dataslot_requestread_ack(dataslot_requestread_ack),
+      .dataslot_requestread_ok (dataslot_requestread_ok),
+
+      .dataslot_requestwrite    (dataslot_requestwrite),
+      .dataslot_requestwrite_id (dataslot_requestwrite_id),
+      .dataslot_requestwrite_ack(dataslot_requestwrite_ack),
+      .dataslot_requestwrite_ok (dataslot_requestwrite_ok),
+
+      .dataslot_allcomplete(dataslot_allcomplete),
+
+      .savestate_supported  (savestate_supported),
+      .savestate_addr       (savestate_addr),
+      .savestate_size       (savestate_size),
+      .savestate_maxloadsize(savestate_maxloadsize),
+
+      .savestate_start     (savestate_start),
+      .savestate_start_ack (savestate_start_ack),
+      .savestate_start_busy(savestate_start_busy),
+      .savestate_start_ok  (savestate_start_ok),
+      .savestate_start_err (savestate_start_err),
+
+      .savestate_load     (savestate_load),
+      .savestate_load_ack (savestate_load_ack),
+      .savestate_load_busy(savestate_load_busy),
+      .savestate_load_ok  (savestate_load_ok),
+      .savestate_load_err (savestate_load_err),
+
+      .datatable_addr(datatable_addr),
+      .datatable_wren(datatable_wren),
+      .datatable_data(datatable_data),
+      .datatable_q   (datatable_q),
+
+  );
 
   // bridge data slot access
 
@@ -445,8 +500,8 @@ module core_top (
       // .reset(~reset_n),
 
       // Input
-      .button_a(cont1_key[5]),
-      .button_b(cont1_key[4]),
+      .button_a(cont1_key[4]),
+      .button_b(cont1_key[5]),
       .button_start(cont1_key[15]),
       .button_select(cont1_key[14]),
       .dpad_up(cont1_key[0]),
@@ -486,58 +541,6 @@ module core_top (
       .video_b(video_rgb_nes[7:0]),
 
       .audio(audio)
-  );
-
-  core_bridge_cmd icb (
-
-      .clk    (clk_74a),
-      .reset_n(reset_n),
-
-      .bridge_endian_little(bridge_endian_little),
-      .bridge_addr         (bridge_addr),
-      .bridge_rd           (bridge_rd),
-      .bridge_rd_data      (cmd_bridge_rd_data),
-      .bridge_wr           (bridge_wr),
-      .bridge_wr_data      (bridge_wr_data),
-
-      .status_boot_done (status_boot_done),
-      .status_setup_done(status_setup_done),
-      .status_running   (status_running),
-
-      .dataslot_requestread    (dataslot_requestread),
-      .dataslot_requestread_id (dataslot_requestread_id),
-      .dataslot_requestread_ack(dataslot_requestread_ack),
-      .dataslot_requestread_ok (dataslot_requestread_ok),
-
-      .dataslot_requestwrite    (dataslot_requestwrite),
-      .dataslot_requestwrite_id (dataslot_requestwrite_id),
-      .dataslot_requestwrite_ack(dataslot_requestwrite_ack),
-      .dataslot_requestwrite_ok (dataslot_requestwrite_ok),
-
-      .dataslot_allcomplete(dataslot_allcomplete),
-
-      .savestate_supported  (savestate_supported),
-      .savestate_addr       (savestate_addr),
-      .savestate_size       (savestate_size),
-      .savestate_maxloadsize(savestate_maxloadsize),
-
-      .savestate_start     (savestate_start),
-      .savestate_start_ack (savestate_start_ack),
-      .savestate_start_busy(savestate_start_busy),
-      .savestate_start_ok  (savestate_start_ok),
-      .savestate_start_err (savestate_start_err),
-
-      .savestate_load     (savestate_load),
-      .savestate_load_ack (savestate_load_ack),
-      .savestate_load_busy(savestate_load_busy),
-      .savestate_load_ok  (savestate_load_ok),
-      .savestate_load_err (savestate_load_err),
-
-      .datatable_addr(datatable_addr),
-      .datatable_wren(datatable_wren),
-      .datatable_data(datatable_data),
-      .datatable_q   (datatable_q),
-
   );
 
   // Video

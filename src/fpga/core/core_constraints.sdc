@@ -12,3 +12,14 @@ set_clock_groups -asynchronous \
  -group { ic|mp1|mf_pllbase_inst|altera_pll_i|general[1].gpll~PLL_OUTPUT_COUNTER|divclk } \
  -group { ic|mp1|mf_pllbase_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk } \
  -group { ic|mp1|mf_pllbase_inst|altera_pll_i|general[3].gpll~PLL_OUTPUT_COUNTER|divclk } 
+
+derive_clock_uncertainty
+
+set_multicycle_path -from {ic|nes|sdram|*} -to [get_clocks {ic|mp1|mf_pllbase_inst|altera_pll_i|*[2].*|divclk}] -start -setup 2
+set_multicycle_path -from {ic|nes|sdram|*} -to [get_clocks {ic|mp1|mf_pllbase_inst|altera_pll_i|*[2].*|divclk}] -start -hold 1
+
+set_multicycle_path -from [get_clocks {ic|mp1|mf_pllbase_inst|altera_pll_i|*[2].*|divclk}] -to {ic|nes|sdram|*} -setup 2
+set_multicycle_path -from [get_clocks {ic|mp1|mf_pllbase_inst|altera_pll_i|*[2].*|divclk}] -to {ic|nes|sdram|*} -hold 1
+
+set_false_path -from {ic|nes|mapper_flags*}
+#set_false_path -from {ic|nes|downloading*}
