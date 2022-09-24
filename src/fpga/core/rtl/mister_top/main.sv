@@ -4,7 +4,8 @@ module MAIN_NES (
     input clk_85_9,
     input clock_locked,
 
-    // input reset,
+    // Control
+    input wire pause,
 
     // Inputs
     input wire button_a,
@@ -26,6 +27,20 @@ module MAIN_NES (
     input wire [14:0] sd_buff_addr,
     output wire [7:0] sd_buff_din,
     input wire [7:0] sd_buff_dout,
+
+    // Save states
+    input wire ss_save,
+    input wire ss_load,
+
+    output wire [63:0] ss_din,
+    input wire [63:0] ss_dout,
+    output wire [25:0] ss_addr,
+    output wire ss_rnw,
+    output wire ss_req,
+    output wire [7:0] ss_be,
+    input wire ss_ack,
+
+    output wire ss_busy,
 
     // SDRAM
     output wire [12:0] dram_a,
@@ -62,8 +77,6 @@ module MAIN_NES (
 
   // Temp wires
   wire ioctl_addr = 0;
-
-  wire save_written;
 
   wire [127:0] status = 0;
 
@@ -110,38 +123,32 @@ module MAIN_NES (
   wire save_state = 0;
   wire load_state = 0;
   wire [1:0] savestate_number = 0;
-  wire sleep_savestate;
   wire state_loaded;
 
-  wire [24:0] Savestate_SDRAMAddr;
-  wire Savestate_SDRAMRdEn;
-  wire Savestate_SDRAMWrEn;
-  wire [7:0] Savestate_SDRAMWriteData;
-  wire [7:0] Savestate_SDRAMReadData;
-
-  wire [63:0] SaveStateBus_Din;
-  wire [9:0] SaveStateBus_Adr;
-  wire SaveStateBus_wren;
-  wire SaveStateBus_rst;
-  wire [63:0] SaveStateBus_Dout = 0;
-  wire savestate_load;
-
-  wire [63:0] ss_din;
-  wire [63:0] ss_dout = 0;
-  wire [25:0] ss_addr;
-  wire ss_rnw;
-  wire ss_req;
-  wire [7:0] ss_be;
-  wire ss_ack = 0;
-
   wire downloading = ioctl_download;
+
+  // pause
+  reg       pausecore;
+  reg [1:0] videopause_ce;
+  wire      corepaused;
+  wire      sleep_savestate;
+
+  always_ff @(posedge clk_ppu_21_47) begin
+    pausecore <= sleep_savestate | (!ioctl_download && !reset_nes);
+
+    if (!corepaused) begin
+      videopause_ce <= nes_ce + 1'd1;
+    end else begin
+      videopause_ce <= videopause_ce + 1'd1;
+    end
+  end
 
   NES nes (
       .clk           (clk_ppu_21_47),
       .reset_nes     (reset_nes),
       .cold_reset    (downloading & (type_fds | type_nes)),
-      .pausecore     (0),
-      // .corepaused      (corepaused),
+      .pausecore     (pause),
+      .corepaused    (corepaused),
       .sys_type      (0),                                      // TODO: Hardcoded to NTSC
       .nes_div       (nes_ce),
       .mapper_flags  (downloading ? 64'd0 : mapper_flags),
@@ -216,6 +223,8 @@ module MAIN_NES (
       .SaveStateExt_rst (SaveStateBus_rst),
       .SaveStateExt_Dout(SaveStateBus_Dout),
       .SaveStateExt_load(savestate_load),
+
+      .savestate_busy(ss_busy),
 
       .SAVE_out_Din(ss_din),  // data read from savestate
       .SAVE_out_Dout(ss_dout),  // data written to savestate
@@ -377,9 +386,6 @@ module MAIN_NES (
 
   // RAM
 
-  wire [15:0] sdram_ss_in = 0;
-  wire [15:0] sdram_ss_out;
-
   // loader_write -> clock when data available
   // reg loader_write_mem;
   // reg [7:0] loader_write_data_mem;
@@ -406,12 +412,15 @@ module MAIN_NES (
   //   end
   // end
 
-  //   wire [24:0] ch2_addr = sleep_savestate ? Savestate_SDRAMAddr : {7'b0001111, save_addr};
-  //   wire ch2_wr = sleep_savestate ? Savestate_SDRAMWrEn : save_wr;
-  //   wire [7:0] ch2_din = sleep_savestate ? Savestate_SDRAMWriteData : sd_buff_dout;
-  //   wire ch2_rd = sleep_savestate ? Savestate_SDRAMRdEn : save_rd;
+  // sleep_savestate is set by NES core to indicate save state transition is occuring
+  // Savestate_* is set by the NES core to control SDRAM for state
+  // save_addr is set by controller in this code
+  wire [24:0] ch2_addr = sleep_savestate ? Savestate_SDRAMAddr : {7'b0001111, save_addr};
+  wire ch2_wr = sleep_savestate ? Savestate_SDRAMWrEn : save_wr;
+  wire [7:0] ch2_din = sleep_savestate ? Savestate_SDRAMWriteData : sd_buff_dout;
+  wire ch2_rd = sleep_savestate ? Savestate_SDRAMRdEn : save_rd;
 
-  //   assign Savestate_SDRAMReadData = save_dout;
+  assign Savestate_SDRAMReadData = save_dout;
 
   sdram sdram (
       // system interface
@@ -434,13 +443,12 @@ module MAIN_NES (
       .ch1_busy(),
 
       // reserved for backup ram save/load
-      // TODO: Add
-      // .ch2_addr   ( ch2_addr ),
-      // .ch2_wr     ( ch2_wr ),
-      // .ch2_din    ( ch2_din ),
-      // .ch2_rd     ( ch2_rd ),
-      // .ch2_dout   ( save_dout ),
-      // .ch2_busy   ( save_busy ),
+      .ch2_addr(ch2_addr),
+      .ch2_wr  (ch2_wr),
+      .ch2_din (ch2_din),
+      .ch2_rd  (ch2_rd),
+      .ch2_dout(save_dout),
+      .ch2_busy(save_busy),
 
       .refresh(refresh),
       .ss_in  (sdram_ss_in),
@@ -463,7 +471,7 @@ module MAIN_NES (
 
   wire sd_ack = 1;
 
-  dpram #(" ", 11) eeprom (
+  dpram #(" ", 11) save_ram (
       .clock_a(clk_85_9),
       .address_a(bram_addr),
       .data_a(bram_dout),
@@ -477,9 +485,90 @@ module MAIN_NES (
       .q_b(sd_buff_din)
   );
 
+  ///////////////////////////// savestates /////////////////////////////////
+
+  // wire [63:0] ss_dout, ss_din;
+  // wire [27:2] ss_addr;
+  // wire [ 7:0] ss_be;
+  // wire ss_rnw, ss_req, ss_ack;
+
+  wire [24:0]                             Savestate_SDRAMAddr;
+  wire                                    Savestate_SDRAMRdEn;
+  wire                                    Savestate_SDRAMWrEn;
+  wire [ 7:0]                             Savestate_SDRAMWriteData;
+  wire [ 7:0]                             Savestate_SDRAMReadData;
+
+  wire [63:0]                             SaveStateBus_Din;
+  wire [ 9:0]                             SaveStateBus_Adr;
+  wire                                    SaveStateBus_wren;
+  wire                                    SaveStateBus_rst;
+  wire [63:0]                             SaveStateBus_Dout;
+  wire                                    savestate_load;
+
+  wire [15:0] sdram_ss_in = SS_Ext[15:0];
+  wire [15:0]                             sdram_ss_out;
+
+  wire [63:0]                             SS_Ext;
+  wire [63:0]                             SS_Ext_BACK;
+  eReg_SavestateV #(SSREG_INDEX_EXT, SSREG_DEFAULT_EXT) iREG_SAVESTATE_Ext (
+      clk,
+      SaveStateBus_Din,
+      SaveStateBus_Adr,
+      SaveStateBus_wren,
+      SaveStateBus_rst,
+      SaveStateBus_Dout,
+      SS_Ext_BACK,
+      SS_Ext
+  );
+
+  assign SS_Ext_BACK[15:0]  = sdram_ss_out;
+  assign SS_Ext_BACK[63:16] = 48'b0;  // free to be used
+
+  wire save_busy;
+  reg save_rd, save_wr;
+  reg save_wait;
+  reg [17:0] save_addr;
+
+  wire bk_busy = 0;
+  wire bk_loading = 0;
+  wire [8:0] sd_lba = 0;
+  wire sd_buff_wr = 0;
+  wire OSD_STATUS = 0;
+  wire bk_state = 0;
+
+  always @(posedge clk_ppu_21_47) begin
+
+    if (~save_busy & ~save_rd & ~save_wr) save_wait <= 0;
+
+    if (~bk_busy) begin
+      save_addr <= '1;
+      save_wait <= 0;
+    end else if (sd_ack & ~save_busy) begin
+      if (~bk_loading && (save_addr != {sd_lba[8:0], sd_buff_addr})) begin
+        save_rd   <= 1;
+        save_addr <= {sd_lba[8:0], sd_buff_addr};
+        save_wait <= 1;
+      end
+      if (bk_loading && sd_buff_wr) begin
+        save_wr   <= 1;
+        save_addr <= {sd_lba[8:0], sd_buff_addr};
+        save_wait <= 1;
+      end
+    end
+    if (~bk_busy | save_busy | bram_en) {save_rd, save_wr} <= 0;
+  end
+
+  reg  bk_pending;
+  wire save_written;
+  always @(posedge clk) begin
+    if ((mapper_flags[25] || fds) && ~OSD_STATUS && save_written) bk_pending <= 1'b1;
+    else if (bk_state) bk_pending <= 1'b0;
+  end
+
+  // Video
+
   wire hold_reset;
-  // wire [1:0] nes_ce_video = corepaused ? videopause_ce : nes_ce;
-  wire [1:0] nes_ce_video = nes_ce;
+  wire [1:0] nes_ce_video = corepaused ? videopause_ce : nes_ce;
 
   wire hide_overscan = 0;
   wire [3:0] palette2_osd = 0;

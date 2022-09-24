@@ -300,6 +300,9 @@ module core_top (
   // add your own devices here
   always @(*) begin
     casex (bridge_addr)
+      32'h00000000: begin
+        bridge_rd_data <= failure_count;
+      end
       32'h10xxxxxx: begin
         // example
         // bridge_rd_data <= example_device_data;
@@ -308,6 +311,12 @@ module core_top (
         bridge_rd_data <= cmd_bridge_rd_data;
       end
     endcase
+
+    if (bridge_addr[31:28] == 4'h2) begin
+      bridge_rd_data <= sd_read_data;
+    end else if (bridge_addr[31:28] == 4'h4) begin
+      bridge_rd_data <= save_state_bridge_read_data;
+    end
   end
 
 
@@ -335,16 +344,16 @@ module core_top (
 
   wire dataslot_allcomplete;
 
-  wire savestate_supported = 0;
-  wire [31:0] savestate_addr;
-  wire [31:0] savestate_size;
-  wire [31:0] savestate_maxloadsize;
+  wire savestate_supported = 1;
+  wire [31:0] savestate_addr = 32'h40000000;
+  wire [31:0] savestate_size = 32'h100000;
+  wire [31:0] savestate_maxloadsize = savestate_size;
 
   wire savestate_start;
-  wire savestate_start_ack;
-  wire savestate_start_busy;
-  wire savestate_start_ok;
-  wire savestate_start_err;
+  reg savestate_start_ack;
+  reg savestate_start_busy;
+  reg savestate_start_ok;
+  reg savestate_start_err;
 
   wire savestate_load;
   wire savestate_load_ack;
@@ -352,9 +361,56 @@ module core_top (
   wire savestate_load_ok;
   wire savestate_load_err;
 
-  // bridge target commands
-  // synchronous to clk_74a
+  core_bridge_cmd icb (
 
+      .clk    (clk_74a),
+      .reset_n(reset_n),
+
+      .bridge_endian_little(bridge_endian_little),
+      .bridge_addr         (bridge_addr),
+      .bridge_rd           (bridge_rd),
+      .bridge_rd_data      (cmd_bridge_rd_data),
+      .bridge_wr           (bridge_wr),
+      .bridge_wr_data      (bridge_wr_data),
+
+      .status_boot_done (status_boot_done),
+      .status_setup_done(status_setup_done),
+      .status_running   (status_running),
+
+      .dataslot_requestread    (dataslot_requestread),
+      .dataslot_requestread_id (dataslot_requestread_id),
+      .dataslot_requestread_ack(dataslot_requestread_ack),
+      .dataslot_requestread_ok (dataslot_requestread_ok),
+
+      .dataslot_requestwrite    (dataslot_requestwrite),
+      .dataslot_requestwrite_id (dataslot_requestwrite_id),
+      .dataslot_requestwrite_ack(dataslot_requestwrite_ack),
+      .dataslot_requestwrite_ok (dataslot_requestwrite_ok),
+
+      .dataslot_allcomplete(dataslot_allcomplete),
+
+      .savestate_supported  (savestate_supported),
+      .savestate_addr       (savestate_addr),
+      .savestate_size       (savestate_size),
+      .savestate_maxloadsize(savestate_maxloadsize),
+
+      .savestate_start     (savestate_start),
+      .savestate_start_ack (savestate_start_ack),
+      .savestate_start_busy(savestate_start_busy),
+      .savestate_start_ok  (savestate_start_ok),
+      .savestate_start_err (savestate_start_err),
+
+      .savestate_load     (savestate_load),
+      .savestate_load_ack (savestate_load_ack),
+      .savestate_load_busy(savestate_load_busy),
+      .savestate_load_ok  (savestate_load_ok),
+      .savestate_load_err (savestate_load_err),
+
+      .datatable_addr(datatable_addr),
+      .datatable_wren(datatable_wren),
+      .datatable_data(datatable_data),
+      .datatable_q   (datatable_q),
+  );
 
   // bridge data slot access
 
@@ -434,7 +490,142 @@ module core_top (
       .write_data(sd_buff_dout)
   );
 
+  // Save states
+  reg prev_savestate_start;
+  reg [31:0] counter = 0;
+
+  always @(posedge clk_74a) begin
+    if (counter == 0) begin
+      savestate_start_busy <= 0;
+      savestate_start_ok   <= 1;
+    end else begin
+      counter <= counter - 1;
+    end
+
+    if (savestate_start && ~prev_savestate_start) begin
+      // Ack beginning of savestate
+      savestate_start_ack <= 1;
+      savestate_start_busy <= 1;
+
+      // Clear old state
+      savestate_start_ok <= 0;
+      savestate_start_err <= 0;
+
+      counter <= 32'h4FFFFFF;
+    end
+
+    if (savestate_start_ack) begin
+      savestate_start_ack <= 0;
+    end
+
+    prev_savestate_start <= savestate_start;
+  end
+
+  // Save state unloader
+  wire ss_busy;
+  wire [63:0] ss_din;
+  wire [63:0] ss_dout;
+  wire [25:0] ss_addr;
+  wire ss_rnw;
+  wire ss_req;
+  wire [7:0] ss_be;
+  reg ss_ack;
+
+  wire [31:0] save_state_bridge_read_data;
+  wire save_state_unloader_read;
+  wire [27:0] save_state_unloader_addr;
+
+  data_unloader #(
+      .ADDRESS_MASK_UPPER_4(4'h4),
+      .INPUT_WORD_SIZE(2)
+  ) save_state_unloader (
+      .clk_74a(clk_74a),
+      .clk_memory(clk_ppu_21_47),
+
+      .bridge_rd(bridge_rd),
+      .bridge_endian_little(bridge_endian_little),
+      .bridge_addr(bridge_addr),
+      .bridge_rd_data(save_state_bridge_read_data),
+
+      .read_en  (save_state_unloader_read),
+      .read_addr(save_state_unloader_addr),
+      .read_data(save_state_read_buffer[15:0])
+  );
+
+  reg [1:0] save_state_read_count = 0;
+  reg [63:0] save_state_read_buffer;
+  reg prev_save_state_unloader_read;
+  reg [31:0] failure_count = 0;
+
+  wire disabled_range = (ss_addr > 8192 && ss_addr < 26'h200000) ||  // After OAM and mapper
+  (ss_addr > 26'h200000 + 1048576 && ss_addr < 26'h300000) ||  // After CHR
+  (ss_addr > 26'h300000 + 2048 && ss_addr < 26'h380000) ||  // After CHR-VRAM
+  (ss_addr > 26'h380000 + 2048 && ss_addr < 26'h3C0000) ||  // After CHR-RAM
+  (ss_addr > 26'h3C0000 + 262144);  // After CARTRAM
+
+  always @(posedge clk_ppu_21_47) begin
+    ss_ack <= 0;
+
+    if (ss_req && ~ss_rnw) begin
+      // Enabled and writing
+      save_state_read_buffer <= disabled_range ? 64'hFEEBDAED : ss_din;
+    end
+
+    if (~save_state_unloader_read && prev_save_state_unloader_read) begin
+      // Falling edge of save_state_unloader_read, prep next word
+      save_state_read_buffer <= {16'b0, save_state_read_buffer[63:16]};
+
+      if (save_state_read_count == 3) begin
+        // Finished reading this 64 bit word
+        ss_ack <= 1;
+      end
+
+      save_state_read_count <= save_state_read_count + 1;
+    end
+
+    if (~disabled_range && save_state_unloader_read && ~prev_save_state_unloader_read && ss_addr[21:0] != save_state_unloader_addr[21:0]) begin
+      // Track mismatched addresses
+      failure_count <= failure_count + 1;
+    end
+
+    prev_save_state_unloader_read <= save_state_unloader_read;
+  end
+
+  // reg [1:0] ss_write_delay;
+
+  // always @(posedge clk_ppu_21_47) begin
+  //   ss_ack <= 0;
+
+  //   if (ss_req) begin
+  //     ss_write_delay <= 3;
+  //   end
+
+  //   if (ss_write_delay == 1) begin
+  //     ss_ack <= 1;
+  //   end
+
+  //   if (ss_write_delay != 0) begin
+  //     ss_write_delay <= ss_write_delay - 1;
+  //   end
+  // end
+
+  // spram_sz #(
+  //     .addr_width(21),
+  //     .data_width(64),
+  //     .numwords  (331776 * 4 / 64)
+  // ) save_state_buffer (
+  //     .clock(clk_85_9),
+  //     .address(ss_addr),
+  //     .data(ss_dout),
+  //     .wren(~ss_rnw),
+  //     .q(ss_din)
+  // );
+
+  // Core
+
   wire [15:0] audio;
+
+  wire pause = savestate_start_busy || ss_busy;
 
   MAIN_NES nes (
       .clk_74a(clk_74a),
@@ -442,11 +633,12 @@ module core_top (
       .clk_85_9(clk_85_9),
       .clock_locked(pll_core_locked),
 
-      // .reset(~reset_n),
+      // Control
+      .pause(pause),
 
       // Input
-      .button_a(cont1_key[5]),
-      .button_b(cont1_key[4]),
+      .button_a(cont1_key[4]),
+      .button_b(cont1_key[5]),
       .button_start(cont1_key[15]),
       .button_select(cont1_key[14]),
       .dpad_up(cont1_key[0]),
@@ -464,6 +656,20 @@ module core_top (
       .sd_buff_addr(sd_buff_addr),
       .sd_buff_din(sd_buff_din),
       .sd_buff_dout(sd_buff_dout),
+
+      // Save states
+      .ss_save(savestate_start_busy),
+      .ss_load(0),
+
+      .ss_busy(ss_busy),
+
+      .ss_din (ss_din),
+      .ss_dout(ss_dout),
+      .ss_addr(ss_addr),
+      .ss_rnw (ss_rnw),
+      .ss_req (ss_req),
+      .ss_be  (ss_be),
+      .ss_ack (ss_ack),
 
       // SDRAM
       .dram_a(dram_a),
@@ -486,58 +692,6 @@ module core_top (
       .video_b(video_rgb_nes[7:0]),
 
       .audio(audio)
-  );
-
-  core_bridge_cmd icb (
-
-      .clk    (clk_74a),
-      .reset_n(reset_n),
-
-      .bridge_endian_little(bridge_endian_little),
-      .bridge_addr         (bridge_addr),
-      .bridge_rd           (bridge_rd),
-      .bridge_rd_data      (cmd_bridge_rd_data),
-      .bridge_wr           (bridge_wr),
-      .bridge_wr_data      (bridge_wr_data),
-
-      .status_boot_done (status_boot_done),
-      .status_setup_done(status_setup_done),
-      .status_running   (status_running),
-
-      .dataslot_requestread    (dataslot_requestread),
-      .dataslot_requestread_id (dataslot_requestread_id),
-      .dataslot_requestread_ack(dataslot_requestread_ack),
-      .dataslot_requestread_ok (dataslot_requestread_ok),
-
-      .dataslot_requestwrite    (dataslot_requestwrite),
-      .dataslot_requestwrite_id (dataslot_requestwrite_id),
-      .dataslot_requestwrite_ack(dataslot_requestwrite_ack),
-      .dataslot_requestwrite_ok (dataslot_requestwrite_ok),
-
-      .dataslot_allcomplete(dataslot_allcomplete),
-
-      .savestate_supported  (savestate_supported),
-      .savestate_addr       (savestate_addr),
-      .savestate_size       (savestate_size),
-      .savestate_maxloadsize(savestate_maxloadsize),
-
-      .savestate_start     (savestate_start),
-      .savestate_start_ack (savestate_start_ack),
-      .savestate_start_busy(savestate_start_busy),
-      .savestate_start_ok  (savestate_start_ok),
-      .savestate_start_err (savestate_start_err),
-
-      .savestate_load     (savestate_load),
-      .savestate_load_ack (savestate_load_ack),
-      .savestate_load_busy(savestate_load_busy),
-      .savestate_load_ok  (savestate_load_ok),
-      .savestate_load_err (savestate_load_err),
-
-      .datatable_addr(datatable_addr),
-      .datatable_wren(datatable_wren),
-      .datatable_data(datatable_data),
-      .datatable_q   (datatable_q),
-
   );
 
   // Video
