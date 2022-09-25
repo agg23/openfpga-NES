@@ -7,20 +7,49 @@ module MAIN_NES (
     // input reset,
 
     // Inputs
-    input wire button_a,
-    input wire button_b,
-    input wire button_start,
-    input wire button_select,
-    input wire dpad_up,
-    input wire dpad_down,
-    input wire dpad_left,
-    input wire dpad_right,
+    input wire p1_button_a,
+    input wire p1_button_b,
+    input wire p1_button_start,
+    input wire p1_button_select,
+    input wire p1_dpad_up,
+    input wire p1_dpad_down,
+    input wire p1_dpad_left,
+    input wire p1_dpad_right,
+
+    input wire p2_button_a,
+    input wire p2_button_b,
+    input wire p2_button_start,
+    input wire p2_button_select,
+    input wire p2_dpad_up,
+    input wire p2_dpad_down,
+    input wire p2_dpad_left,
+    input wire p2_dpad_right,
+
+    input wire p3_button_a,
+    input wire p3_button_b,
+    input wire p3_button_start,
+    input wire p3_button_select,
+    input wire p3_dpad_up,
+    input wire p3_dpad_down,
+    input wire p3_dpad_left,
+    input wire p3_dpad_right,
+
+    input wire p4_button_a,
+    input wire p4_button_b,
+    input wire p4_button_start,
+    input wire p4_button_select,
+    input wire p4_dpad_up,
+    input wire p4_dpad_down,
+    input wire p4_dpad_left,
+    input wire p4_dpad_right,
 
     // Settings
     input wire hide_overscan,
     input wire [1:0] mask_vid_edges,
     input wire allow_extra_sprites,
     input wire [2:0] selected_palette,
+
+    input wire multitap_enabled,
 
     // Data in
     input wire       ioctl_wr,
@@ -167,7 +196,7 @@ module MAIN_NES (
       .joypad_out    (joypad_out),
       .joypad_clock  (joypad_clock),
       .joypad1_data  (joypad1_data),
-      .joypad2_data  (0),                                      // TODO: Disabled
+      .joypad2_data  (joypad2_data),
 
       .diskside      (diskside),
       .fds_busy      (fds_busy),
@@ -233,15 +262,59 @@ module MAIN_NES (
   wire [2:0] joypad_out;
   wire [1:0] joypad_clock;
   reg [23:0] joypad_bits;
+  reg [23:0] joypad_bits2;
   reg [1:0] last_joypad_clock;
+  wire joy_swap = 0;
 
   wire mic = 0;
   wire paddle_en = 0;
   wire paddle_btn = 0;
   wire [4:0] joypad1_data = {2'b0, mic, paddle_en & paddle_btn, joypad_bits[0]};
+  // Upper 4 bits are other peripherals
+  wire [4:0] joypad2_data = {4'b0, joypad_bits2[0]};
 
   wire [7:0] nes_joy_A = {
-    dpad_right, dpad_left, dpad_down, dpad_up, button_start, button_select, button_b, button_a
+    p1_dpad_right,
+    p1_dpad_left,
+    p1_dpad_down,
+    p1_dpad_up,
+    p1_button_start,
+    p1_button_select,
+    p1_button_b,
+    p1_button_a
+  };
+
+  wire [7:0] nes_joy_B = {
+    p2_dpad_right,
+    p2_dpad_left,
+    p2_dpad_down,
+    p2_dpad_up,
+    p2_button_start,
+    p2_button_select,
+    p2_button_b,
+    p2_button_a
+  };
+
+  wire [7:0] nes_joy_C = {
+    p3_dpad_right,
+    p3_dpad_left,
+    p3_dpad_down,
+    p3_dpad_up,
+    p3_button_start,
+    p3_button_select,
+    p3_button_b,
+    p3_button_a
+  };
+
+  wire [7:0] nes_joy_D = {
+    p4_dpad_right,
+    p4_dpad_left,
+    p4_dpad_down,
+    p4_dpad_up,
+    p4_button_start,
+    p4_button_select,
+    p4_button_b,
+    p4_button_a
   };
 
   always @(posedge clk_ppu_21_47) begin
@@ -253,10 +326,13 @@ module MAIN_NES (
       last_joypad_clock <= 0;
     end else begin
       if (joypad_out[0]) begin
-        joypad_bits <= nes_joy_A;
-        // joypad_bits2 <= {
-        //   status[10] ? {8'h04, nes_joy_D} : 16'hFFFF, joy_swap ? nes_joy_A : nes_joy_B
-        // };
+        joypad_bits <= {
+          multitap_enabled ? {8'h08, nes_joy_C} : 16'hFFFF, joy_swap ? nes_joy_B : nes_joy_A
+        };
+        joypad_bits2 <= {
+          multitap_enabled ? {8'h04, nes_joy_D} : 16'hFFFF, joy_swap ? nes_joy_A : nes_joy_B
+        };
+
         // joypad_d4 <= paddle_en ? paddle_nes : {4'b1111, powerpad[7], powerpad[11], powerpad[2], powerpad[3]};
         // joypad_d3 <= {
         //   powerpad[6],
@@ -272,11 +348,11 @@ module MAIN_NES (
       if (!joypad_clock[0] && last_joypad_clock[0]) begin
         joypad_bits <= {1'b0, joypad_bits[23:1]};
       end
-      // if (!joypad_clock[1] && last_joypad_clock[1]) begin
-      //   joypad_bits2 <= {1'b0, joypad_bits2[23:1]};
-      //   joypad_d4 <= {~paddle_en, joypad_d4[7:1]};
-      //   joypad_d3 <= {1'b1, joypad_d3[7:1]};
-      // end
+      if (!joypad_clock[1] && last_joypad_clock[1]) begin
+        joypad_bits2 <= {1'b0, joypad_bits2[23:1]};
+        // joypad_d4 <= {~paddle_en, joypad_d4[7:1]};
+        // joypad_d3 <= {1'b1, joypad_d3[7:1]};
+      end
       last_joypad_clock <= joypad_clock;
     end
   end

@@ -328,6 +328,9 @@ module core_top (
         32'h0000020C: begin
           selected_palette <= bridge_wr_data[2:0];
         end
+        32'h00000300: begin
+          multitap_enabled <= bridge_wr_data[0];
+        end
       endcase
     end
   end
@@ -528,11 +531,51 @@ module core_top (
       .write_data(sd_buff_dout)
   );
 
+  wire [15:0] cont1_key_s;
+  wire [15:0] cont2_key_s;
+  wire [15:0] cont3_key_s;
+  wire [15:0] cont4_key_s;
+  wire [31:0] cont1_joy_s;
+
+  synch_3 #(
+      .WIDTH(32)
+  ) cont1_s (
+      cont1_key,
+      cont1_key_s,
+      clk_ppu_21_47
+  );
+
+  synch_3 #(
+      .WIDTH(32)
+  ) cont2_s (
+      cont2_key,
+      cont2_key_s,
+      clk_ppu_21_47
+  );
+
+  synch_3 #(
+      .WIDTH(32)
+  ) cont3_s (
+      cont3_key,
+      cont3_key_s,
+      clk_ppu_21_47
+  );
+
+  synch_3 #(
+      .WIDTH(32)
+  ) cont4_s (
+      cont4_key,
+      cont4_key_s,
+      clk_ppu_21_47
+  );
+
   // Settings
   reg hide_overscan;
   reg [1:0] mask_vid_edges;
   reg allow_extra_sprites;
   reg [2:0] selected_palette;
+
+  reg multitap_enabled;
 
   MAIN_NES nes (
       .clk_74a(clk_74a),
@@ -543,20 +586,49 @@ module core_top (
       // .reset(~reset_n),
 
       // Input
-      .button_a(cont1_key[4]),
-      .button_b(cont1_key[5]),
-      .button_start(cont1_key[15]),
-      .button_select(cont1_key[14]),
-      .dpad_up(cont1_key[0]),
-      .dpad_down(cont1_key[1]),
-      .dpad_left(cont1_key[2]),
-      .dpad_right(cont1_key[3]),
+      .p1_button_a(cont1_key_s[4]),
+      .p1_button_b(cont1_key_s[5]),
+      .p1_button_start(cont1_key_s[15]),
+      .p1_button_select(cont1_key_s[14]),
+      .p1_dpad_up(cont1_key_s[0]),
+      .p1_dpad_down(cont1_key_s[1]),
+      .p1_dpad_left(cont1_key_s[2]),
+      .p1_dpad_right(cont1_key_s[3]),
+
+      .p2_button_a(cont2_key_s[4]),
+      .p2_button_b(cont2_key_s[5]),
+      .p2_button_start(cont2_key_s[15]),
+      .p2_button_select(cont2_key_s[14]),
+      .p2_dpad_up(cont2_key_s[0]),
+      .p2_dpad_down(cont2_key_s[1]),
+      .p2_dpad_left(cont2_key_s[2]),
+      .p2_dpad_right(cont2_key_s[3]),
+
+      .p3_button_a(cont3_key_s[4]),
+      .p3_button_b(cont3_key_s[5]),
+      .p3_button_start(cont3_key_s[15]),
+      .p3_button_select(cont3_key_s[14]),
+      .p3_dpad_up(cont3_key_s[0]),
+      .p3_dpad_down(cont3_key_s[1]),
+      .p3_dpad_left(cont3_key_s[2]),
+      .p3_dpad_right(cont3_key_s[3]),
+
+      .p4_button_a(cont4_key_s[4]),
+      .p4_button_b(cont4_key_s[5]),
+      .p4_button_start(cont4_key_s[15]),
+      .p4_button_select(cont4_key_s[14]),
+      .p4_dpad_up(cont4_key_s[0]),
+      .p4_dpad_down(cont4_key_s[1]),
+      .p4_dpad_left(cont4_key_s[2]),
+      .p4_dpad_right(cont4_key_s[3]),
 
       // Settings
       .hide_overscan(hide_overscan),
       .mask_vid_edges(mask_vid_edges),
       .allow_extra_sprites(allow_extra_sprites),
       .selected_palette(selected_palette),
+
+      .multitap_enabled(multitap_enabled),
 
       // APF
       .ioctl_wr(ioctl_wr),
