@@ -22,8 +22,10 @@ module MAIN_NES (
     input wire       ioctl_download,
 
     // Save data
-    input wire sd_wr,
-    input wire [14:0] sd_buff_addr,
+    output wire has_save,
+    input wire sd_buff_wr,
+    input wire sd_buff_rd,
+    input wire [17:0] sd_buff_addr,
     output wire [7:0] sd_buff_din,
     input wire [7:0] sd_buff_dout,
 
@@ -63,7 +65,7 @@ module MAIN_NES (
   // Temp wires
   wire ioctl_addr = 0;
 
-  wire save_written;
+  // wire save_written;
 
   wire [127:0] status = 0;
 
@@ -99,12 +101,6 @@ module MAIN_NES (
   wire [7:0] ppu_dout;
   wire [7:0] ppu_din;
   wire refresh;
-
-  wire [17:0] bram_addr;
-  wire [7:0] bram_din;
-  wire [7:0] bram_dout;
-  wire bram_write;
-  wire bram_en;
 
   wire mapper_has_savestate;
   wire save_state = 0;
@@ -194,7 +190,7 @@ module MAIN_NES (
       .bram_dout    (bram_dout),
       .bram_write   (bram_write),
       .bram_override(bram_en),
-      .save_written (save_written),
+      // .save_written (save_written),
 
       // savestates
       .mapper_has_savestate (mapper_has_savestate),
@@ -296,6 +292,7 @@ module MAIN_NES (
   wire [3:0] prg_nvram = mapper_flags[34:31];
   wire loader_busy, loader_done, loader_fail;
   wire [9:0] prg_mask, chr_mask;
+  assign has_save = mapper_flags[25];
 
   GameLoader loader (
       .clk         (clk_ppu_21_47),
@@ -356,11 +353,11 @@ module MAIN_NES (
   //   reg [1:0] old_sys_type;
   //   always @(posedge clk_ppu_21_47) old_sys_type <= status[24:23];
 
-  //   wire [17:0] bram_addr;
-  //   wire [7:0] bram_din;
-  //   wire [7:0] bram_dout;
-  //   wire bram_write;
-  //   wire bram_en;
+  wire [17:0] bram_addr;
+  wire [7:0] bram_din;
+  wire [7:0] bram_dout;
+  wire bram_write;
+  wire bram_en;
   //   wire trigger;
   //   wire light;
 
@@ -406,12 +403,19 @@ module MAIN_NES (
   //   end
   // end
 
-  //   wire [24:0] ch2_addr = sleep_savestate ? Savestate_SDRAMAddr : {7'b0001111, save_addr};
-  //   wire ch2_wr = sleep_savestate ? Savestate_SDRAMWrEn : save_wr;
-  //   wire [7:0] ch2_din = sleep_savestate ? Savestate_SDRAMWriteData : sd_buff_dout;
-  //   wire ch2_rd = sleep_savestate ? Savestate_SDRAMRdEn : save_rd;
+  wire save_busy;
 
-  //   assign Savestate_SDRAMReadData = save_dout;
+  // SDRAM controller is stupid and only detects the rising edge of read and write
+  // iff the rising edge occurs on a non-busy cycle
+  wire save_wr = sd_buff_wr && ~save_busy;
+  wire save_rd = sd_buff_rd && ~save_busy;
+
+  wire [24:0] ch2_addr = sleep_savestate ? Savestate_SDRAMAddr : {7'b0001111, save_addr};
+  wire ch2_wr = sleep_savestate ? Savestate_SDRAMWrEn : save_wr;
+  wire [7:0] ch2_din = sleep_savestate ? Savestate_SDRAMWriteData : sd_buff_dout;
+  wire ch2_rd = sleep_savestate ? Savestate_SDRAMRdEn : save_rd;
+
+  assign Savestate_SDRAMReadData = save_dout;
 
   sdram sdram (
       // system interface
@@ -434,13 +438,12 @@ module MAIN_NES (
       .ch1_busy(),
 
       // reserved for backup ram save/load
-      // TODO: Add
-      // .ch2_addr   ( ch2_addr ),
-      // .ch2_wr     ( ch2_wr ),
-      // .ch2_din    ( ch2_din ),
-      // .ch2_rd     ( ch2_rd ),
-      // .ch2_dout   ( save_dout ),
-      // .ch2_busy   ( save_busy ),
+      .ch2_addr(ch2_addr),
+      .ch2_wr  (ch2_wr),
+      .ch2_din (ch2_din),
+      .ch2_rd  (ch2_rd),
+      .ch2_dout(save_dout),
+      .ch2_busy(save_busy),
 
       .refresh(refresh),
       .ss_in  (sdram_ss_in),
@@ -461,8 +464,10 @@ module MAIN_NES (
       .SDRAM_CKE(dram_cke)
   );
 
-  wire sd_ack = 1;
+  wire [7:0] save_dout;
+  assign sd_buff_din = bram_en ? eeprom_dout : save_dout;
 
+  wire [7:0] eeprom_dout;
   dpram #(" ", 11) eeprom (
       .clock_a(clk_85_9),
       .address_a(bram_addr),
@@ -473,9 +478,11 @@ module MAIN_NES (
       .clock_b(clk_ppu_21_47),
       .address_b(sd_buff_addr),
       .data_b(sd_buff_dout),
-      .wren_b(sd_wr & sd_ack),
-      .q_b(sd_buff_din)
+      .wren_b(sd_buff_wr),
+      .q_b(eeprom_dout)
   );
+
+  wire [17:0] save_addr = sd_buff_addr;
 
   wire hold_reset;
   // wire [1:0] nes_ce_video = corepaused ? videopause_ce : nes_ce;
@@ -515,6 +522,9 @@ module MAIN_NES (
       .B(video_b)
   );
 
+  // TODO: FDS save support
+  // wire [17:0] rom_sz = 0;
 
+  // wire [ 8:0] save_sz = fds ? rom_sz[17:9] : bram_en ? 9'd3 : (prg_nvram == 4'd7) ? 9'd15 : 9'd63;
 
 endmodule

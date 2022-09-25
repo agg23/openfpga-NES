@@ -29,7 +29,7 @@
 module data_loader #(
     // Upper 4 bits of address
     parameter ADDRESS_MASK_UPPER_4 = 0,
-    parameter ADDRESS_SIZE = 14,
+    parameter ADDRESS_SIZE = 28,
 
     // Number of clk_memory cycles to delay each write output
     // Min 4. Component will assert this value is within the valid range
@@ -54,7 +54,7 @@ module data_loader #(
 
     // These outputs are synced to the memory clock
     output reg write_en = 0,
-    output reg [ADDRESS_SIZE:0] write_addr = 0,
+    output reg [ADDRESS_SIZE-1:0] write_addr = 0,
     output reg [8 * OUTPUT_WORD_SIZE - 1:0] write_data = 0
 );
 
