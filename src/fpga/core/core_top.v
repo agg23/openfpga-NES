@@ -313,6 +313,21 @@ module core_top (
     end
   end
 
+  always @(posedge clk_74a) begin
+    if (bridge_wr) begin
+      casex (bridge_addr)
+        32'h00000200: begin
+          hide_overscan <= bridge_wr_data[0];
+        end
+        32'h00000204: begin
+          mask_vid_edges <= bridge_wr_data[1:0];
+        end
+        32'h00000208: begin
+          allow_extra_sprites <= bridge_wr_data[0];
+        end
+      endcase
+    end
+  end
 
   //
   // host/target command handler
@@ -419,6 +434,8 @@ module core_top (
 
   reg ioctl_download = 0;
 
+  wire has_save;
+
   always @(posedge clk_74a) begin
     if (dataslot_requestwrite) ioctl_download <= 1;
     else if (dataslot_allcomplete) ioctl_download <= 0;
@@ -508,8 +525,10 @@ module core_top (
       .write_data(sd_buff_dout)
   );
 
-  wire [15:0] audio;
-  wire has_save;
+  // Settings
+  reg hide_overscan;
+  reg [1:0] mask_vid_edges;
+  reg allow_extra_sprites;
 
   MAIN_NES nes (
       .clk_74a(clk_74a),
@@ -528,6 +547,11 @@ module core_top (
       .dpad_down(cont1_key[1]),
       .dpad_left(cont1_key[2]),
       .dpad_right(cont1_key[3]),
+
+      // Settings
+      .hide_overscan(hide_overscan),
+      .mask_vid_edges(mask_vid_edges),
+      .allow_extra_sprites(allow_extra_sprites),
 
       // APF
       .ioctl_wr(ioctl_wr),
@@ -588,16 +612,23 @@ module core_top (
   reg hs_prev;
   reg [2:0] hs_delay;
   reg vs_prev;
+  reg de_prev;
+
+  wire de = ~(h_blank || v_blank);
+  // TODO: Add PAL
+  wire [23:0] video_slot_rgb = {10'b0, hide_overscan, 10'b0, 3'b0};
 
   always @(posedge clk_video_5_37) begin
     video_hs_reg  <= 0;
     video_de_reg  <= 0;
     video_rgb_reg <= 24'h0;
 
-    if (~(h_blank || v_blank)) begin
+    if (de) begin
       video_de_reg  <= 1;
 
       video_rgb_reg <= video_rgb_nes;
+    end else if (de_prev && ~de) begin
+      video_rgb_reg <= video_slot_rgb;
     end
 
     if (hs_delay > 0) begin
@@ -617,7 +648,12 @@ module core_top (
     video_vs_reg <= ~vs_prev && video_vs_nes;
     hs_prev <= video_hs_nes;
     vs_prev <= video_vs_nes;
+    de_prev <= de;
   end
+
+  // Sound
+
+  wire [15:0] audio;
 
   sound_i2s sound_i2s (
       .clk_74a  (clk_74a),

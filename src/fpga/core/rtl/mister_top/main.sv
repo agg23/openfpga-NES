@@ -16,6 +16,11 @@ module MAIN_NES (
     input wire dpad_left,
     input wire dpad_right,
 
+    // Settings
+    input wire hide_overscan,
+    input wire [1:0] mask_vid_edges,
+    input wire allow_extra_sprites,
+
     // Data in
     input wire       ioctl_wr,
     input wire [7:0] ioctl_dout,
@@ -151,12 +156,12 @@ module MAIN_NES (
       .int_audio     (int_audio),
       .ext_audio     (ext_audio),
       // Video
-      .ex_sprites    (status[25]),
+      .ex_sprites    (allow_extra_sprites),
       .color         (color),
       .emphasis      (emphasis),
       .cycle         (cycle),
       .scanline      (scanline),
-      .mask          (status[28:27]),
+      .mask          (mask_vid_edges),
       // User Input
       .joypad_out    (joypad_out),
       .joypad_clock  (joypad_clock),
@@ -488,7 +493,6 @@ module MAIN_NES (
   // wire [1:0] nes_ce_video = corepaused ? videopause_ce : nes_ce;
   wire [1:0] nes_ce_video = nes_ce;
 
-  wire hide_overscan = 0;
   wire [3:0] palette2_osd = 0;
   wire pal_video = 0;
 
