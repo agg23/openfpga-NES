@@ -20,6 +20,7 @@ module MAIN_NES (
     input wire hide_overscan,
     input wire [1:0] mask_vid_edges,
     input wire allow_extra_sprites,
+    input wire [2:0] selected_palette,
 
     // Data in
     input wire       ioctl_wr,
@@ -493,7 +494,6 @@ module MAIN_NES (
   // wire [1:0] nes_ce_video = corepaused ? videopause_ce : nes_ce;
   wire [1:0] nes_ce_video = nes_ce;
 
-  wire [3:0] palette2_osd = 0;
   wire pal_video = 0;
 
   video video (
@@ -505,7 +505,7 @@ module MAIN_NES (
       .count_v(scanline),
       .count_h(cycle),
       .hide_overscan(hide_overscan),
-      .palette(palette2_osd),
+      .palette(selected_palette),
       // TODO: Custom palette loading not enabled
       // .load_color(pal_write && ioctl_download),
       // .load_color_data(pal_color),

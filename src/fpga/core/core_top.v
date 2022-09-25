@@ -325,6 +325,9 @@ module core_top (
         32'h00000208: begin
           allow_extra_sprites <= bridge_wr_data[0];
         end
+        32'h0000020C: begin
+          selected_palette <= bridge_wr_data[2:0];
+        end
       endcase
     end
   end
@@ -529,6 +532,7 @@ module core_top (
   reg hide_overscan;
   reg [1:0] mask_vid_edges;
   reg allow_extra_sprites;
+  reg [2:0] selected_palette;
 
   MAIN_NES nes (
       .clk_74a(clk_74a),
@@ -552,6 +556,7 @@ module core_top (
       .hide_overscan(hide_overscan),
       .mask_vid_edges(mask_vid_edges),
       .allow_extra_sprites(allow_extra_sprites),
+      .selected_palette(selected_palette),
 
       // APF
       .ioctl_wr(ioctl_wr),

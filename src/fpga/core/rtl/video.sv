@@ -10,7 +10,7 @@ module video
 	input  [8:0] count_h,
 	input  [8:0] count_v,
 	input        hide_overscan,
-	input  [3:0] palette,
+	input  [2:0] palette,
 	input  [2:0] emphasis,
 	input  [1:0] reticle,
 	input        pal_video,

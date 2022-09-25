@@ -80,6 +80,23 @@
         "writeonly": true,
         "defaultval": 0,
         "value": 1
+      },
+      {
+        "name": "Palette",
+        "id": 60,
+        "type": "slider_u32",
+        "enabled": true,
+        "address": "0x0000020C",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 1,
+        "graphical": {
+          "signed": false,
+          "min": 0,
+          "max": 4,
+          "adjust_small": 1,
+          "adjust_large": 1
+        }
       }
     ],
     "messages": []
