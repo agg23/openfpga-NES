@@ -577,6 +577,26 @@ module core_top (
 
   reg multitap_enabled;
 
+  wire hide_overscan_s;
+  wire [1:0] mask_vid_edges_s;
+  wire allow_extra_sprites_s;
+  wire [2:0] selected_palette_s;
+  wire multitap_enabled_s;
+
+  synch_3 #(
+      .WIDTH(8)
+  ) settings_s (
+      {hide_overscan, mask_vid_edges, allow_extra_sprites, selected_palette, multitap_enabled},
+      {
+        hide_overscan_s,
+        mask_vid_edges_s,
+        allow_extra_sprites_s,
+        selected_palette_s,
+        multitap_enabled_s
+      },
+      clk_ppu_21_47
+  );
+
   MAIN_NES nes (
       .clk_74a(clk_74a),
       .clk_ppu_21_47(clk_ppu_21_47),
@@ -623,12 +643,12 @@ module core_top (
       .p4_dpad_right(cont4_key_s[3]),
 
       // Settings
-      .hide_overscan(hide_overscan),
-      .mask_vid_edges(mask_vid_edges),
-      .allow_extra_sprites(allow_extra_sprites),
-      .selected_palette(selected_palette),
+      .hide_overscan(hide_overscan_s),
+      .mask_vid_edges(mask_vid_edges_s),
+      .allow_extra_sprites(allow_extra_sprites_s),
+      .selected_palette(selected_palette_s),
 
-      .multitap_enabled(multitap_enabled),
+      .multitap_enabled(multitap_enabled_s),
 
       // APF
       .ioctl_wr(ioctl_wr),
