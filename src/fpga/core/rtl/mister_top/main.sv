@@ -111,7 +111,7 @@ module MAIN_NES (
   wire gg_avail = 0;
 
   wire int_audio = 1;
-  wire ext_audio = 0;
+  wire ext_audio = 1;
 
   wire [5:0] color;
   wire [2:0] emphasis;

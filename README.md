@@ -20,6 +20,10 @@ Core supports four players/controllers via the Analogue Dock. To enable four pla
 
 Supports saves for most games and mappers. Saving on the NES is rather complicated due to the different scenarios for different mappers, so it's possible some less common mappers do not save correctly on this core. Please report all such issues to this repo
 
+### Expansion Audio
+
+Expansion audio should be fully supported. If you encounter a game that is not playing the expanded audio, please report it.
+
 ### Palette Options
 
 The core has 5 palette options built in, changable with a slider in `Core Settings`. The palettes are known as:
