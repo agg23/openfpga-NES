@@ -180,8 +180,13 @@ always @(posedge clk) begin
 	// number of 224 pixels, so we take off a proportional percentage from the sides to compensate.
 
 	if(pix_ce) begin
-		hblank <= (hc >= HBL_START) && (hc <= HBL_END);                // 280 pixels
-		vblank <= (vc >= VBL_START);                                   // 240 lines
+		if(hide_overscan) begin
+			hblank <= (hc >= HBL_START && hc <= HBL_END);                  // 280 - ((224/240) * 16) = 261.3
+			vblank <= (vc > (VBL_START - 9)) || (vc < 8);                  // 240 - 16 = 224
+		end else begin
+			hblank <= (hc >= HBL_START) && (hc <= HBL_END);                // 280 pixels
+			vblank <= (vc >= VBL_START);                                   // 240 lines
+		end
 		
 		if(hc == 279) begin
 			HSync <= 1;
@@ -205,20 +210,12 @@ wire [7:0] ri = pixel[23:16];
 wire [7:0] gi = pixel[15:8];
 wire [7:0] bi = pixel[7:0];
 
-wire in_overscan = hide_overscan ? (vc <= VBL_START && vc > VBL_START - 9) || vc < 8 : 0;
-
 reg [7:0] ro,go,bo;
 always @(posedge clk) if (pix_ce_n) begin
 	reg [2:0] emph;
-	if (in_overscan) begin
-		ro <= 0;
-		go <= 0;
-		bo <= 0;
-	end else begin
-		ro <= ri;
-		go <= gi;
-		bo <= bi;
-	end
+	ro <= ri;
+	go <= gi;
+	bo <= bi;
 	emph <= 0;
 	if (~&color_ef[3:1]) begin // Only applies in draw range
 		emph <= emphasis;
