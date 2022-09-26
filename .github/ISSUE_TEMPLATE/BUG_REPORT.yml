@@ -1,0 +1,67 @@
+#####################################################################
+# SPDX-License-Identifier: CC0-1.0
+# SPDX-FileType: OTHER
+# SPDX-FileCopyrightText: (c) 2022, OpenGateware authors and contributors, Adam Gastineau
+#####################################################################
+name: "Bug Report"
+description: "Let us know about an unexpected error, a crash, or incorrect behavior."
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please note that the issue tracker is intended for bug reports.
+        Make sure to [search for existing issues](https://github.com/agg23/openfpga-NES/issues) before filing a new one!
+
+  - type: input
+    id: version
+    attributes:
+      label: Version (or build number)
+      placeholder: "0.1.0"
+      description: |
+        You can find the version in the About section, when you open the core.
+
+        If you are not running the latest version, please try upgrading before reporting issues.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Please list the full steps required to reproduce the issue
+      placeholder: |
+        - Be precise
+        - Include exact data used during testing for easy reference
+        - The steps have to be in the exact order
+        - Mention pre-requisites when applicable
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: If you want to include screenshots, paste them into the markdown editor below or follow up with a separate comment.
+      placeholder: What were you expecting?
+    validations:
+      required: false
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual Behavior
+      placeholder: What happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug_context
+    attributes:
+      label: Additional Context
+      description: |
+        Are there anything unusual about your situation that we should know?
+    validations:
+      required: false
