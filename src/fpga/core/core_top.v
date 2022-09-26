@@ -709,11 +709,9 @@ module core_top (
   reg hs_prev;
   reg [2:0] hs_delay;
   reg vs_prev;
-  reg de_prev;
 
   wire de = ~(h_blank || v_blank);
   // TODO: Add PAL
-  wire [23:0] video_slot_rgb = {10'b0, hide_overscan, 10'b0, 3'b0};
 
   always @(posedge clk_video_5_37) begin
     video_hs_reg  <= 0;
@@ -724,8 +722,6 @@ module core_top (
       video_de_reg  <= 1;
 
       video_rgb_reg <= video_rgb_nes;
-    end else if (de_prev && ~de) begin
-      video_rgb_reg <= video_slot_rgb;
     end
 
     if (hs_delay > 0) begin
@@ -745,7 +741,6 @@ module core_top (
     video_vs_reg <= ~vs_prev && video_vs_nes;
     hs_prev <= video_hs_nes;
     vs_prev <= video_vs_nes;
-    de_prev <= de;
   end
 
   // Sound
