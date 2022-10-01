@@ -300,12 +300,8 @@ module core_top (
   // add your own devices here
   always @(*) begin
     casex (bridge_addr)
-      32'h00000000: begin
-        bridge_rd_data <= failure_count;
-      end
-      32'h10xxxxxx: begin
-        // example
-        // bridge_rd_data <= example_device_data;
+      default: begin
+        bridge_rd_data <= 0;
       end
       32'hF8xxxxxx: begin
         bridge_rd_data <= cmd_bridge_rd_data;
@@ -319,6 +315,27 @@ module core_top (
     end
   end
 
+  always @(posedge clk_74a) begin
+    if (bridge_wr) begin
+      casex (bridge_addr)
+        32'h00000200: begin
+          hide_overscan <= bridge_wr_data[0];
+        end
+        32'h00000204: begin
+          mask_vid_edges <= bridge_wr_data[1:0];
+        end
+        32'h00000208: begin
+          allow_extra_sprites <= bridge_wr_data[0];
+        end
+        32'h0000020C: begin
+          selected_palette <= bridge_wr_data[2:0];
+        end
+        32'h00000300: begin
+          multitap_enabled <= bridge_wr_data[0];
+        end
+      endcase
+    end
+  end
 
   //
   // host/target command handler
@@ -343,6 +360,8 @@ module core_top (
   wire dataslot_requestwrite_ok = 1;
 
   wire dataslot_allcomplete;
+
+
 
   wire savestate_supported = 1;
   wire [31:0] savestate_addr = 32'h40000000;
@@ -410,20 +429,37 @@ module core_top (
       .datatable_wren(datatable_wren),
       .datatable_data(datatable_data),
       .datatable_q   (datatable_q),
+
   );
 
   // bridge data slot access
 
-  wire [9:0] datatable_addr;
-  wire datatable_wren;
-  wire [31:0] datatable_data;
+  reg [9:0] datatable_addr;
+  reg datatable_wren;
+  reg [31:0] datatable_data;
   wire [31:0] datatable_q;
 
   reg ioctl_download = 0;
 
+  wire has_save;
+
   always @(posedge clk_74a) begin
     if (dataslot_requestwrite) ioctl_download <= 1;
     else if (dataslot_allcomplete) ioctl_download <= 0;
+  end
+
+  always @(posedge clk_74a or negedge pll_core_locked) begin
+    if (~pll_core_locked) begin
+      datatable_addr <= 0;
+      datatable_data <= 0;
+      datatable_wren <= 0;
+    end else begin
+      // Write sram size
+      datatable_wren <= 1;
+      datatable_data <= has_save ? 32'h40000 : 32'h0;
+      // Data slot index 1, not id 1
+      datatable_addr <= 1 * 2 + 1;
+    end
   end
 
   // Data Loader 8
@@ -448,18 +484,21 @@ module core_top (
 
   wire [31:0] sd_read_data;
 
-  wire sd_wr;
+  wire sd_buff_wr;
+  wire sd_buff_rd;
 
-  wire [14:0] sd_buff_addr_in;
-  wire [14:0] sd_buff_addr_out;
+  wire [17:0] sd_buff_addr_in;
+  wire [17:0] sd_buff_addr_out;
 
-  wire [14:0] sd_buff_addr = sd_wr ? sd_buff_addr_in : sd_buff_addr_out;
+  wire [17:0] sd_buff_addr = sd_buff_wr ? sd_buff_addr_in : sd_buff_addr_out;
 
   wire [7:0] sd_buff_din;
   wire [7:0] sd_buff_dout;
 
   data_unloader #(
-      .ADDRESS_MASK_UPPER_4(4'h2)
+      .ADDRESS_MASK_UPPER_4(4'h2),
+      .ADDRESS_SIZE(18),
+      .READ_MEM_CLOCK_DELAY(7)
   ) save_data_unloader (
       .clk_74a(clk_74a),
       .clk_memory(clk_ppu_21_47),
@@ -469,13 +508,16 @@ module core_top (
       .bridge_addr(bridge_addr),
       .bridge_rd_data(sd_read_data),
 
-      // .read_en  (sd_rd), // Unused
+      .read_en  (sd_buff_rd),
       .read_addr(sd_buff_addr_out),
       .read_data(sd_buff_din)
   );
 
   data_loader #(
-      .ADDRESS_MASK_UPPER_4(4'h2)
+      .ADDRESS_MASK_UPPER_4(4'h2),
+      .ADDRESS_SIZE(18),
+      .WRITE_MEM_CLOCK_DELAY(7),
+      .WRITE_MEM_EN_CYCLE_LENGTH(3)
   ) save_data_loader (
       .clk_74a(clk_74a),
       .clk_memory(clk_ppu_21_47),
@@ -485,7 +527,7 @@ module core_top (
       .bridge_addr(bridge_addr),
       .bridge_wr_data(bridge_wr_data),
 
-      .write_en  (sd_wr),
+      .write_en  (sd_buff_wr),
       .write_addr(sd_buff_addr_in),
       .write_data(sd_buff_dout)
   );
@@ -623,7 +665,73 @@ module core_top (
 
   // Core
 
-  wire [15:0] audio;
+  wire [15:0] cont1_key_s;
+  wire [15:0] cont2_key_s;
+  wire [15:0] cont3_key_s;
+  wire [15:0] cont4_key_s;
+  wire [31:0] cont1_joy_s;
+
+  synch_3 #(
+      .WIDTH(32)
+  ) cont1_s (
+      cont1_key,
+      cont1_key_s,
+      clk_ppu_21_47
+  );
+
+  synch_3 #(
+      .WIDTH(32)
+  ) cont2_s (
+      cont2_key,
+      cont2_key_s,
+      clk_ppu_21_47
+  );
+
+  synch_3 #(
+      .WIDTH(32)
+  ) cont3_s (
+      cont3_key,
+      cont3_key_s,
+      clk_ppu_21_47
+  );
+
+  synch_3 #(
+      .WIDTH(32)
+  ) cont4_s (
+      cont4_key,
+      cont4_key_s,
+      clk_ppu_21_47
+  );
+
+  // Settings
+  reg hide_overscan;
+  reg [1:0] mask_vid_edges;
+  reg allow_extra_sprites;
+  reg [2:0] selected_palette;
+
+  reg multitap_enabled;
+
+  wire hide_overscan_s;
+  wire [1:0] mask_vid_edges_s;
+  wire allow_extra_sprites_s;
+  wire [2:0] selected_palette_s;
+  wire multitap_enabled_s;
+
+
+
+  synch_3 #(
+      .WIDTH(8)
+  ) settings_s (
+      {hide_overscan, mask_vid_edges, allow_extra_sprites, selected_palette, multitap_enabled},
+      {
+        hide_overscan_s,
+        mask_vid_edges_s,
+        allow_extra_sprites_s,
+        selected_palette_s,
+        multitap_enabled_s
+      },
+      clk_ppu_21_47
+  );
 
   wire pause = savestate_start_busy || ss_busy;
 
@@ -637,14 +745,49 @@ module core_top (
       .pause(pause),
 
       // Input
-      .button_a(cont1_key[4]),
-      .button_b(cont1_key[5]),
-      .button_start(cont1_key[15]),
-      .button_select(cont1_key[14]),
-      .dpad_up(cont1_key[0]),
-      .dpad_down(cont1_key[1]),
-      .dpad_left(cont1_key[2]),
-      .dpad_right(cont1_key[3]),
+      .p1_button_a(cont1_key_s[4]),
+      .p1_button_b(cont1_key_s[5]),
+      .p1_button_start(cont1_key_s[15]),
+      .p1_button_select(cont1_key_s[14]),
+      .p1_dpad_up(cont1_key_s[0]),
+      .p1_dpad_down(cont1_key_s[1]),
+      .p1_dpad_left(cont1_key_s[2]),
+      .p1_dpad_right(cont1_key_s[3]),
+
+      .p2_button_a(cont2_key_s[4]),
+      .p2_button_b(cont2_key_s[5]),
+      .p2_button_start(cont2_key_s[15]),
+      .p2_button_select(cont2_key_s[14]),
+      .p2_dpad_up(cont2_key_s[0]),
+      .p2_dpad_down(cont2_key_s[1]),
+      .p2_dpad_left(cont2_key_s[2]),
+      .p2_dpad_right(cont2_key_s[3]),
+
+      .p3_button_a(cont3_key_s[4]),
+      .p3_button_b(cont3_key_s[5]),
+      .p3_button_start(cont3_key_s[15]),
+      .p3_button_select(cont3_key_s[14]),
+      .p3_dpad_up(cont3_key_s[0]),
+      .p3_dpad_down(cont3_key_s[1]),
+      .p3_dpad_left(cont3_key_s[2]),
+      .p3_dpad_right(cont3_key_s[3]),
+
+      .p4_button_a(cont4_key_s[4]),
+      .p4_button_b(cont4_key_s[5]),
+      .p4_button_start(cont4_key_s[15]),
+      .p4_button_select(cont4_key_s[14]),
+      .p4_dpad_up(cont4_key_s[0]),
+      .p4_dpad_down(cont4_key_s[1]),
+      .p4_dpad_left(cont4_key_s[2]),
+      .p4_dpad_right(cont4_key_s[3]),
+
+      // Settings
+      .hide_overscan(hide_overscan_s),
+      .mask_vid_edges(mask_vid_edges_s),
+      .allow_extra_sprites(allow_extra_sprites_s),
+      .selected_palette(selected_palette_s),
+
+      .multitap_enabled(multitap_enabled_s),
 
       // APF
       .ioctl_wr(ioctl_wr),
@@ -652,7 +795,9 @@ module core_top (
       .ioctl_download(ioctl_download),
 
       // Save data
-      .sd_wr(sd_wr),
+      .has_save(has_save),
+      .sd_buff_wr(sd_buff_wr),
+      .sd_buff_rd(sd_buff_rd),
       .sd_buff_addr(sd_buff_addr),
       .sd_buff_din(sd_buff_din),
       .sd_buff_dout(sd_buff_dout),
@@ -717,16 +862,23 @@ module core_top (
   reg hs_prev;
   reg [2:0] hs_delay;
   reg vs_prev;
+  reg de_prev;
+
+  wire de = ~(h_blank || v_blank);
+  // TODO: Add PAL
+  wire [23:0] video_slot_rgb = {10'b0, hide_overscan, 10'b0, 3'b0};
 
   always @(posedge clk_video_5_37) begin
     video_hs_reg  <= 0;
     video_de_reg  <= 0;
     video_rgb_reg <= 24'h0;
 
-    if (~(h_blank || v_blank)) begin
+    if (de) begin
       video_de_reg  <= 1;
 
       video_rgb_reg <= video_rgb_nes;
+    end else if (de_prev && ~de) begin
+      video_rgb_reg <= video_slot_rgb;
     end
 
     if (hs_delay > 0) begin
@@ -746,7 +898,12 @@ module core_top (
     video_vs_reg <= ~vs_prev && video_vs_nes;
     hs_prev <= video_hs_nes;
     vs_prev <= video_vs_nes;
+    de_prev <= de;
   end
+
+  // Sound
+
+  wire [15:0] audio;
 
   sound_i2s sound_i2s (
       .clk_74a  (clk_74a),
@@ -761,7 +918,6 @@ module core_top (
   );
 
   ///////////////////////////////////////////////
-
 
   wire clk_85_9;
   wire clk_ppu_21_47;

@@ -3,12 +3,12 @@
     "magic": "APF_VER_1",
     "metadata": {
       "platform_ids": ["nes"],
-      "shortname": "nes",
-      "description": "Nintendo Entertainment System",
+      "shortname": "NES",
+      "description": "Nintendo Entertainment System and Famicom. Nintendo's first home console",
       "author": "agg23",
       "url": "https://github.com/agg23/openFPGA-NES",
-      "version": "0.1.0-pre",
-      "date_release": "2022-09-20"
+      "version": "0.1.1",
+      "date_release": "2022-09-26"
     },
     "framework": {
       "target_product": "Analogue Pocket",

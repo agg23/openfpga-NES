@@ -1,0 +1,24 @@
+#####################################################################
+# SPDX-License-Identifier: CC0-1.0
+# SPDX-FileType: OTHER
+# SPDX-FileCopyrightText: (c) 2022, OpenGateware authors and contributors, Adam Gastineau
+#####################################################################
+name: "Question"
+description: "Ask a question about the project."
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please note that the issue tracker is intended for bug reports.
+        Make sure to [search for existing issues](https://github.com/agg23/openfpga-NES/issues) before filing a new one!
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Ask a question
+      placeholder: |
+        Ask your question here! Please keep the questions related to the core only.
+    validations:
+      required: true

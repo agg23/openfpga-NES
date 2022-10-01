@@ -8,14 +8,49 @@ module MAIN_NES (
     input wire pause,
 
     // Inputs
-    input wire button_a,
-    input wire button_b,
-    input wire button_start,
-    input wire button_select,
-    input wire dpad_up,
-    input wire dpad_down,
-    input wire dpad_left,
-    input wire dpad_right,
+    input wire p1_button_a,
+    input wire p1_button_b,
+    input wire p1_button_start,
+    input wire p1_button_select,
+    input wire p1_dpad_up,
+    input wire p1_dpad_down,
+    input wire p1_dpad_left,
+    input wire p1_dpad_right,
+
+    input wire p2_button_a,
+    input wire p2_button_b,
+    input wire p2_button_start,
+    input wire p2_button_select,
+    input wire p2_dpad_up,
+    input wire p2_dpad_down,
+    input wire p2_dpad_left,
+    input wire p2_dpad_right,
+
+    input wire p3_button_a,
+    input wire p3_button_b,
+    input wire p3_button_start,
+    input wire p3_button_select,
+    input wire p3_dpad_up,
+    input wire p3_dpad_down,
+    input wire p3_dpad_left,
+    input wire p3_dpad_right,
+
+    input wire p4_button_a,
+    input wire p4_button_b,
+    input wire p4_button_start,
+    input wire p4_button_select,
+    input wire p4_dpad_up,
+    input wire p4_dpad_down,
+    input wire p4_dpad_left,
+    input wire p4_dpad_right,
+
+    // Settings
+    input wire hide_overscan,
+    input wire [1:0] mask_vid_edges,
+    input wire allow_extra_sprites,
+    input wire [2:0] selected_palette,
+
+    input wire multitap_enabled,
 
     // Data in
     input wire       ioctl_wr,
@@ -23,8 +58,10 @@ module MAIN_NES (
     input wire       ioctl_download,
 
     // Save data
-    input wire sd_wr,
-    input wire [14:0] sd_buff_addr,
+    output wire has_save,
+    input wire sd_buff_wr,
+    input wire sd_buff_rd,
+    input wire [17:0] sd_buff_addr,
     output wire [7:0] sd_buff_din,
     input wire [7:0] sd_buff_dout,
 
@@ -78,60 +115,54 @@ module MAIN_NES (
   // Temp wires
   wire ioctl_addr = 0;
 
-  wire [127:0] status = 0;
+  wire                               [127:0] status = 0;
 
-  wire [1:0] nes_ce;
+  wire                               [  1:0]                       nes_ce;
 
   wire gg_code = 0;
   wire gg_reset = 0;
   wire gg_avail = 0;
 
   wire int_audio = 1;
-  wire ext_audio = 0;
+  wire ext_audio = 1;
 
-  wire [5:0] color;
-  wire [2:0] emphasis;
-  wire [8:0] cycle;
-  wire [8:0] scanline;
+  wire                               [  5:0]                       color;
+  wire                               [  2:0]                       emphasis;
+  wire                               [  8:0]                       cycle;
+  wire                               [  8:0]                       scanline;
 
-  wire [1:0] diskside;
+  wire                               [  1:0]                       diskside;
   wire fds_busy = 0;
   wire fds_eject = 0;
   wire fds_auto_eject = 0;
-  wire [1:0] max_diskside = 0;
+  wire                               [  1:0] max_diskside = 0;
 
-  wire [24:0] cpu_addr;
-  wire cpu_read;
-  wire cpu_write;
-  wire [7:0] cpu_dout;
-  wire [7:0] cpu_din;
+  wire                               [ 24:0]                       cpu_addr;
+  wire                                                             cpu_read;
+  wire                                                             cpu_write;
+  wire                               [  7:0]                       cpu_dout;
+  wire                               [  7:0]                       cpu_din;
 
-  wire [21:0] ppu_addr;
-  wire ppu_read;
-  wire ppu_write;
-  wire [7:0] ppu_dout;
-  wire [7:0] ppu_din;
-  wire refresh;
+  wire                               [ 21:0]                       ppu_addr;
+  wire                                                             ppu_read;
+  wire                                                             ppu_write;
+  wire                               [  7:0]                       ppu_dout;
+  wire                               [  7:0]                       ppu_din;
+  wire                                                             refresh;
 
-  wire [17:0] bram_addr;
-  wire [7:0] bram_din;
-  wire [7:0] bram_dout;
-  wire bram_write;
-  wire bram_en;
-
-  wire mapper_has_savestate;
+  wire                                                             mapper_has_savestate;
   wire save_state = 0;
   wire load_state = 0;
-  wire [1:0] savestate_number = 0;
-  wire state_loaded;
+  wire                               [  1:0] savestate_number = 0;
+  wire                                                             state_loaded;
 
   wire downloading = ioctl_download;
 
   // pause
-  reg       pausecore;
-  reg [1:0] videopause_ce;
-  wire      corepaused;
-  wire      sleep_savestate;
+  reg                                                              pausecore;
+  reg                                [  1:0]                       videopause_ce;
+  wire                                                             corepaused;
+  wire                                                             sleep_savestate;
 
   always_ff @(posedge clk_ppu_21_47) begin
     pausecore <= sleep_savestate | (!ioctl_download && !reset_nes);
@@ -162,17 +193,17 @@ module MAIN_NES (
       .int_audio     (int_audio),
       .ext_audio     (ext_audio),
       // Video
-      .ex_sprites    (status[25]),
+      .ex_sprites    (allow_extra_sprites),
       .color         (color),
       .emphasis      (emphasis),
       .cycle         (cycle),
       .scanline      (scanline),
-      .mask          (status[28:27]),
+      .mask          (mask_vid_edges),
       // User Input
       .joypad_out    (joypad_out),
       .joypad_clock  (joypad_clock),
       .joypad1_data  (joypad1_data),
-      .joypad2_data  (0),                                      // TODO: Disabled
+      .joypad2_data  (joypad2_data),
 
       .diskside      (diskside),
       .fds_busy      (fds_busy),
@@ -201,7 +232,7 @@ module MAIN_NES (
       .bram_dout    (bram_dout),
       .bram_write   (bram_write),
       .bram_override(bram_en),
-      .save_written (save_written),
+      // .save_written (save_written),
 
       // savestates
       .mapper_has_savestate (mapper_has_savestate),
@@ -240,15 +271,59 @@ module MAIN_NES (
   wire [2:0] joypad_out;
   wire [1:0] joypad_clock;
   reg [23:0] joypad_bits;
+  reg [23:0] joypad_bits2;
   reg [1:0] last_joypad_clock;
+  wire joy_swap = 0;
 
   wire mic = 0;
   wire paddle_en = 0;
   wire paddle_btn = 0;
   wire [4:0] joypad1_data = {2'b0, mic, paddle_en & paddle_btn, joypad_bits[0]};
+  // Upper 4 bits are other peripherals
+  wire [4:0] joypad2_data = {4'b0, joypad_bits2[0]};
 
   wire [7:0] nes_joy_A = {
-    dpad_right, dpad_left, dpad_down, dpad_up, button_start, button_select, button_b, button_a
+    p1_dpad_right,
+    p1_dpad_left,
+    p1_dpad_down,
+    p1_dpad_up,
+    p1_button_start,
+    p1_button_select,
+    p1_button_b,
+    p1_button_a
+  };
+
+  wire [7:0] nes_joy_B = {
+    p2_dpad_right,
+    p2_dpad_left,
+    p2_dpad_down,
+    p2_dpad_up,
+    p2_button_start,
+    p2_button_select,
+    p2_button_b,
+    p2_button_a
+  };
+
+  wire [7:0] nes_joy_C = {
+    p3_dpad_right,
+    p3_dpad_left,
+    p3_dpad_down,
+    p3_dpad_up,
+    p3_button_start,
+    p3_button_select,
+    p3_button_b,
+    p3_button_a
+  };
+
+  wire [7:0] nes_joy_D = {
+    p4_dpad_right,
+    p4_dpad_left,
+    p4_dpad_down,
+    p4_dpad_up,
+    p4_button_start,
+    p4_button_select,
+    p4_button_b,
+    p4_button_a
   };
 
   always @(posedge clk_ppu_21_47) begin
@@ -260,10 +335,13 @@ module MAIN_NES (
       last_joypad_clock <= 0;
     end else begin
       if (joypad_out[0]) begin
-        joypad_bits <= nes_joy_A;
-        // joypad_bits2 <= {
-        //   status[10] ? {8'h04, nes_joy_D} : 16'hFFFF, joy_swap ? nes_joy_A : nes_joy_B
-        // };
+        joypad_bits <= {
+          multitap_enabled ? {8'h08, nes_joy_C} : 16'hFFFF, joy_swap ? nes_joy_B : nes_joy_A
+        };
+        joypad_bits2 <= {
+          multitap_enabled ? {8'h04, nes_joy_D} : 16'hFFFF, joy_swap ? nes_joy_A : nes_joy_B
+        };
+
         // joypad_d4 <= paddle_en ? paddle_nes : {4'b1111, powerpad[7], powerpad[11], powerpad[2], powerpad[3]};
         // joypad_d3 <= {
         //   powerpad[6],
@@ -279,11 +357,11 @@ module MAIN_NES (
       if (!joypad_clock[0] && last_joypad_clock[0]) begin
         joypad_bits <= {1'b0, joypad_bits[23:1]};
       end
-      // if (!joypad_clock[1] && last_joypad_clock[1]) begin
-      //   joypad_bits2 <= {1'b0, joypad_bits2[23:1]};
-      //   joypad_d4 <= {~paddle_en, joypad_d4[7:1]};
-      //   joypad_d3 <= {1'b1, joypad_d3[7:1]};
-      // end
+      if (!joypad_clock[1] && last_joypad_clock[1]) begin
+        joypad_bits2 <= {1'b0, joypad_bits2[23:1]};
+        // joypad_d4 <= {~paddle_en, joypad_d4[7:1]};
+        // joypad_d3 <= {1'b1, joypad_d3[7:1]};
+      end
       last_joypad_clock <= joypad_clock;
     end
   end
@@ -305,6 +383,7 @@ module MAIN_NES (
   wire [3:0] prg_nvram = mapper_flags[34:31];
   wire loader_busy, loader_done, loader_fail;
   wire [9:0] prg_mask, chr_mask;
+  assign has_save = mapper_flags[25];
 
   GameLoader loader (
       .clk         (clk_ppu_21_47),
@@ -365,11 +444,11 @@ module MAIN_NES (
   //   reg [1:0] old_sys_type;
   //   always @(posedge clk_ppu_21_47) old_sys_type <= status[24:23];
 
-  //   wire [17:0] bram_addr;
-  //   wire [7:0] bram_din;
-  //   wire [7:0] bram_dout;
-  //   wire bram_write;
-  //   wire bram_en;
+  wire [17:0] bram_addr;
+  wire [7:0] bram_din;
+  wire [7:0] bram_dout;
+  wire bram_write;
+  wire bram_en;
   //   wire trigger;
   //   wire light;
 
@@ -411,6 +490,13 @@ module MAIN_NES (
   //     //   end
   //   end
   // end
+
+  wire save_busy;
+
+  // SDRAM controller is stupid and only detects the rising edge of read and write
+  // iff the rising edge occurs on a non-busy cycle
+  wire save_wr = sd_buff_wr && ~save_busy;
+  wire save_rd = sd_buff_rd && ~save_busy;
 
   // sleep_savestate is set by NES core to indicate save state transition is occuring
   // Savestate_* is set by the NES core to control SDRAM for state
@@ -469,8 +555,12 @@ module MAIN_NES (
       .SDRAM_CKE(dram_cke)
   );
 
+  wire [7:0] save_dout;
+  assign sd_buff_din = bram_en ? eeprom_dout : save_dout;
+
   wire sd_ack = 1;
 
+  wire [7:0] eeprom_dout;
   dpram #(" ", 11) save_ram (
       .clock_a(clk_85_9),
       .address_a(bram_addr),
@@ -481,9 +571,11 @@ module MAIN_NES (
       .clock_b(clk_ppu_21_47),
       .address_b(sd_buff_addr),
       .data_b(sd_buff_dout),
-      .wren_b(sd_wr & sd_ack),
-      .q_b(sd_buff_din)
+      .wren_b(sd_buff_wr && sd_ack),
+      .q_b(eeprom_dout)
   );
+
+  wire [17:0] save_addr = sd_buff_addr;
 
   ///////////////////////////// savestates /////////////////////////////////
 
@@ -524,41 +616,35 @@ module MAIN_NES (
   assign SS_Ext_BACK[15:0]  = sdram_ss_out;
   assign SS_Ext_BACK[63:16] = 48'b0;  // free to be used
 
-  wire save_busy;
-  reg save_rd, save_wr;
-  reg save_wait;
-  reg [17:0] save_addr;
-
   wire bk_busy = 0;
   wire bk_loading = 0;
   wire [8:0] sd_lba = 0;
-  wire sd_buff_wr = 0;
   wire OSD_STATUS = 0;
   wire bk_state = 0;
 
-  always @(posedge clk_ppu_21_47) begin
+  // always @(posedge clk_ppu_21_47) begin
 
-    if (~save_busy & ~save_rd & ~save_wr) save_wait <= 0;
+  //   if (~save_busy & ~save_rd & ~save_wr) save_wait <= 0;
 
-    if (~bk_busy) begin
-      save_addr <= '1;
-      save_wait <= 0;
-    end else if (sd_ack & ~save_busy) begin
-      if (~bk_loading && (save_addr != {sd_lba[8:0], sd_buff_addr})) begin
-        save_rd   <= 1;
-        save_addr <= {sd_lba[8:0], sd_buff_addr};
-        save_wait <= 1;
-      end
-      if (bk_loading && sd_buff_wr) begin
-        save_wr   <= 1;
-        save_addr <= {sd_lba[8:0], sd_buff_addr};
-        save_wait <= 1;
-      end
-    end
-    if (~bk_busy | save_busy | bram_en) {save_rd, save_wr} <= 0;
-  end
+  //   if (~bk_busy) begin
+  //     save_addr <= '1;
+  //     save_wait <= 0;
+  //   end else if (sd_ack & ~save_busy) begin
+  //     if (~bk_loading && (save_addr != {sd_lba[8:0], sd_buff_addr})) begin
+  //       save_rd   <= 1;
+  //       save_addr <= {sd_lba[8:0], sd_buff_addr};
+  //       save_wait <= 1;
+  //     end
+  //     if (bk_loading && sd_buff_wr) begin
+  //       save_wr   <= 1;
+  //       save_addr <= {sd_lba[8:0], sd_buff_addr};
+  //       save_wait <= 1;
+  //     end
+  //   end
+  //   if (~bk_busy | save_busy | bram_en) {save_rd, save_wr} <= 0;
+  // end
 
-  reg  bk_pending;
+  reg bk_pending;
   wire save_written;
   always @(posedge clk) begin
     if ((mapper_flags[25] || fds) && ~OSD_STATUS && save_written) bk_pending <= 1'b1;
@@ -566,12 +652,9 @@ module MAIN_NES (
   end
 
   // Video
-
   wire hold_reset;
   wire [1:0] nes_ce_video = corepaused ? videopause_ce : nes_ce;
 
-  wire hide_overscan = 0;
-  wire [3:0] palette2_osd = 0;
   wire pal_video = 0;
 
   video video (
@@ -583,7 +666,7 @@ module MAIN_NES (
       .count_v(scanline),
       .count_h(cycle),
       .hide_overscan(hide_overscan),
-      .palette(palette2_osd),
+      .palette(selected_palette),
       // TODO: Custom palette loading not enabled
       // .load_color(pal_write && ioctl_download),
       // .load_color_data(pal_color),
@@ -604,6 +687,9 @@ module MAIN_NES (
       .B(video_b)
   );
 
+  // TODO: FDS save support
+  // wire [17:0] rom_sz = 0;
 
+  // wire [ 8:0] save_sz = fds ? rom_sz[17:9] : bram_en ? 9'd3 : (prg_nvram == 4'd7) ? 9'd15 : 9'd63;
 
 endmodule

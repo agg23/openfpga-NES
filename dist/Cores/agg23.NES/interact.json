@@ -1,7 +1,115 @@
 {
-    "interact": {
-        "magic": "APF_VER_1",
-        "variables": [],
-        "messages": []
-    }
+  "interact": {
+    "magic": "APF_VER_1",
+    "variables": [
+      {
+        "name": "Use Multitap",
+        "id": 20,
+        "type": "check",
+        "enabled": true,
+        "address": "0x00000300",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
+        "name": "Hide Overscan",
+        "id": 40,
+        "type": "check",
+        "enabled": true,
+        "address": "0x00000200",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 1,
+        "value": 1
+      },
+      {
+        "name": "Edge Masking",
+        "id": 41,
+        "type": "action",
+        "enabled": false
+      },
+      {
+        "name": "No Masking",
+        "id": 42,
+        "group": 3,
+        "type": "radio",
+        "enabled": true,
+        "address": "0x00000204",
+        "persist": true,
+        "writeonly": true,
+        "value": 0
+      },
+      {
+        "name": "Mask Left",
+        "id": 43,
+        "group": 3,
+        "type": "radio",
+        "enabled": true,
+        "address": "0x00000204",
+        "writeonly": true,
+        "persist": true,
+        "value": 1
+      },
+      {
+        "name": "Mask Both",
+        "id": 44,
+        "group": 3,
+        "type": "radio",
+        "enabled": true,
+        "address": "0x00000204",
+        "writeonly": true,
+        "persist": true,
+        "value": 2
+      },
+      {
+        "name": "Auto Masking",
+        "id": 45,
+        "group": 3,
+        "type": "radio",
+        "enabled": true,
+        "address": "0x00000204",
+        "writeonly": true,
+        "persist": true,
+        "defaultval": 1,
+        "value": 3
+      },
+      {
+        "name": "--------------",
+        "id": 46,
+        "type": "action",
+        "enabled": false
+      },
+      {
+        "name": "Extra Sprites",
+        "id": 48,
+        "type": "check",
+        "enabled": true,
+        "address": "0x00000208",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
+        "name": "Palette",
+        "id": 60,
+        "type": "slider_u32",
+        "enabled": true,
+        "address": "0x0000020C",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 1,
+        "graphical": {
+          "signed": false,
+          "min": 0,
+          "max": 4,
+          "adjust_small": 1,
+          "adjust_large": 1
+        }
+      }
+    ],
+    "messages": []
+  }
 }
