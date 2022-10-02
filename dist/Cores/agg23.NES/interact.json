@@ -108,6 +108,40 @@
           "adjust_small": 1,
           "adjust_large": 1
         }
+      },
+      {
+        "name": "Lightgun Options",
+        "id": 30,
+        "type": "action",
+        "enabled": false
+      },
+      {
+        "name": "Use Zapper",
+        "id": 31,
+        "type": "check",
+        "enabled": true,
+        "address": "0x00000304",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
+        "name": "D-Pad Aim Speed",
+        "id": 32,
+        "type": "slider_u32",
+        "enabled": true,
+        "address": "0x00000308",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 3,
+        "graphical": {
+          "signed": false,
+          "min": 1,
+          "max": 10,
+          "adjust_small": 1,
+          "adjust_large": 4
+        }
       }
     ],
     "messages": []

@@ -331,6 +331,12 @@ module core_top (
         32'h00000300: begin
           multitap_enabled <= bridge_wr_data[0];
         end
+        32'h00000304: begin
+          lightgun_enabled <= bridge_wr_data[0];
+        end
+        32'h00000308: begin
+          lightgun_dpad_aim_speed <= bridge_wr_data[7:0];
+        end
       endcase
     end
   end
@@ -569,30 +575,52 @@ module core_top (
       clk_ppu_21_47
   );
 
+  synch_3 #(
+      .WIDTH(32)
+  ) joy1_s (
+      cont1_joy,
+      cont1_joy_s,
+      clk_ppu_21_47
+  );
+
   // Settings
   reg hide_overscan;
   reg [1:0] mask_vid_edges;
   reg allow_extra_sprites;
   reg [2:0] selected_palette;
-
+  
   reg multitap_enabled;
+  reg lightgun_enabled;
+  reg [7:0] lightgun_dpad_aim_speed;
 
   wire hide_overscan_s;
   wire [1:0] mask_vid_edges_s;
   wire allow_extra_sprites_s;
   wire [2:0] selected_palette_s;
+  
   wire multitap_enabled_s;
+  wire lightgun_enabled_s;
+  wire [7:0]lightgun_dpad_aim_speed_s;
 
   synch_3 #(
-      .WIDTH(8)
+      .WIDTH(16)
   ) settings_s (
-      {hide_overscan, mask_vid_edges, allow_extra_sprites, selected_palette, multitap_enabled},
+      {
+        hide_overscan,
+        mask_vid_edges,
+        allow_extra_sprites,
+        selected_palette,
+        multitap_enabled,
+        lightgun_enabled,
+        lightgun_dpad_aim_speed},
       {
         hide_overscan_s,
         mask_vid_edges_s,
         allow_extra_sprites_s,
         selected_palette_s,
-        multitap_enabled_s
+        multitap_enabled_s,
+        lightgun_enabled_s,
+        lightgun_dpad_aim_speed_s
       },
       clk_ppu_21_47
   );
@@ -614,6 +642,9 @@ module core_top (
       .p1_dpad_down(cont1_key_s[1]),
       .p1_dpad_left(cont1_key_s[2]),
       .p1_dpad_right(cont1_key_s[3]),
+
+      .p1_lstick_x(cont1_joy_s[7:0]),
+      .p1_lstick_y(cont1_joy_s[15:8]),
 
       .p2_button_a(cont2_key_s[4]),
       .p2_button_b(cont2_key_s[5]),
@@ -649,6 +680,8 @@ module core_top (
       .selected_palette(selected_palette_s),
 
       .multitap_enabled(multitap_enabled_s),
+      .lightgun_enabled(lightgun_enabled_s),
+      .lightgun_dpad_aim_speed(lightgun_dpad_aim_speed_s),
 
       // APF
       .ioctl_wr(ioctl_wr),
