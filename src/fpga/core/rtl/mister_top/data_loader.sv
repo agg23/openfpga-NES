@@ -102,12 +102,13 @@ module data_loader #(
 
   /// APF to Mem clock
 
-  reg prev_bridge_wr = 0;
-  reg [2:0] write_count = 0;
-  reg [2:0] write_state = 0;
-
+  localparam WRITE_NONE = 0;
   localparam WRITE_START = 1;
   localparam WRITE_REQ_SHIFT = 2;
+
+  reg prev_bridge_wr = 0;
+  reg [2:0] write_count = 0;
+  reg [2:0] write_state = WRITE_NONE;
 
   // Receive APF writes and buffer them into the memory clock domain
   always @(posedge clk_74a) begin
@@ -143,7 +144,7 @@ module data_loader #(
 
         if (write_count == (4 / OUTPUT_WORD_SIZE) - 1) begin
           // Finished write
-          write_state <= 0;
+          write_state <= WRITE_NONE;
         end else begin
           write_state <= WRITE_START;
         end

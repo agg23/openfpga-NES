@@ -361,24 +361,22 @@ module core_top (
 
   wire dataslot_allcomplete;
 
-
-
   wire savestate_supported = 1;
   wire [31:0] savestate_addr = 32'h40000000;
-  wire [31:0] savestate_size = 32'h100000;
+  wire [31:0] savestate_size = 32'h400000;
   wire [31:0] savestate_maxloadsize = savestate_size;
 
   wire savestate_start;
-  reg savestate_start_ack;
-  reg savestate_start_busy;
-  reg savestate_start_ok;
-  reg savestate_start_err;
+  reg savestate_start_ack = 0;
+  reg savestate_start_busy = 0;
+  reg savestate_start_ok = 0;
+  reg savestate_start_err = 0;
 
   wire savestate_load;
-  wire savestate_load_ack;
-  wire savestate_load_busy;
-  wire savestate_load_ok;
-  wire savestate_load_err;
+  reg savestate_load_ack = 0;
+  reg savestate_load_busy = 0;
+  reg savestate_load_ok = 0;
+  reg savestate_load_err = 0;
 
   core_bridge_cmd icb (
 
@@ -534,14 +532,21 @@ module core_top (
 
   // Save states
   reg prev_savestate_start;
-  reg [31:0] counter = 0;
+  reg [31:0] savestate_start_counter = 0;
+
+  reg prev_savestate_load;
+  reg prev_ss_busy;
+  // reg savestate_load_start_manager = 0;
+
 
   always @(posedge clk_74a) begin
-    if (counter == 0) begin
+    if (savestate_start_counter == 1) begin
       savestate_start_busy <= 0;
       savestate_start_ok   <= 1;
-    end else begin
-      counter <= counter - 1;
+    end
+
+    if (savestate_start_counter > 0) begin
+      savestate_start_counter <= savestate_start_counter - 1;
     end
 
     if (savestate_start && ~prev_savestate_start) begin
@@ -552,8 +557,10 @@ module core_top (
       // Clear old state
       savestate_start_ok <= 0;
       savestate_start_err <= 0;
+      savestate_load_ok <= 0;
+      savestate_load_err <= 0;
 
-      counter <= 32'h4FFFFFF;
+      savestate_start_counter <= 32'h2;
     end
 
     if (savestate_start_ack) begin
@@ -561,6 +568,33 @@ module core_top (
     end
 
     prev_savestate_start <= savestate_start;
+
+    //// LOADING
+    savestate_load_ack <= 0;
+    // savestate_load_start_manager <= 0;
+    prev_ss_busy <= ss_busy;
+
+    // if (prev_ss_busy && ~ss_busy) begin
+    if (savestate_load_busy) begin
+      // Load completed in save manager
+      savestate_load_busy <= 0;
+      savestate_load_ok   <= 1;
+    end
+
+    if (savestate_load && ~prev_savestate_load) begin
+      // Ack beginning of savestate load
+      savestate_load_ack  <= 1;
+      savestate_load_busy <= 1;
+      // savestate_load_start_manager <= 1;
+
+      // Clear old state
+      savestate_start_ok  <= 0;
+      savestate_start_err <= 0;
+      savestate_load_ok   <= 0;
+      savestate_load_err  <= 0;
+    end
+
+    prev_savestate_load <= savestate_load;
   end
 
   // Save state unloader
@@ -594,10 +628,35 @@ module core_top (
       .read_data(save_state_read_buffer[15:0])
   );
 
+  wire save_state_loader_write;
+  wire [27:0] save_state_loader_addr;
+  wire [15:0] save_state_loader_data;
+
+  data_loader #(
+      .ADDRESS_MASK_UPPER_4(4'h4),
+      .OUTPUT_WORD_SIZE(2),
+      .WRITE_MEM_CLOCK_DELAY(7)
+  ) save_state_loader (
+      .clk_74a(clk_74a),
+      .clk_memory(clk_ppu_21_47),
+
+      .bridge_wr(bridge_wr),
+      .bridge_endian_little(bridge_endian_little),
+      .bridge_addr(bridge_addr),
+      .bridge_wr_data(bridge_wr_data),
+
+      .write_en  (save_state_loader_write),
+      .write_addr(save_state_loader_addr),
+      .write_data(save_state_loader_data)
+  );
+
   reg [1:0] save_state_read_count = 0;
   reg [63:0] save_state_read_buffer;
   reg prev_save_state_unloader_read;
-  reg [31:0] failure_count = 0;
+
+  reg [2:0] save_state_write_count = 0;
+  reg [63:0] save_state_write_buffer;
+  reg prev_save_state_loader_write;
 
   wire disabled_range = (ss_addr > 8192 && ss_addr < 26'h200000) ||  // After OAM and mapper
   (ss_addr > 26'h200000 + 1048576 && ss_addr < 26'h300000) ||  // After CHR
@@ -605,12 +664,23 @@ module core_top (
   (ss_addr > 26'h380000 + 2048 && ss_addr < 26'h3C0000) ||  // After CHR-RAM
   (ss_addr > 26'h3C0000 + 262144);  // After CARTRAM
 
+  reg [23:0] received_load = 0;
+
+  reg loading_state = 0;
+
   always @(posedge clk_ppu_21_47) begin
     ss_ack <= 0;
 
-    if (ss_req && ~ss_rnw) begin
-      // Enabled and writing
-      save_state_read_buffer <= disabled_range ? 64'hFEEBDAED : ss_din;
+    // READING
+    if (ss_req) begin
+      if (~ss_rnw) begin
+        // Enabled and writing
+        save_state_read_buffer <= disabled_range ? 64'hFEEBDAED : ss_din;
+      end else begin
+        // Enabled and reading
+        received_load <= received_load + 1;
+        // save_state_write_buffer <= disabled_range ? 64'h0 : 
+      end
     end
 
     if (~save_state_unloader_read && prev_save_state_unloader_read) begin
@@ -625,13 +695,43 @@ module core_top (
       save_state_read_count <= save_state_read_count + 1;
     end
 
-    if (~disabled_range && save_state_unloader_read && ~prev_save_state_unloader_read && ss_addr[21:0] != save_state_unloader_addr[21:0]) begin
-      // Track mismatched addresses
-      failure_count <= failure_count + 1;
+    // WRITING
+    //////////
+
+    // TODO: Fix this, it's in the 74MHz clock domain
+    if (prev_ss_busy && ~ss_busy) begin
+      // Halt save state loading
+      loading_state <= 0;
     end
 
+    if (~prev_save_state_loader_write && save_state_loader_write) begin
+      // Start save state loading
+      loading_state <= 1;
+
+      // Write began, add to shifter
+      save_state_write_buffer[47:0] <= save_state_write_buffer[63:16];
+      save_state_write_buffer[63:48] <= save_state_loader_data;
+      save_state_write_count <= save_state_write_count + 1;
+    end
+
+    if (save_state_write_count == 4) begin
+      // Begin ss write
+      ss_ack <= 1;
+
+      save_state_write_count <= 0;
+    end
+
+
+    // if (~disabled_range && save_state_unloader_read && ~prev_save_state_unloader_read && ss_addr[21:0] != save_state_unloader_addr[21:0]) begin
+    //   // Track mismatched addresses
+    //   failure_count <= failure_count + 1;
+    // end
+
     prev_save_state_unloader_read <= save_state_unloader_read;
+    prev_save_state_loader_write  <= save_state_loader_write;
   end
+
+  assign ss_dout = disabled_range ? 64'h0 : save_state_write_buffer;
 
   // reg [1:0] ss_write_delay;
 
@@ -733,7 +833,7 @@ module core_top (
       clk_ppu_21_47
   );
 
-  wire pause = savestate_start_busy || ss_busy;
+  wire pause = savestate_start_busy || savestate_load_busy || ss_busy;
 
   MAIN_NES nes (
       .clk_74a(clk_74a),
@@ -804,7 +904,7 @@ module core_top (
 
       // Save states
       .ss_save(savestate_start_busy),
-      .ss_load(0),
+      .ss_load(loading_state),
 
       .ss_busy(ss_busy),
 
