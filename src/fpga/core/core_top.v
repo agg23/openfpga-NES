@@ -294,7 +294,10 @@ module core_top (
   assign user1                   = 1'bZ;
   assign aux_scl                 = 1'bZ;
   assign vpll_feed               = 1'bZ;
-
+    
+  //Controller YB  
+  reg cs_YB_map_enable          = 0;
+    
   // for bridge write data, we just broadcast it to all bus devices
   // for bridge read data, we have to mux it
   // add your own devices here
@@ -331,6 +334,7 @@ module core_top (
         32'h00000300: begin
           multitap_enabled <= bridge_wr_data[0];
         end
+        32'h00000310: cs_YB_map_enable                 <= bridge_wr_data[0]; 
       endcase
     end
   end
@@ -606,8 +610,8 @@ module core_top (
       // .reset(~reset_n),
 
       // Input
-      .p1_button_a(cont1_key_s[4]),
-      .p1_button_b(cont1_key_s[5]),
+      .p1_button_a(cs_YB_map_enable ? cont1_key_s[5] : cont1_key_s[4]),
+      .p1_button_b(cs_YB_map_enable ? cont1_key_s[7] : cont1_key_s[5]),
       .p1_button_start(cont1_key_s[15]),
       .p1_button_select(cont1_key_s[14]),
       .p1_dpad_up(cont1_key_s[0]),
