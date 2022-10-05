@@ -259,17 +259,17 @@ module core_top (
   assign port_tran_sd_dir        = 1'b0;  // SD is input and not used
 
   // tie off the rest of the pins we are not using
-  assign cram0_a                 = 'h0;
-  assign cram0_dq                = {16{1'bZ}};
-  assign cram0_clk               = 0;
-  assign cram0_adv_n             = 1;
-  assign cram0_cre               = 0;
-  assign cram0_ce0_n             = 1;
-  assign cram0_ce1_n             = 1;
-  assign cram0_oe_n              = 1;
-  assign cram0_we_n              = 1;
-  assign cram0_ub_n              = 1;
-  assign cram0_lb_n              = 1;
+  // assign cram0_a                 = 'h0;
+  // assign cram0_dq                = {16{1'bZ}};
+  // assign cram0_clk               = 0;
+  // assign cram0_adv_n             = 1;
+  // assign cram0_cre               = 0;
+  // assign cram0_ce0_n             = 1;
+  // assign cram0_ce1_n             = 1;
+  // assign cram0_oe_n              = 1;
+  // assign cram0_we_n              = 1;
+  // assign cram0_ub_n              = 1;
+  // assign cram0_lb_n              = 1;
 
   assign cram1_a                 = 'h0;
   assign cram1_dq                = {16{1'bZ}};
@@ -310,9 +310,10 @@ module core_top (
 
     if (bridge_addr[31:28] == 4'h2) begin
       bridge_rd_data <= sd_read_data;
-    end else if (bridge_addr[31:28] == 4'h4) begin
-      bridge_rd_data <= save_state_bridge_read_data;
     end
+    // else if (bridge_addr[31:28] == 4'h4) begin
+    //   bridge_rd_data <= save_state_bridge_read_data;
+    // end
   end
 
   always @(posedge clk_74a) begin
@@ -373,10 +374,10 @@ module core_top (
   reg savestate_start_err = 0;
 
   wire savestate_load;
-  reg savestate_load_ack = 0;
-  reg savestate_load_busy = 0;
-  reg savestate_load_ok = 0;
-  reg savestate_load_err = 0;
+  wire savestate_load_ack;
+  wire savestate_load_busy;
+  wire savestate_load_ok;
+  wire savestate_load_err;
 
   core_bridge_cmd icb (
 
@@ -557,8 +558,8 @@ module core_top (
       // Clear old state
       savestate_start_ok <= 0;
       savestate_start_err <= 0;
-      savestate_load_ok <= 0;
-      savestate_load_err <= 0;
+      // savestate_load_ok <= 0;
+      // savestate_load_err <= 0;
 
       savestate_start_counter <= 32'h2;
     end
@@ -570,31 +571,31 @@ module core_top (
     prev_savestate_start <= savestate_start;
 
     //// LOADING
-    savestate_load_ack <= 0;
-    // savestate_load_start_manager <= 0;
-    prev_ss_busy <= ss_busy;
+    // savestate_load_ack <= 0;
+    // // savestate_load_start_manager <= 0;
+    // prev_ss_busy <= ss_busy;
 
-    // if (prev_ss_busy && ~ss_busy) begin
-    if (savestate_load_busy) begin
-      // Load completed in save manager
-      savestate_load_busy <= 0;
-      savestate_load_ok   <= 1;
-    end
+    // // if (prev_ss_busy && ~ss_busy) begin
+    // if (savestate_load_busy) begin
+    //   // Load completed in save manager
+    //   savestate_load_busy <= 0;
+    //   savestate_load_ok   <= 1;
+    // end
 
-    if (savestate_load && ~prev_savestate_load) begin
-      // Ack beginning of savestate load
-      savestate_load_ack  <= 1;
-      savestate_load_busy <= 1;
-      // savestate_load_start_manager <= 1;
+    // if (savestate_load && ~prev_savestate_load) begin
+    //   // Ack beginning of savestate load
+    //   savestate_load_ack  <= 1;
+    //   savestate_load_busy <= 1;
+    //   // savestate_load_start_manager <= 1;
 
-      // Clear old state
-      savestate_start_ok  <= 0;
-      savestate_start_err <= 0;
-      savestate_load_ok   <= 0;
-      savestate_load_err  <= 0;
-    end
+    //   // Clear old state
+    //   savestate_start_ok  <= 0;
+    //   savestate_start_err <= 0;
+    //   savestate_load_ok   <= 0;
+    //   savestate_load_err  <= 0;
+    // end
 
-    prev_savestate_load <= savestate_load;
+    // prev_savestate_load <= savestate_load;
   end
 
   // Save state unloader
@@ -605,133 +606,184 @@ module core_top (
   wire ss_rnw;
   wire ss_req;
   wire [7:0] ss_be;
-  reg ss_ack;
+  wire ss_ack;
 
-  wire [31:0] save_state_bridge_read_data;
-  wire save_state_unloader_read;
-  wire [27:0] save_state_unloader_addr;
+  wire ss_save;
+  wire ss_load;
 
-  data_unloader #(
-      .ADDRESS_MASK_UPPER_4(4'h4),
-      .INPUT_WORD_SIZE(2)
-  ) save_state_unloader (
+  save_state_controller save_state_controller (
       .clk_74a(clk_74a),
-      .clk_memory(clk_ppu_21_47),
+      .clk_mem_85_9(clk_85_9),
+      .clk_ppu_21_47(clk_ppu_21_47),
 
-      .bridge_rd(bridge_rd),
-      .bridge_endian_little(bridge_endian_little),
-      .bridge_addr(bridge_addr),
-      .bridge_rd_data(save_state_bridge_read_data),
-
-      .read_en  (save_state_unloader_read),
-      .read_addr(save_state_unloader_addr),
-      .read_data(save_state_read_buffer[15:0])
-  );
-
-  wire save_state_loader_write;
-  wire [27:0] save_state_loader_addr;
-  wire [15:0] save_state_loader_data;
-
-  data_loader #(
-      .ADDRESS_MASK_UPPER_4(4'h4),
-      .OUTPUT_WORD_SIZE(2),
-      .WRITE_MEM_CLOCK_DELAY(7)
-  ) save_state_loader (
-      .clk_74a(clk_74a),
-      .clk_memory(clk_ppu_21_47),
-
+      // APF
       .bridge_wr(bridge_wr),
+      .bridge_rd(bridge_rd),
       .bridge_endian_little(bridge_endian_little),
       .bridge_addr(bridge_addr),
       .bridge_wr_data(bridge_wr_data),
 
-      .write_en  (save_state_loader_write),
-      .write_addr(save_state_loader_addr),
-      .write_data(save_state_loader_data)
+      // APF Save States
+      .savestate_load(savestate_load),
+      .savestate_load_ack(savestate_load_ack),
+      .savestate_load_busy(savestate_load_busy),
+      .savestate_load_ok(savestate_load_ok),
+      .savestate_load_err(savestate_load_err),
+
+      // Save States Manager
+      .ss_save(ss_save),
+      .ss_load(ss_load),
+
+      .ss_din (ss_din),
+      .ss_dout(ss_dout),
+      .ss_addr(ss_addr),
+      .ss_rnw (ss_rnw),
+      .ss_req (ss_req),
+      .ss_be  (ss_be),
+      .ss_ack (ss_ack),
+
+      .ss_busy(ss_busy),
+
+      // PSRAM
+      .cram0_a(cram0_a),
+      .cram0_dq(cram0_dq),
+      .cram0_wait(cram0_wait),
+      .cram0_clk(cram0_clk),
+      .cram0_adv_n(cram0_adv_n),
+      .cram0_cre(cram0_cre),
+      .cram0_ce0_n(cram0_ce0_n),
+      .cram0_ce1_n(cram0_ce1_n),
+      .cram0_oe_n(cram0_oe_n),
+      .cram0_we_n(cram0_we_n),
+      .cram0_ub_n(cram0_ub_n),
+      .cram0_lb_n(cram0_lb_n)
   );
 
-  reg [1:0] save_state_read_count = 0;
-  reg [63:0] save_state_read_buffer;
-  reg prev_save_state_unloader_read;
+  // wire [31:0] save_state_bridge_read_data;
+  // wire save_state_unloader_read;
+  // wire [27:0] save_state_unloader_addr;
 
-  reg [2:0] save_state_write_count = 0;
-  reg [63:0] save_state_write_buffer;
-  reg prev_save_state_loader_write;
+  // data_unloader #(
+  //     .ADDRESS_MASK_UPPER_4(4'h4),
+  //     .INPUT_WORD_SIZE(2)
+  // ) save_state_unloader (
+  //     .clk_74a(clk_74a),
+  //     .clk_memory(clk_ppu_21_47),
 
-  wire disabled_range = (ss_addr > 8192 && ss_addr < 26'h200000) ||  // After OAM and mapper
-  (ss_addr > 26'h200000 + 1048576 && ss_addr < 26'h300000) ||  // After CHR
-  (ss_addr > 26'h300000 + 2048 && ss_addr < 26'h380000) ||  // After CHR-VRAM
-  (ss_addr > 26'h380000 + 2048 && ss_addr < 26'h3C0000) ||  // After CHR-RAM
-  (ss_addr > 26'h3C0000 + 262144);  // After CARTRAM
+  //     .bridge_rd(bridge_rd),
+  //     .bridge_endian_little(bridge_endian_little),
+  //     .bridge_addr(bridge_addr),
+  //     .bridge_rd_data(save_state_bridge_read_data),
 
-  reg [23:0] received_load = 0;
+  //     .read_en  (save_state_unloader_read),
+  //     .read_addr(save_state_unloader_addr),
+  //     .read_data(save_state_read_buffer[15:0])
+  // );
 
-  reg loading_state = 0;
+  // wire save_state_loader_write;
+  // wire [27:0] save_state_loader_addr;
+  // wire [15:0] save_state_loader_data;
 
-  always @(posedge clk_ppu_21_47) begin
-    ss_ack <= 0;
+  // data_loader #(
+  //     .ADDRESS_MASK_UPPER_4(4'h4),
+  //     .OUTPUT_WORD_SIZE(2),
+  //     .WRITE_MEM_CLOCK_DELAY(7)
+  // ) save_state_loader (
+  //     .clk_74a(clk_74a),
+  //     .clk_memory(clk_ppu_21_47),
 
-    // READING
-    if (ss_req) begin
-      if (~ss_rnw) begin
-        // Enabled and writing
-        save_state_read_buffer <= disabled_range ? 64'hFEEBDAED : ss_din;
-      end else begin
-        // Enabled and reading
-        received_load <= received_load + 1;
-        // save_state_write_buffer <= disabled_range ? 64'h0 : 
-      end
-    end
+  //     .bridge_wr(bridge_wr),
+  //     .bridge_endian_little(bridge_endian_little),
+  //     .bridge_addr(bridge_addr),
+  //     .bridge_wr_data(bridge_wr_data),
 
-    if (~save_state_unloader_read && prev_save_state_unloader_read) begin
-      // Falling edge of save_state_unloader_read, prep next word
-      save_state_read_buffer <= {16'b0, save_state_read_buffer[63:16]};
+  //     .write_en  (save_state_loader_write),
+  //     .write_addr(save_state_loader_addr),
+  //     .write_data(save_state_loader_data)
+  // );
 
-      if (save_state_read_count == 3) begin
-        // Finished reading this 64 bit word
-        ss_ack <= 1;
-      end
+  // reg [1:0] save_state_read_count = 0;
+  // reg [63:0] save_state_read_buffer;
+  // reg prev_save_state_unloader_read;
 
-      save_state_read_count <= save_state_read_count + 1;
-    end
+  // reg [2:0] save_state_write_count = 0;
+  // reg [63:0] save_state_write_buffer;
+  // reg prev_save_state_loader_write;
 
-    // WRITING
-    //////////
+  // wire disabled_range = (ss_addr > 8192 && ss_addr < 26'h200000) ||  // After OAM and mapper
+  // (ss_addr > 26'h200000 + 1048576 && ss_addr < 26'h300000) ||  // After CHR
+  // (ss_addr > 26'h300000 + 2048 && ss_addr < 26'h380000) ||  // After CHR-VRAM
+  // (ss_addr > 26'h380000 + 2048 && ss_addr < 26'h3C0000) ||  // After CHR-RAM
+  // (ss_addr > 26'h3C0000 + 262144);  // After CARTRAM
 
-    // TODO: Fix this, it's in the 74MHz clock domain
-    if (prev_ss_busy && ~ss_busy) begin
-      // Halt save state loading
-      loading_state <= 0;
-    end
+  // reg [23:0] received_load = 0;
 
-    if (~prev_save_state_loader_write && save_state_loader_write) begin
-      // Start save state loading
-      loading_state <= 1;
+  // reg loading_state = 0;
 
-      // Write began, add to shifter
-      save_state_write_buffer[47:0] <= save_state_write_buffer[63:16];
-      save_state_write_buffer[63:48] <= save_state_loader_data;
-      save_state_write_count <= save_state_write_count + 1;
-    end
+  // always @(posedge clk_ppu_21_47) begin
+  //   ss_ack <= 0;
 
-    if (save_state_write_count == 4) begin
-      // Begin ss write
-      ss_ack <= 1;
+  //   // READING
+  //   if (ss_req) begin
+  //     if (~ss_rnw) begin
+  //       // Enabled and writing
+  //       save_state_read_buffer <= disabled_range ? 64'hFEEBDAED : ss_din;
+  //     end else begin
+  //       // Enabled and reading
+  //       received_load <= received_load + 1;
+  //       // save_state_write_buffer <= disabled_range ? 64'h0 : 
+  //     end
+  //   end
 
-      save_state_write_count <= 0;
-    end
+  //   if (~save_state_unloader_read && prev_save_state_unloader_read) begin
+  //     // Falling edge of save_state_unloader_read, prep next word
+  //     save_state_read_buffer <= {16'b0, save_state_read_buffer[63:16]};
+
+  //     if (save_state_read_count == 3) begin
+  //       // Finished reading this 64 bit word
+  //       ss_ack <= 1;
+  //     end
+
+  //     save_state_read_count <= save_state_read_count + 1;
+  //   end
+
+  //   // WRITING
+  //   //////////
+
+  //   // TODO: Fix this, it's in the 74MHz clock domain
+  //   if (prev_ss_busy && ~ss_busy) begin
+  //     // Halt save state loading
+  //     loading_state <= 0;
+  //   end
+
+  //   if (~prev_save_state_loader_write && save_state_loader_write) begin
+  //     // Start save state loading
+  //     loading_state <= 1;
+
+  //     // Write began, add to shifter
+  //     save_state_write_buffer[47:0] <= save_state_write_buffer[63:16];
+  //     save_state_write_buffer[63:48] <= save_state_loader_data;
+  //     save_state_write_count <= save_state_write_count + 1;
+  //   end
+
+  //   if (save_state_write_count == 4) begin
+  //     // Begin ss write
+  //     ss_ack <= 1;
+
+  //     save_state_write_count <= 0;
+  //   end
 
 
-    // if (~disabled_range && save_state_unloader_read && ~prev_save_state_unloader_read && ss_addr[21:0] != save_state_unloader_addr[21:0]) begin
-    //   // Track mismatched addresses
-    //   failure_count <= failure_count + 1;
-    // end
+  //   // if (~disabled_range && save_state_unloader_read && ~prev_save_state_unloader_read && ss_addr[21:0] != save_state_unloader_addr[21:0]) begin
+  //   //   // Track mismatched addresses
+  //   //   failure_count <= failure_count + 1;
+  //   // end
 
-    prev_save_state_unloader_read <= save_state_unloader_read;
-    prev_save_state_loader_write  <= save_state_loader_write;
-  end
+  //   prev_save_state_unloader_read <= save_state_unloader_read;
+  //   prev_save_state_loader_write  <= save_state_loader_write;
+  // end
 
-  assign ss_dout = disabled_range ? 64'h0 : save_state_write_buffer;
+  // assign ss_dout = disabled_range ? 64'h0 : save_state_write_buffer;
 
   // reg [1:0] ss_write_delay;
 
@@ -903,8 +955,9 @@ module core_top (
       .sd_buff_dout(sd_buff_dout),
 
       // Save states
-      .ss_save(savestate_start_busy),
-      .ss_load(loading_state),
+      // .ss_save(savestate_start_busy),
+      .ss_save(ss_save),
+      .ss_load(ss_load),
 
       .ss_busy(ss_busy),
 

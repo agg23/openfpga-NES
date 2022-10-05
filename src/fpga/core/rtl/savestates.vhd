@@ -261,7 +261,7 @@ begin
                
             when LOAD_HEADERAMOUNTCHECK =>
                if (bus_out_done = '1') then
-                  -- if (bus_out_Dout(63 downto 32) = std_logic_vector(to_unsigned(STATESIZE, 32))) then
+                  if (bus_out_Dout(63 downto 32) = std_logic_vector(to_unsigned(STATESIZE, 32))) then
                      header_amount        <= unsigned(bus_out_Dout(31 downto 0));
                      state                <= LOADINTERNALS_READ;
                      bus_out_Adr          <= std_logic_vector(to_unsigned(savestate_address + HEADERCOUNT, 26));
@@ -269,10 +269,10 @@ begin
                      BUS_adr              <= (others => '0');
                      count                <= 1;
                      loading_savestate    <= '1';
-                  -- else
-                  --    state                <= IDLE;
-                  --    sleep_savestate      <= '0';
-                  -- end if;
+                  else
+                     state                <= IDLE;
+                     sleep_savestate      <= '0';
+                  end if;
                end if;
             
             when LOADINTERNALS_READ =>

@@ -59,7 +59,10 @@ module psram #(
     input wire write_high_byte,
     input wire write_low_byte,
 
+    output reg write_ack,
+
     input wire read_en,
+    output reg read_ack,
     output reg read_avail,
     output reg [15:0] data_out,
 
@@ -256,6 +259,8 @@ module psram #(
     case (state)
       STATE_NONE: begin
         read_avail <= 0;
+        read_ack   <= 0;
+        write_ack  <= 0;
 
         cram_clk   <= 0;
         cram_adv_n <= 1;
@@ -292,6 +297,8 @@ module psram #(
 
           // Set busy now instead of waiting for the state change
           busy <= 1;
+
+          write_ack <= 1;
         end else if (read_en) begin
           state <= READ_INITIAL_COUNT;
 
@@ -311,6 +318,8 @@ module psram #(
 
           // Set busy now instead of waiting for the state change
           busy <= 1;
+
+          read_ack <= 1;
         end
       end
 
@@ -331,6 +340,7 @@ module psram #(
       STATE_WRITE_DATA_END: begin
         state <= STATE_NONE;
 
+        write_ack <= 0;
         data_out_en <= 0;
 
         // Unlatch write enable and banks
@@ -363,6 +373,7 @@ module psram #(
         state <= STATE_NONE;
 
         // Actually read data
+        read_ack <= 0;
         read_avail <= 1;
         data_out <= cram_dq;
 
