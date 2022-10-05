@@ -26,7 +26,7 @@ assign trigger = trigger_state;
 wire light_state = light_cnt > 0;
 
 reg [8:0] light_cnt; // timer for 10-25 scanlines worth of "light" activity.
-reg signed [9:0] pos_x, pos_y;
+reg [9:0] pos_x, pos_y;
 wire trigger_state = (trigger_cnt > 'd2_100_000);
 reg old_msg;
 reg [8:0] old_scanline;
@@ -44,15 +44,12 @@ wire hit_y = ((pos_y >= scanline - cross_size && pos_y <= scanline + cross_size)
 wire is_offscreen = ((pos_x >= 254 || pos_x <= 1) || (pos_y >= 224 || pos_y <= 8));
 wire light_square = ((pos_x >= cycle - 3'd4 && pos_x <= cycle + 3'd4) && (pos_y >= scanline - 3'd4 && pos_y <= scanline + 3'd4));
 
-// Jump through a few hoops to deal with signed math
-wire signed [7:0] joy_x = analog[7:0];
-wire signed [7:0] joy_y = analog[15:8];
+wire [7:0] joy_x = analog[7:0];
+wire [7:0] joy_y = analog[15:8];
 
 wire trigger_btn = analog_trigger;
 
 always @(posedge clk) begin
-  reg [15:0] jy1, jy2;
-
   if (reset) begin
     {trigger_cnt, pos_x, pos_y, light_cnt} <= 0;
     reticle <= 0;
@@ -71,17 +68,14 @@ always @(posedge clk) begin
 
     if (~trigger_btn) pressed <= 0;
 
-    jy1 <= {8'd0, joy_y} * 8'd240;
-    jy2 <= jy1;
-
     old_vde <= vde;
     if(~old_vde & vde) begin
-      old_analog = analog;
+      old_analog <= analog;
       if (old_analog != analog) begin
         pos_x <= joy_x;
-        pos_y <= jy2[15:8];
+        pos_y <= joy_y;
       end else begin
-      if(dpad_left) begin
+        if(dpad_left) begin
           if (pos_x >= dpad_aim_speed) pos_x <= pos_x - dpad_aim_speed;
           else pos_x <= 0;
         end
