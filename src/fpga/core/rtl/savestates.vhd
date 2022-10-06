@@ -77,6 +77,8 @@ architecture arch of savestates is
       (16#3C0000#,  262144)   -- CARTRAM  -> sdram 
    );
 
+   -- Total save size 1,323,264 bytes == 0x143100
+
    type tstate is
    (
       IDLE,

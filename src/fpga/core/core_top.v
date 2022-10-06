@@ -363,8 +363,11 @@ module core_top (
 
   wire savestate_supported = 1;
   wire [31:0] savestate_addr = 32'h40000000;
-  wire [31:0] savestate_size = 32'h400000;
-  wire [31:0] savestate_maxloadsize = savestate_size;
+  // MiSTer saves have 8 extra bytes
+  // TODO: Remove. Add one for APF offset word
+  wire [31:0] savestate_size = 32'h143100 + 1 + 8;
+  // Add buffer of 0x1000 for extra data that we'll just discard on loading
+  wire [31:0] savestate_maxloadsize = savestate_size + 32'h1000;
 
   wire savestate_start;
   wire savestate_start_ack;
