@@ -80,7 +80,10 @@ module save_state_controller (
 
   data_unloader #(
       .ADDRESS_MASK_UPPER_4(4'h4),
-      .INPUT_WORD_SIZE(2)
+      .INPUT_WORD_SIZE(2),
+      // It takes 7 cycles for a PSRAM read in the mem clock, which is 4x PPU clock, so allow
+      // 14 mem cycles < 4 PPU cycles to make sure it completes
+      .READ_MEM_CLOCK_DELAY(4)
   ) save_state_unloader (
       .clk_74a(clk_74a),
       .clk_memory(clk_ppu_21_47),
@@ -119,10 +122,7 @@ module save_state_controller (
 
       .bank_sel(0),
       // Remove bottom most bit, since this is a 8bit address and the RAM wants a 16bit address
-      .addr(save_state_loader_write ?
-      // TODO: We subtract 1 here because APF seems to be persisting an extra word at the beginning of the save state
-      // Subtracting one lets us bypass this issue
-      save_state_loader_addr[21:1] - 1
+      .addr(save_state_loader_write ? save_state_loader_addr[21:1]
           : save_state_unloader_read ? save_state_unloader_addr[21:1] : full_ss_addr),
 
       .busy(psram_busy),
@@ -239,7 +239,7 @@ module save_state_controller (
         ss_save <= 0;
 
         if (ss_req && ~ss_rnw) begin
-          // Write requested
+          // Write requested, capture SS manager data, send to PSRAM
           ss_buffer <= ss_din;
           state <= SAVE_STATE_WRITE_DELAY_WAIT_ACK;
           ss_psram_write <= 1;
@@ -252,13 +252,13 @@ module save_state_controller (
       end
       SAVE_STATE_WRITE_DELAY_WAIT_ACK: begin
         if (~(psram_write_ack && ~prev_psram_write_ack)) begin
-          // Wait for write to ack
+          // Wait for PSRAM write to ack
           state <= SAVE_STATE_WRITE_DELAY_WAIT_ACK;
         end
       end
       SAVE_STATE_WRITE_DELAY_WAIT_AVAIL: begin
         if (~(~psram_busy && prev_psram_busy)) begin
-          // Wait for write to complete (and RAM to stop being busy)
+          // Wait for PSRAM write to complete (and RAM to stop being busy)
           state <= SAVE_STATE_WRITE_DELAY_WAIT_AVAIL;
         end
       end
