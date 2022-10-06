@@ -3,6 +3,14 @@
     "magic": "APF_VER_1",
     "variables": [
       {
+        "name": "Reset core",
+        "id": 10,
+        "type": "action",
+        "enabled": true,
+        "address": "0x00000050",
+        "value": 1
+      },
+      {
         "name": "Use Multitap",
         "id": 20,
         "type": "check",
@@ -27,59 +35,30 @@
       {
         "name": "Edge Masking",
         "id": 41,
-        "type": "action",
-        "enabled": false
-      },
-      {
-        "name": "No Masking",
-        "id": 42,
-        "group": 3,
-        "type": "radio",
+        "type": "list",
         "enabled": true,
-        "address": "0x00000204",
         "persist": true,
         "writeonly": true,
-        "value": 0
-      },
-      {
-        "name": "Mask Left",
-        "id": 43,
-        "group": 3,
-        "type": "radio",
-        "enabled": true,
         "address": "0x00000204",
-        "writeonly": true,
-        "persist": true,
-        "value": 1
-      },
-      {
-        "name": "Mask Both",
-        "id": 44,
-        "group": 3,
-        "type": "radio",
-        "enabled": true,
-        "address": "0x00000204",
-        "writeonly": true,
-        "persist": true,
-        "value": 2
-      },
-      {
-        "name": "Auto Masking",
-        "id": 45,
-        "group": 3,
-        "type": "radio",
-        "enabled": true,
-        "address": "0x00000204",
-        "writeonly": true,
-        "persist": true,
-        "defaultval": 1,
-        "value": 3
-      },
-      {
-        "name": "--------------",
-        "id": 46,
-        "type": "action",
-        "enabled": false
+        "defaultval": 3,
+        "options": [
+          {
+            "value": 0,
+            "name": "No Masking"
+          },
+          {
+            "value": 1,
+            "name": "Mask Left"
+          },
+          {
+            "value": 2,
+            "name": "Mask Both"
+          },
+          {
+            "value": 3,
+            "name": "Auto Masking"
+          }
+        ]
       },
       {
         "name": "Extra Sprites",
