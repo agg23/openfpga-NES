@@ -119,7 +119,10 @@ module save_state_controller (
 
       .bank_sel(0),
       // Remove bottom most bit, since this is a 8bit address and the RAM wants a 16bit address
-      .addr(save_state_loader_write ? save_state_loader_addr[21:1]
+      .addr(save_state_loader_write ?
+      // TODO: We subtract 1 here because APF seems to be persisting an extra word at the beginning of the save state
+      // Subtracting one lets us bypass this issue
+      save_state_loader_addr[21:1] - 1
           : save_state_unloader_read ? save_state_unloader_addr[21:1] : full_ss_addr),
 
       .busy(psram_busy),
