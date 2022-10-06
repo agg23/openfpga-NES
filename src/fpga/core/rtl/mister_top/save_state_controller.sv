@@ -9,6 +9,7 @@ module save_state_controller (
     input wire bridge_endian_little,
     input wire [31:0] bridge_addr,
     input wire [31:0] bridge_wr_data,
+    output wire [31:0] save_state_bridge_read_data,
 
     // APF Save States
     input  wire savestate_load,
@@ -16,6 +17,12 @@ module save_state_controller (
     output reg  savestate_load_busy,
     output reg  savestate_load_ok,
     output reg  savestate_load_err,
+
+    input  wire savestate_start,
+    output reg  savestate_start_ack,
+    output reg  savestate_start_busy,
+    output reg  savestate_start_ok,
+    output reg  savestate_start_err,
 
     // Save States
     output wire ss_save,
@@ -49,6 +56,9 @@ module save_state_controller (
   wire [27:0] save_state_loader_addr;
   wire [15:0] save_state_loader_data;
 
+  wire save_state_unloader_read;
+  wire [27:0] save_state_unloader_addr;
+
   data_loader #(
       .ADDRESS_MASK_UPPER_4(4'h4),
       .OUTPUT_WORD_SIZE(2)
@@ -68,14 +78,39 @@ module save_state_controller (
       .write_data(save_state_loader_data)
   );
 
+  data_unloader #(
+      .ADDRESS_MASK_UPPER_4(4'h4),
+      .INPUT_WORD_SIZE(2)
+  ) save_state_unloader (
+      .clk_74a(clk_74a),
+      .clk_memory(clk_ppu_21_47),
+
+      .bridge_rd(bridge_rd),
+      .bridge_endian_little(bridge_endian_little),
+      .bridge_addr(bridge_addr),
+      .bridge_rd_data(save_state_bridge_read_data),
+
+      .read_en  (save_state_unloader_read),
+      .read_addr(save_state_unloader_addr),
+      .read_data(psram_data_out)
+  );
+
   // Drop lowest bit of ss_addr
   wire [21:0] full_ss_addr = {ss_addr[20:1], shift_count};
   wire [15:0] psram_data_out;
   wire psram_read_ack;
   wire psram_read_avail;
 
+  wire psram_write_ack;
+  wire psram_busy;
+
   // Disable reads when initially populating ram with save state
-  wire psram_read_en = state >= LOAD_STATE_ACK && ~save_state_loader_write;
+  wire psram_read_en = (state >= LOAD_STATE_ACK && ~save_state_loader_write) || save_state_unloader_read;
+
+  wire psram_write_en = save_state_loader_write || ss_psram_write;
+  wire [15:0] psram_data_in = save_state_loader_write ? save_state_loader_data : ss_buffer[15:0];
+
+  reg ss_psram_write;
 
   psram #(
       .CLOCK_SPEED(85.9)
@@ -84,12 +119,16 @@ module save_state_controller (
 
       .bank_sel(0),
       // Remove bottom most bit, since this is a 8bit address and the RAM wants a 16bit address
-      .addr(save_state_loader_write ? save_state_loader_addr[21:1] : full_ss_addr),
+      .addr(save_state_loader_write ? save_state_loader_addr[21:1]
+          : save_state_unloader_read ? save_state_unloader_addr[21:1] : full_ss_addr),
 
-      .write_en(save_state_loader_write),
-      .data_in(save_state_loader_data),
+      .busy(psram_busy),
+
+      .write_en(psram_write_en),
+      .data_in(psram_data_in),
       .write_high_byte(1),
       .write_low_byte(1),
+      .write_ack(psram_write_ack),
 
       .read_en(psram_read_en),
       .data_out(psram_data_out),
@@ -111,14 +150,22 @@ module save_state_controller (
       .cram_lb_n(cram0_lb_n)
   );
 
-  assign ss_dout = read_buffer;
+  assign ss_dout = ss_buffer;
 
-  reg prev_savestate_load;
-  reg prev_ss_busy;
+  localparam STATE_NONE = 0;
 
-  localparam LOAD_STATE_NONE = 0;
-  localparam LOAD_STATE_ACK = 1;
-  localparam LOAD_STATE_READ_REQ = 5;
+  // SAVE
+  localparam SAVE_STATE_ACK = 1;
+  localparam SAVE_STATE_WRITE_REQ = 5;
+
+  localparam SAVE_STATE_WRITE_DELAY_WAIT_ACK = SAVE_STATE_WRITE_REQ + 1;  // 6
+  localparam SAVE_STATE_WRITE_DELAY_WAIT_AVAIL = SAVE_STATE_WRITE_DELAY_WAIT_ACK + 1;  // 7
+  localparam SAVE_STATE_WRITE_COMPLETE = SAVE_STATE_WRITE_DELAY_WAIT_AVAIL + 1;  // 8
+  localparam SAVE_STATE_FINISH = SAVE_STATE_WRITE_COMPLETE + 1;  // 9
+
+  // LOAD
+  localparam LOAD_STATE_ACK = 20;
+  localparam LOAD_STATE_READ_REQ = LOAD_STATE_ACK + 4;
   localparam LOAD_STATE_READ_DELAY_START = LOAD_STATE_READ_REQ + 1;  //6
 
   localparam LOAD_STATE_READ_DELAY_WAIT_ACK = LOAD_STATE_READ_DELAY_START + 1;  //7
@@ -128,14 +175,22 @@ module save_state_controller (
   localparam LOAD_STATE_SEND = LOAD_STATE_FILL_BUFFER + 1;  // 10
   localparam LOAD_STATE_FINISH = LOAD_STATE_SEND + 1;  // 11
 
-  reg [7:0] state = LOAD_STATE_NONE;
-  reg [63:0] read_buffer = 0;
+  reg [7:0] state = STATE_NONE;
+  reg [63:0] ss_buffer = 0;
   reg [1:0] shift_count = 0;
+
+  reg prev_savestate_start;
+  reg prev_savestate_load;
+  reg prev_ss_busy;
 
   reg prev_psram_read_ack;
   reg prev_psram_read_avail;
 
+  reg prev_psram_write_ack;
+  reg prev_psram_busy;
+
   always @(posedge clk_ppu_21_47) begin
+    prev_savestate_start <= savestate_start;
     prev_savestate_load <= savestate_load;
     prev_ss_busy <= ss_busy;
 
@@ -143,23 +198,98 @@ module save_state_controller (
       // Begin ss manager
       state <= LOAD_STATE_ACK;
       shift_count <= 0;
+    end else if (savestate_start && ~prev_savestate_start) begin
+      // Begin ss manager
+      state <= SAVE_STATE_ACK;
+      shift_count <= 0;
     end
 
+    savestate_start_ack <= 0;
     savestate_load_ack <= 0;
     ss_ack <= 0;
+    ss_psram_write <= 0;
 
-    if (state != LOAD_STATE_NONE) begin
+    if (state != STATE_NONE) begin
       state <= state + 1;
     end
 
-    prev_psram_read_ack   <= psram_read_ack;
+    prev_psram_read_ack <= psram_read_ack;
     prev_psram_read_avail <= psram_read_avail;
 
+    prev_psram_write_ack <= psram_write_ack;
+    prev_psram_busy <= psram_busy;
+
     case (state)
+      // Saving //
+      SAVE_STATE_ACK: begin
+        savestate_start_ack <= 1;
+        savestate_start_ok <= 0;
+        savestate_start_err <= 0;
+
+        savestate_load_ok <= 0;
+        savestate_load_err <= 0;
+
+        ss_save <= 1;
+      end
+      SAVE_STATE_WRITE_REQ: begin
+        savestate_start_busy <= 1;
+        ss_save <= 0;
+
+        if (ss_req && ~ss_rnw) begin
+          // Write requested
+          ss_buffer <= ss_din;
+          state <= SAVE_STATE_WRITE_DELAY_WAIT_ACK;
+          ss_psram_write <= 1;
+        end else if (prev_ss_busy && ~ss_busy) begin
+          // Left busy, SS manager is done
+          state <= SAVE_STATE_FINISH;
+        end else begin
+          state <= SAVE_STATE_WRITE_REQ;
+        end
+      end
+      SAVE_STATE_WRITE_DELAY_WAIT_ACK: begin
+        if (~(psram_write_ack && ~prev_psram_write_ack)) begin
+          // Wait for write to ack
+          state <= SAVE_STATE_WRITE_DELAY_WAIT_ACK;
+        end
+      end
+      SAVE_STATE_WRITE_DELAY_WAIT_AVAIL: begin
+        if (~(~psram_busy && prev_psram_busy)) begin
+          // Wait for write to complete (and RAM to stop being busy)
+          state <= SAVE_STATE_WRITE_DELAY_WAIT_AVAIL;
+        end
+      end
+      SAVE_STATE_WRITE_COMPLETE: begin
+        // Write completed
+        if (shift_count == 3) begin
+          // Send write ack
+          state <= SAVE_STATE_WRITE_REQ;
+          shift_count <= 0;
+          ss_ack <= 1;
+        end else begin
+          state <= SAVE_STATE_WRITE_DELAY_WAIT_ACK;
+
+          // Shift
+          ss_buffer[47:0] <= ss_buffer[63:16];
+          ss_psram_write <= 1;
+          shift_count <= shift_count + 1;
+        end
+      end
+      SAVE_STATE_FINISH: begin
+        savestate_start_busy <= 0;
+        savestate_start_ok <= 1;
+
+        state <= STATE_NONE;
+      end
+
+      // Loading //
       LOAD_STATE_ACK: begin
         savestate_load_ack <= 1;
         savestate_load_ok <= 0;
         savestate_load_err <= 0;
+
+        savestate_start_ok <= 0;
+        savestate_start_err <= 0;
 
         ss_load <= 1;
       end
@@ -180,7 +310,7 @@ module save_state_controller (
       end
       LOAD_STATE_READ_DELAY_START: begin
         // Shift
-        read_buffer[47:0] <= read_buffer[63:16];
+        ss_buffer[47:0] <= ss_buffer[63:16];
       end
       LOAD_STATE_READ_DELAY_WAIT_ACK: begin
         // Wait for PSRAM to ack read
@@ -196,7 +326,7 @@ module save_state_controller (
       end
       LOAD_STATE_FILL_BUFFER: begin
         // Read data and prepare to write to SS manager
-        read_buffer[63:48] <= psram_data_out;
+        ss_buffer[63:48] <= psram_data_out;
 
         if (shift_count == 3) begin
           // Send data
@@ -216,7 +346,7 @@ module save_state_controller (
         savestate_load_busy <= 0;
         savestate_load_ok <= 1;
 
-        state <= LOAD_STATE_NONE;
+        state <= STATE_NONE;
       end
     endcase
   end

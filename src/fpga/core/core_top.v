@@ -310,10 +310,9 @@ module core_top (
 
     if (bridge_addr[31:28] == 4'h2) begin
       bridge_rd_data <= sd_read_data;
+    end else if (bridge_addr[31:28] == 4'h4) begin
+      bridge_rd_data <= save_state_bridge_read_data;
     end
-    // else if (bridge_addr[31:28] == 4'h4) begin
-    //   bridge_rd_data <= save_state_bridge_read_data;
-    // end
   end
 
   always @(posedge clk_74a) begin
@@ -368,10 +367,10 @@ module core_top (
   wire [31:0] savestate_maxloadsize = savestate_size;
 
   wire savestate_start;
-  reg savestate_start_ack = 0;
-  reg savestate_start_busy = 0;
-  reg savestate_start_ok = 0;
-  reg savestate_start_err = 0;
+  wire savestate_start_ack;
+  wire savestate_start_busy;
+  wire savestate_start_ok;
+  wire savestate_start_err;
 
   wire savestate_load;
   wire savestate_load_ack;
@@ -532,71 +531,42 @@ module core_top (
   );
 
   // Save states
-  reg prev_savestate_start;
-  reg [31:0] savestate_start_counter = 0;
+  // reg prev_savestate_start;
+  // reg [31:0] savestate_start_counter = 0;
 
-  reg prev_savestate_load;
-  reg prev_ss_busy;
-  // reg savestate_load_start_manager = 0;
+  // reg prev_savestate_load;
+  // reg prev_ss_busy;
 
+  // always @(posedge clk_74a) begin
+  //   if (savestate_start_counter == 1) begin
+  //     savestate_start_busy <= 0;
+  //     savestate_start_ok   <= 1;
+  //   end
 
-  always @(posedge clk_74a) begin
-    if (savestate_start_counter == 1) begin
-      savestate_start_busy <= 0;
-      savestate_start_ok   <= 1;
-    end
+  //   if (savestate_start_counter > 0) begin
+  //     savestate_start_counter <= savestate_start_counter - 1;
+  //   end
 
-    if (savestate_start_counter > 0) begin
-      savestate_start_counter <= savestate_start_counter - 1;
-    end
+  //   if (savestate_start && ~prev_savestate_start) begin
+  //     // Ack beginning of savestate
+  //     savestate_start_ack <= 1;
+  //     savestate_start_busy <= 1;
 
-    if (savestate_start && ~prev_savestate_start) begin
-      // Ack beginning of savestate
-      savestate_start_ack <= 1;
-      savestate_start_busy <= 1;
+  //     // Clear old state
+  //     savestate_start_ok <= 0;
+  //     savestate_start_err <= 0;
+  //     // savestate_load_ok <= 0;
+  //     // savestate_load_err <= 0;
 
-      // Clear old state
-      savestate_start_ok <= 0;
-      savestate_start_err <= 0;
-      // savestate_load_ok <= 0;
-      // savestate_load_err <= 0;
+  //     savestate_start_counter <= 32'h2;
+  //   end
 
-      savestate_start_counter <= 32'h2;
-    end
+  //   if (savestate_start_ack) begin
+  //     savestate_start_ack <= 0;
+  //   end
 
-    if (savestate_start_ack) begin
-      savestate_start_ack <= 0;
-    end
-
-    prev_savestate_start <= savestate_start;
-
-    //// LOADING
-    // savestate_load_ack <= 0;
-    // // savestate_load_start_manager <= 0;
-    // prev_ss_busy <= ss_busy;
-
-    // // if (prev_ss_busy && ~ss_busy) begin
-    // if (savestate_load_busy) begin
-    //   // Load completed in save manager
-    //   savestate_load_busy <= 0;
-    //   savestate_load_ok   <= 1;
-    // end
-
-    // if (savestate_load && ~prev_savestate_load) begin
-    //   // Ack beginning of savestate load
-    //   savestate_load_ack  <= 1;
-    //   savestate_load_busy <= 1;
-    //   // savestate_load_start_manager <= 1;
-
-    //   // Clear old state
-    //   savestate_start_ok  <= 0;
-    //   savestate_start_err <= 0;
-    //   savestate_load_ok   <= 0;
-    //   savestate_load_err  <= 0;
-    // end
-
-    // prev_savestate_load <= savestate_load;
-  end
+  //   prev_savestate_start <= savestate_start;
+  // end
 
   // Save state unloader
   wire ss_busy;
@@ -611,6 +581,8 @@ module core_top (
   wire ss_save;
   wire ss_load;
 
+  wire [31:0] save_state_bridge_read_data;
+
   save_state_controller save_state_controller (
       .clk_74a(clk_74a),
       .clk_mem_85_9(clk_85_9),
@@ -622,6 +594,7 @@ module core_top (
       .bridge_endian_little(bridge_endian_little),
       .bridge_addr(bridge_addr),
       .bridge_wr_data(bridge_wr_data),
+      .save_state_bridge_read_data(save_state_bridge_read_data),
 
       // APF Save States
       .savestate_load(savestate_load),
@@ -629,6 +602,12 @@ module core_top (
       .savestate_load_busy(savestate_load_busy),
       .savestate_load_ok(savestate_load_ok),
       .savestate_load_err(savestate_load_err),
+
+      .savestate_start(savestate_start),
+      .savestate_start_ack(savestate_start_ack),
+      .savestate_start_busy(savestate_start_busy),
+      .savestate_start_ok(savestate_start_ok),
+      .savestate_start_err(savestate_start_err),
 
       // Save States Manager
       .ss_save(ss_save),
