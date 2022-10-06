@@ -295,6 +295,9 @@ module core_top (
   assign aux_scl                 = 1'bZ;
   assign vpll_feed               = 1'bZ;
 
+  //Controller YB  
+  reg controller_map_y_b_enable = 0;
+
   // for bridge write data, we just broadcast it to all bus devices
   // for bridge read data, we have to mux it
   // add your own devices here
@@ -316,8 +319,15 @@ module core_top (
   end
 
   always @(posedge clk_74a) begin
+    if (reset_delay > 0) begin
+      reset_delay <= reset_delay - 1;
+    end
+
     if (bridge_wr) begin
       casex (bridge_addr)
+        32'h00000050: begin
+          reset_delay <= 32'h100000;
+        end
         32'h00000200: begin
           hide_overscan <= bridge_wr_data[0];
         end
@@ -333,6 +343,7 @@ module core_top (
         32'h00000300: begin
           multitap_enabled <= bridge_wr_data[0];
         end
+        32'h00000310: controller_map_y_b_enable <= bridge_wr_data[0];
       endcase
     end
   end
@@ -428,8 +439,7 @@ module core_top (
       .datatable_addr(datatable_addr),
       .datatable_wren(datatable_wren),
       .datatable_data(datatable_data),
-      .datatable_q   (datatable_q),
-
+      .datatable_q   (datatable_q)
   );
 
   // bridge data slot access
@@ -841,6 +851,7 @@ module core_top (
   reg [1:0] mask_vid_edges;
   reg allow_extra_sprites;
   reg [2:0] selected_palette;
+  wire external_reset = reset_delay > 0;
 
   reg multitap_enabled;
 
@@ -849,24 +860,35 @@ module core_top (
   wire allow_extra_sprites_s;
   wire [2:0] selected_palette_s;
   wire multitap_enabled_s;
+  wire external_reset_s;
 
 
 
   synch_3 #(
       .WIDTH(8)
   ) settings_s (
-      {hide_overscan, mask_vid_edges, allow_extra_sprites, selected_palette, multitap_enabled},
+      {
+        hide_overscan,
+        mask_vid_edges,
+        allow_extra_sprites,
+        selected_palette,
+        multitap_enabled,
+        external_reset
+      },
       {
         hide_overscan_s,
         mask_vid_edges_s,
         allow_extra_sprites_s,
         selected_palette_s,
-        multitap_enabled_s
+        multitap_enabled_s,
+        external_reset_s
       },
       clk_ppu_21_47
   );
 
   wire pause = savestate_start_busy || savestate_load_busy || ss_busy;
+
+  reg [31:0] reset_delay = 0;
 
   MAIN_NES nes (
       .clk_74a(clk_74a),
@@ -876,10 +898,11 @@ module core_top (
 
       // Control
       .pause(pause),
+      .external_reset(external_reset_s),
 
       // Input
-      .p1_button_a(cont1_key_s[4]),
-      .p1_button_b(cont1_key_s[5]),
+      .p1_button_a(controller_map_y_b_enable ? cont1_key_s[5] : cont1_key_s[4]),
+      .p1_button_b(controller_map_y_b_enable ? cont1_key_s[7] : cont1_key_s[5]),
       .p1_button_start(cont1_key_s[15]),
       .p1_button_select(cont1_key_s[14]),
       .p1_dpad_up(cont1_key_s[0]),

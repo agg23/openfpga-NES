@@ -6,6 +6,7 @@ module MAIN_NES (
 
     // Control
     input wire pause,
+    input wire external_reset,
 
     // Inputs
     input wire p1_button_a,
@@ -437,8 +438,7 @@ module MAIN_NES (
   //     ;
   //   end
 
-  wire reset_nes = ~init_reset_n || download_reset || loader_fail || hold_reset;
-  // buttons[1]     || // TODO: Add reset button
+  wire reset_nes = ~init_reset_n || download_reset || loader_fail || hold_reset || external_reset;
   // arm_reset || bk_loading || bk_loading_req || (old_sys_type != status[24:23]);
 
   //   reg [1:0] old_sys_type;
