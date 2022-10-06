@@ -22,6 +22,17 @@
         "value": 1
       },
       {
+        "name": "Use Y + B Buttons",
+        "id": 499,
+        "type": "check",
+        "enabled": true,
+        "persist": true,
+        "address": "0x00000310",
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
         "name": "Hide Overscan",
         "id": 40,
         "type": "check",
