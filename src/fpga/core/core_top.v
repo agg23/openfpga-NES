@@ -314,8 +314,15 @@ module core_top (
   end
 
   always @(posedge clk_74a) begin
+    if (reset_delay > 0) begin
+      reset_delay <= reset_delay - 1;
+    end
+
     if (bridge_wr) begin
       casex (bridge_addr)
+        32'h00000050: begin
+          reset_delay <= 32'h100000;
+        end
         32'h00000200: begin
           hide_overscan <= bridge_wr_data[0];
         end
@@ -433,8 +440,7 @@ module core_top (
       .datatable_addr(datatable_addr),
       .datatable_wren(datatable_wren),
       .datatable_data(datatable_data),
-      .datatable_q   (datatable_q),
-
+      .datatable_q   (datatable_q)
   );
 
   // bridge data slot access
@@ -588,7 +594,8 @@ module core_top (
   reg [1:0] mask_vid_edges;
   reg allow_extra_sprites;
   reg [2:0] selected_palette;
-  
+  wire external_reset = reset_delay > 0;
+
   reg multitap_enabled;
   reg lightgun_enabled;
   reg [7:0] lightgun_dpad_aim_speed;
@@ -601,6 +608,7 @@ module core_top (
   wire multitap_enabled_s;
   wire lightgun_enabled_s;
   wire [7:0]lightgun_dpad_aim_speed_s;
+  wire external_reset_s;
 
   synch_3 #(
       .WIDTH(16)
@@ -612,7 +620,9 @@ module core_top (
         selected_palette,
         multitap_enabled,
         lightgun_enabled,
-        lightgun_dpad_aim_speed},
+        lightgun_dpad_aim_speed,
+        external_reset
+      },
       {
         hide_overscan_s,
         mask_vid_edges_s,
@@ -620,10 +630,15 @@ module core_top (
         selected_palette_s,
         multitap_enabled_s,
         lightgun_enabled_s,
-        lightgun_dpad_aim_speed_s
+        lightgun_dpad_aim_speed_s,
+        external_reset_s
       },
       clk_ppu_21_47
   );
+
+  wire pause = savestate_start_busy || savestate_load_busy || ss_busy;
+
+  reg [31:0] reset_delay = 0;
 
   MAIN_NES nes (
       .clk_74a(clk_74a),
@@ -631,7 +646,9 @@ module core_top (
       .clk_85_9(clk_85_9),
       .clock_locked(pll_core_locked),
 
-      // .reset(~reset_n),
+      // Control
+      .pause(pause),
+      .external_reset(external_reset_s),
 
       // Input
       .p1_button_a(cont1_key_s[4]),
