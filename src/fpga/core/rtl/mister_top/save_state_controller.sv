@@ -13,16 +13,16 @@ module save_state_controller (
 
     // APF Save States
     input  wire savestate_load,
-    output reg  savestate_load_ack,
-    output reg  savestate_load_busy,
-    output reg  savestate_load_ok,
-    output reg  savestate_load_err,
+    output wire savestate_load_ack_s,
+    output wire savestate_load_busy_s,
+    output wire savestate_load_ok_s,
+    output wire savestate_load_err_s,
 
     input  wire savestate_start,
-    output reg  savestate_start_ack,
-    output reg  savestate_start_busy,
-    output reg  savestate_start_ok,
-    output reg  savestate_start_err,
+    output wire savestate_start_ack_s,
+    output wire savestate_start_busy_s,
+    output wire savestate_start_ok_s,
+    output wire savestate_start_err_s,
 
     // Save States
     output wire ss_save,
@@ -52,6 +52,54 @@ module save_state_controller (
     output wire cram0_ub_n,
     output wire cram0_lb_n
 );
+  wire savestate_load_s;
+  wire savestate_start_s;
+
+  // Syncing
+  synch_3 #(
+      .WIDTH(2)
+  ) savestate_in (
+      {savestate_load, savestate_start},
+      {savestate_load_s, savestate_start_s},
+      clk_ppu_21_47
+  );
+
+  reg savestate_load_ack;
+  reg savestate_load_busy;
+  reg savestate_load_ok;
+  reg savestate_load_err;
+
+  reg savestate_start_ack;
+  reg savestate_start_busy;
+  reg savestate_start_ok;
+  reg savestate_start_err;
+
+  synch_3 #(
+      .WIDTH(8)
+  ) savestate_out (
+      {
+        savestate_load_ack,
+        savestate_load_busy,
+        savestate_load_ok,
+        savestate_load_err,
+        savestate_start_ack,
+        savestate_start_busy,
+        savestate_start_ok,
+        savestate_start_err
+      },
+      {
+        savestate_load_ack_s,
+        savestate_load_busy_s,
+        savestate_load_ok_s,
+        savestate_load_err_s,
+        savestate_start_ack_s,
+        savestate_start_busy_s,
+        savestate_start_ok_s,
+        savestate_start_err_s
+      },
+      clk_74a
+  );
+
   wire save_state_loader_write;
   wire [27:0] save_state_loader_addr;
   wire [15:0] save_state_loader_data;
@@ -61,8 +109,8 @@ module save_state_controller (
 
   data_loader #(
       .ADDRESS_MASK_UPPER_4(4'h4),
-      .OUTPUT_WORD_SIZE(2)
-      // .WRITE_MEM_CLOCK_DELAY(10),
+      .OUTPUT_WORD_SIZE(2),
+      .WRITE_MEM_CLOCK_DELAY(10)
       // .WRITE_MEM_EN_CYCLE_LENGTH(4)
   ) save_state_loader (
       .clk_74a(clk_74a),
@@ -83,7 +131,7 @@ module save_state_controller (
       .INPUT_WORD_SIZE(2),
       // It takes 7 cycles for a PSRAM read in the mem clock, which is 4x PPU clock, so allow
       // 14 mem cycles < 4 PPU cycles to make sure it completes
-      .READ_MEM_CLOCK_DELAY(4)
+      .READ_MEM_CLOCK_DELAY(8)
   ) save_state_unloader (
       .clk_74a(clk_74a),
       .clk_memory(clk_ppu_21_47),
@@ -107,13 +155,14 @@ module save_state_controller (
   wire psram_write_ack;
   wire psram_busy;
 
+  reg ss_psram_write;
+  reg ss_psram_read;
+
   // Disable reads when initially populating ram with save state
-  wire psram_read_en = (state >= LOAD_STATE_ACK && ~save_state_loader_write) || save_state_unloader_read;
+  wire psram_read_en = ss_psram_read || save_state_unloader_read;
 
   wire psram_write_en = save_state_loader_write || ss_psram_write;
   wire [15:0] psram_data_in = save_state_loader_write ? save_state_loader_data : ss_buffer[15:0];
-
-  reg ss_psram_write;
 
   psram #(
       .CLOCK_SPEED(85.9)
@@ -164,19 +213,24 @@ module save_state_controller (
   localparam SAVE_STATE_WRITE_DELAY_WAIT_ACK = SAVE_STATE_WRITE_REQ + 1;  // 6
   localparam SAVE_STATE_WRITE_DELAY_WAIT_AVAIL = SAVE_STATE_WRITE_DELAY_WAIT_ACK + 1;  // 7
   localparam SAVE_STATE_WRITE_COMPLETE = SAVE_STATE_WRITE_DELAY_WAIT_AVAIL + 1;  // 8
-  localparam SAVE_STATE_FINISH = SAVE_STATE_WRITE_COMPLETE + 1;  // 9
+  localparam SAVE_STATE_WRITE_DELAY_1 = SAVE_STATE_WRITE_COMPLETE + 1;  // 9
+  localparam SAVE_STATE_WRITE_DELAY_2 = SAVE_STATE_WRITE_COMPLETE + 2;  // 10
+  localparam SAVE_STATE_WRITE_DELAY_3 = SAVE_STATE_WRITE_COMPLETE + 3;  // 11
+  localparam SAVE_STATE_FINISH = SAVE_STATE_WRITE_DELAY_3 + 1;  // 12
 
   // LOAD
   localparam LOAD_STATE_ACK = 20;
   localparam LOAD_STATE_READ_REQ = LOAD_STATE_ACK + 4;
-  localparam LOAD_STATE_READ_DELAY_START = LOAD_STATE_READ_REQ + 1;  //6
 
-  localparam LOAD_STATE_READ_DELAY_WAIT_ACK = LOAD_STATE_READ_DELAY_START + 1;  //7
-  localparam LOAD_STATE_READ_DELAY_WAIT_AVAIL = LOAD_STATE_READ_DELAY_WAIT_ACK + 1;  // 8
+  localparam LOAD_STATE_READ_DELAY_WAIT_ACK = LOAD_STATE_READ_REQ + 1;  // 25
+  localparam LOAD_STATE_READ_DELAY_WAIT_AVAIL = LOAD_STATE_READ_DELAY_WAIT_ACK + 1;  // 26
 
-  localparam LOAD_STATE_FILL_BUFFER = LOAD_STATE_READ_DELAY_WAIT_AVAIL + 1;  // 9
-  localparam LOAD_STATE_SEND = LOAD_STATE_FILL_BUFFER + 1;  // 10
-  localparam LOAD_STATE_FINISH = LOAD_STATE_SEND + 1;  // 11
+  localparam LOAD_STATE_FILL_BUFFER = LOAD_STATE_READ_DELAY_WAIT_AVAIL + 1;  // 27
+  localparam LOAD_STATE_SEND = LOAD_STATE_FILL_BUFFER + 1;  // 28
+  localparam LOAD_STATE_DELAY_1 = LOAD_STATE_SEND + 1;  // 29
+  localparam LOAD_STATE_DELAY_2 = LOAD_STATE_SEND + 2;  // 30
+  localparam LOAD_STATE_DELAY_3 = LOAD_STATE_SEND + 3;  // 31
+  localparam LOAD_STATE_FINISH = LOAD_STATE_DELAY_3 + 1;  // 32
 
   reg [7:0] state = STATE_NONE;
   reg [63:0] ss_buffer = 0;
@@ -192,16 +246,16 @@ module save_state_controller (
   reg prev_psram_write_ack;
   reg prev_psram_busy;
 
-  always @(posedge clk_ppu_21_47) begin
-    prev_savestate_start <= savestate_start;
-    prev_savestate_load <= savestate_load;
+  always @(posedge clk_mem_85_9) begin
+    prev_savestate_start <= savestate_start_s;
+    prev_savestate_load <= savestate_load_s;
     prev_ss_busy <= ss_busy;
 
-    if (savestate_load && ~prev_savestate_load) begin
+    if (savestate_load_s && ~prev_savestate_load) begin
       // Begin ss manager
       state <= LOAD_STATE_ACK;
       shift_count <= 0;
-    end else if (savestate_start && ~prev_savestate_start) begin
+    end else if (savestate_start_s && ~prev_savestate_start) begin
       // Begin ss manager
       state <= SAVE_STATE_ACK;
       shift_count <= 0;
@@ -211,6 +265,7 @@ module save_state_controller (
     savestate_load_ack <= 0;
     ss_ack <= 0;
     ss_psram_write <= 0;
+    ss_psram_read <= 0;
 
     if (state != STATE_NONE) begin
       state <= state + 1;
@@ -225,6 +280,7 @@ module save_state_controller (
     case (state)
       // Saving //
       SAVE_STATE_ACK: begin
+        // TODO: Sync these lines with 74Mhz
         savestate_start_ack <= 1;
         savestate_start_ok <= 0;
         savestate_start_err <= 0;
@@ -266,17 +322,23 @@ module save_state_controller (
         // Write completed
         if (shift_count == 3) begin
           // Send write ack
-          state <= SAVE_STATE_WRITE_REQ;
           shift_count <= 0;
           ss_ack <= 1;
         end else begin
           state <= SAVE_STATE_WRITE_DELAY_WAIT_ACK;
 
+          ss_psram_write <= 1;
+
           // Shift
           ss_buffer[47:0] <= ss_buffer[63:16];
-          ss_psram_write <= 1;
           shift_count <= shift_count + 1;
         end
+      end
+      SAVE_STATE_WRITE_DELAY_1: ss_ack <= 1;
+      SAVE_STATE_WRITE_DELAY_2: ss_ack <= 1;
+      SAVE_STATE_WRITE_DELAY_3: begin
+        ss_ack <= 1;
+        state  <= SAVE_STATE_WRITE_REQ;
       end
       SAVE_STATE_FINISH: begin
         savestate_start_busy <= 0;
@@ -303,7 +365,8 @@ module save_state_controller (
 
         if (ss_req) begin
           // Read requested
-          state <= LOAD_STATE_READ_DELAY_START;
+          state <= LOAD_STATE_READ_DELAY_WAIT_ACK;
+          ss_psram_read <= 1;
         end else if (prev_ss_busy && ~ss_busy) begin
           // Left busy, SS manager is done
           state <= LOAD_STATE_FINISH;
@@ -311,14 +374,13 @@ module save_state_controller (
           state <= LOAD_STATE_READ_REQ;
         end
       end
-      LOAD_STATE_READ_DELAY_START: begin
-        // Shift
-        ss_buffer[47:0] <= ss_buffer[63:16];
-      end
       LOAD_STATE_READ_DELAY_WAIT_ACK: begin
         // Wait for PSRAM to ack read
-        if (~(psram_read_ack && ~prev_psram_read_ack)) begin
+        if (~(psram_read_ack)) begin
           state <= LOAD_STATE_READ_DELAY_WAIT_ACK;
+        end else begin
+          // Shift
+          ss_buffer[47:0] <= ss_buffer[63:16];
         end
       end
       LOAD_STATE_READ_DELAY_WAIT_AVAIL: begin
@@ -333,16 +395,21 @@ module save_state_controller (
 
         if (shift_count == 3) begin
           // Send data
-          state <= LOAD_STATE_SEND;
           shift_count <= 0;
         end else begin
-          state <= LOAD_STATE_READ_DELAY_START;
+          state <= LOAD_STATE_READ_DELAY_WAIT_ACK;
+
+          // Read next
+          ss_psram_read <= 1;
+
           shift_count <= shift_count + 1;
         end
       end
-      LOAD_STATE_SEND: begin
+      LOAD_STATE_SEND: ss_ack <= 1;
+      LOAD_STATE_DELAY_1: ss_ack <= 1;
+      LOAD_STATE_DELAY_2: ss_ack <= 1;
+      LOAD_STATE_DELAY_3: begin
         ss_ack <= 1;
-
         state  <= LOAD_STATE_READ_REQ;
       end
       LOAD_STATE_FINISH: begin

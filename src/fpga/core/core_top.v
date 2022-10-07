@@ -543,43 +543,6 @@ module core_top (
   );
 
   // Save states
-  // reg prev_savestate_start;
-  // reg [31:0] savestate_start_counter = 0;
-
-  // reg prev_savestate_load;
-  // reg prev_ss_busy;
-
-  // always @(posedge clk_74a) begin
-  //   if (savestate_start_counter == 1) begin
-  //     savestate_start_busy <= 0;
-  //     savestate_start_ok   <= 1;
-  //   end
-
-  //   if (savestate_start_counter > 0) begin
-  //     savestate_start_counter <= savestate_start_counter - 1;
-  //   end
-
-  //   if (savestate_start && ~prev_savestate_start) begin
-  //     // Ack beginning of savestate
-  //     savestate_start_ack <= 1;
-  //     savestate_start_busy <= 1;
-
-  //     // Clear old state
-  //     savestate_start_ok <= 0;
-  //     savestate_start_err <= 0;
-  //     // savestate_load_ok <= 0;
-  //     // savestate_load_err <= 0;
-
-  //     savestate_start_counter <= 32'h2;
-  //   end
-
-  //   if (savestate_start_ack) begin
-  //     savestate_start_ack <= 0;
-  //   end
-
-  //   prev_savestate_start <= savestate_start;
-  // end
-
   // Save state unloader
   wire ss_busy;
   wire [63:0] ss_din;
@@ -610,16 +573,16 @@ module core_top (
 
       // APF Save States
       .savestate_load(savestate_load),
-      .savestate_load_ack(savestate_load_ack),
-      .savestate_load_busy(savestate_load_busy),
-      .savestate_load_ok(savestate_load_ok),
-      .savestate_load_err(savestate_load_err),
+      .savestate_load_ack_s(savestate_load_ack),
+      .savestate_load_busy_s(savestate_load_busy),
+      .savestate_load_ok_s(savestate_load_ok),
+      .savestate_load_err_s(savestate_load_err),
 
       .savestate_start(savestate_start),
-      .savestate_start_ack(savestate_start_ack),
-      .savestate_start_busy(savestate_start_busy),
-      .savestate_start_ok(savestate_start_ok),
-      .savestate_start_err(savestate_start_err),
+      .savestate_start_ack_s(savestate_start_ack),
+      .savestate_start_busy_s(savestate_start_busy),
+      .savestate_start_ok_s(savestate_start_ok),
+      .savestate_start_err_s(savestate_start_err),
 
       // Save States Manager
       .ss_save(ss_save),
@@ -649,162 +612,6 @@ module core_top (
       .cram0_ub_n(cram0_ub_n),
       .cram0_lb_n(cram0_lb_n)
   );
-
-  // wire [31:0] save_state_bridge_read_data;
-  // wire save_state_unloader_read;
-  // wire [27:0] save_state_unloader_addr;
-
-  // data_unloader #(
-  //     .ADDRESS_MASK_UPPER_4(4'h4),
-  //     .INPUT_WORD_SIZE(2)
-  // ) save_state_unloader (
-  //     .clk_74a(clk_74a),
-  //     .clk_memory(clk_ppu_21_47),
-
-  //     .bridge_rd(bridge_rd),
-  //     .bridge_endian_little(bridge_endian_little),
-  //     .bridge_addr(bridge_addr),
-  //     .bridge_rd_data(save_state_bridge_read_data),
-
-  //     .read_en  (save_state_unloader_read),
-  //     .read_addr(save_state_unloader_addr),
-  //     .read_data(save_state_read_buffer[15:0])
-  // );
-
-  // wire save_state_loader_write;
-  // wire [27:0] save_state_loader_addr;
-  // wire [15:0] save_state_loader_data;
-
-  // data_loader #(
-  //     .ADDRESS_MASK_UPPER_4(4'h4),
-  //     .OUTPUT_WORD_SIZE(2),
-  //     .WRITE_MEM_CLOCK_DELAY(7)
-  // ) save_state_loader (
-  //     .clk_74a(clk_74a),
-  //     .clk_memory(clk_ppu_21_47),
-
-  //     .bridge_wr(bridge_wr),
-  //     .bridge_endian_little(bridge_endian_little),
-  //     .bridge_addr(bridge_addr),
-  //     .bridge_wr_data(bridge_wr_data),
-
-  //     .write_en  (save_state_loader_write),
-  //     .write_addr(save_state_loader_addr),
-  //     .write_data(save_state_loader_data)
-  // );
-
-  // reg [1:0] save_state_read_count = 0;
-  // reg [63:0] save_state_read_buffer;
-  // reg prev_save_state_unloader_read;
-
-  // reg [2:0] save_state_write_count = 0;
-  // reg [63:0] save_state_write_buffer;
-  // reg prev_save_state_loader_write;
-
-  // wire disabled_range = (ss_addr > 8192 && ss_addr < 26'h200000) ||  // After OAM and mapper
-  // (ss_addr > 26'h200000 + 1048576 && ss_addr < 26'h300000) ||  // After CHR
-  // (ss_addr > 26'h300000 + 2048 && ss_addr < 26'h380000) ||  // After CHR-VRAM
-  // (ss_addr > 26'h380000 + 2048 && ss_addr < 26'h3C0000) ||  // After CHR-RAM
-  // (ss_addr > 26'h3C0000 + 262144);  // After CARTRAM
-
-  // reg [23:0] received_load = 0;
-
-  // reg loading_state = 0;
-
-  // always @(posedge clk_ppu_21_47) begin
-  //   ss_ack <= 0;
-
-  //   // READING
-  //   if (ss_req) begin
-  //     if (~ss_rnw) begin
-  //       // Enabled and writing
-  //       save_state_read_buffer <= disabled_range ? 64'hFEEBDAED : ss_din;
-  //     end else begin
-  //       // Enabled and reading
-  //       received_load <= received_load + 1;
-  //       // save_state_write_buffer <= disabled_range ? 64'h0 : 
-  //     end
-  //   end
-
-  //   if (~save_state_unloader_read && prev_save_state_unloader_read) begin
-  //     // Falling edge of save_state_unloader_read, prep next word
-  //     save_state_read_buffer <= {16'b0, save_state_read_buffer[63:16]};
-
-  //     if (save_state_read_count == 3) begin
-  //       // Finished reading this 64 bit word
-  //       ss_ack <= 1;
-  //     end
-
-  //     save_state_read_count <= save_state_read_count + 1;
-  //   end
-
-  //   // WRITING
-  //   //////////
-
-  //   // TODO: Fix this, it's in the 74MHz clock domain
-  //   if (prev_ss_busy && ~ss_busy) begin
-  //     // Halt save state loading
-  //     loading_state <= 0;
-  //   end
-
-  //   if (~prev_save_state_loader_write && save_state_loader_write) begin
-  //     // Start save state loading
-  //     loading_state <= 1;
-
-  //     // Write began, add to shifter
-  //     save_state_write_buffer[47:0] <= save_state_write_buffer[63:16];
-  //     save_state_write_buffer[63:48] <= save_state_loader_data;
-  //     save_state_write_count <= save_state_write_count + 1;
-  //   end
-
-  //   if (save_state_write_count == 4) begin
-  //     // Begin ss write
-  //     ss_ack <= 1;
-
-  //     save_state_write_count <= 0;
-  //   end
-
-
-  //   // if (~disabled_range && save_state_unloader_read && ~prev_save_state_unloader_read && ss_addr[21:0] != save_state_unloader_addr[21:0]) begin
-  //   //   // Track mismatched addresses
-  //   //   failure_count <= failure_count + 1;
-  //   // end
-
-  //   prev_save_state_unloader_read <= save_state_unloader_read;
-  //   prev_save_state_loader_write  <= save_state_loader_write;
-  // end
-
-  // assign ss_dout = disabled_range ? 64'h0 : save_state_write_buffer;
-
-  // reg [1:0] ss_write_delay;
-
-  // always @(posedge clk_ppu_21_47) begin
-  //   ss_ack <= 0;
-
-  //   if (ss_req) begin
-  //     ss_write_delay <= 3;
-  //   end
-
-  //   if (ss_write_delay == 1) begin
-  //     ss_ack <= 1;
-  //   end
-
-  //   if (ss_write_delay != 0) begin
-  //     ss_write_delay <= ss_write_delay - 1;
-  //   end
-  // end
-
-  // spram_sz #(
-  //     .addr_width(21),
-  //     .data_width(64),
-  //     .numwords  (331776 * 4 / 64)
-  // ) save_state_buffer (
-  //     .clock(clk_85_9),
-  //     .address(ss_addr),
-  //     .data(ss_dout),
-  //     .wren(~ss_rnw),
-  //     .q(ss_din)
-  // );
 
   // Core
 
@@ -861,8 +668,6 @@ module core_top (
   wire [2:0] selected_palette_s;
   wire multitap_enabled_s;
   wire external_reset_s;
-
-
 
   synch_3 #(
       .WIDTH(8)
