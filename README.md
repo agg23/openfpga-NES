@@ -41,7 +41,3 @@ There are several options provided for tweaking the displayed video:
 * `Hide Overscan` - Hides the top and bottom 8 pixels of the video, which would normally be masked by the CRT. Adjusts the aspect ratio to correspond with this modification
 * `Edge Masking` - Masks the sides of the screen in black, depending on the chosen option. The auto setting automatically masks the left side when certain conditions are met.
 * `Extra Sprites` - Allows an extra 8 sprites to be displayed per line (up to 16 from the original 8). Will decrease flickering in some games
-
-### Controller Options
-
-* `Use Y + B Buttons` - Option to map controller to use Y + B buttons instead of the default A + B. Handy if your used to the snes controller with Y as run and B as jump in Super Mario Games.
