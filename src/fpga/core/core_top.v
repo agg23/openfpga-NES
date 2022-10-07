@@ -604,14 +604,14 @@ module core_top (
   wire [1:0] mask_vid_edges_s;
   wire allow_extra_sprites_s;
   wire [2:0] selected_palette_s;
-  
+
   wire multitap_enabled_s;
   wire lightgun_enabled_s;
-  wire [7:0]lightgun_dpad_aim_speed_s;
+  wire [7:0] lightgun_dpad_aim_speed_s;
   wire external_reset_s;
 
   synch_3 #(
-      .WIDTH(16)
+      .WIDTH(18)
   ) settings_s (
       {
         hide_overscan,
@@ -636,8 +636,6 @@ module core_top (
       clk_ppu_21_47
   );
 
-  wire pause = savestate_start_busy || savestate_load_busy || ss_busy;
-
   reg [31:0] reset_delay = 0;
 
   MAIN_NES nes (
@@ -647,7 +645,7 @@ module core_top (
       .clock_locked(pll_core_locked),
 
       // Control
-      .pause(pause),
+      .pause(0),
       .external_reset(external_reset_s),
 
       // Input

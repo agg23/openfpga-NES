@@ -171,6 +171,9 @@ module MAIN_NES (
   wire ss_req;
   wire [7:0] ss_be;
   wire ss_ack = 0;
+  wire ss_load = 0;
+  wire ss_save = 0;
+  wire ss_slot = 0;
 
   wire downloading = ioctl_download;
 
@@ -327,7 +330,7 @@ module MAIN_NES (
   wire [1:0] reticle;
   wire trigger;
   wire light;
-  
+
   zapper zap (
       .clk(clk_ppu_21_47),
       .reset(reset_nes | ~lightgun_enabled),
@@ -423,7 +426,7 @@ module MAIN_NES (
       .busy        (loader_busy),
       .done        (loader_done),
       .error       (loader_fail),
-      .rom_loaded  (rom_loaded)
+      // .rom_loaded  (rom_loaded)
   );
 
   always @(posedge clk_ppu_21_47) if (loader_done) mapper_flags <= loader_flags;
