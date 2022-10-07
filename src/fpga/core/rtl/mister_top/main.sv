@@ -5,7 +5,6 @@ module MAIN_NES (
     input clock_locked,
 
     // Control
-    input wire pause,
     input wire external_reset,
 
     // Inputs
@@ -67,6 +66,8 @@ module MAIN_NES (
     input wire [7:0] sd_buff_dout,
 
     // Save states
+    output wire mapper_has_savestate,
+
     input wire ss_save,
     input wire ss_load,
 
@@ -118,7 +119,7 @@ module MAIN_NES (
 
   wire                               [127:0] status = 0;
 
-  wire                               [  1:0]                       nes_ce;
+  wire                               [  1:0]                   nes_ce;
 
   wire gg_code = 0;
   wire gg_reset = 0;
@@ -127,46 +128,42 @@ module MAIN_NES (
   wire int_audio = 1;
   wire ext_audio = 1;
 
-  wire                               [  5:0]                       color;
-  wire                               [  2:0]                       emphasis;
-  wire                               [  8:0]                       cycle;
-  wire                               [  8:0]                       scanline;
+  wire                               [  5:0]                   color;
+  wire                               [  2:0]                   emphasis;
+  wire                               [  8:0]                   cycle;
+  wire                               [  8:0]                   scanline;
 
-  wire                               [  1:0]                       diskside;
+  wire                               [  1:0]                   diskside;
   wire fds_busy = 0;
   wire fds_eject = 0;
   wire fds_auto_eject = 0;
   wire                               [  1:0] max_diskside = 0;
 
-  wire                               [ 24:0]                       cpu_addr;
-  wire                                                             cpu_read;
-  wire                                                             cpu_write;
-  wire                               [  7:0]                       cpu_dout;
-  wire                               [  7:0]                       cpu_din;
+  wire                               [ 24:0]                   cpu_addr;
+  wire                                                         cpu_read;
+  wire                                                         cpu_write;
+  wire                               [  7:0]                   cpu_dout;
+  wire                               [  7:0]                   cpu_din;
 
-  wire                               [ 21:0]                       ppu_addr;
-  wire                                                             ppu_read;
-  wire                                                             ppu_write;
-  wire                               [  7:0]                       ppu_dout;
-  wire                               [  7:0]                       ppu_din;
-  wire                                                             refresh;
+  wire                               [ 21:0]                   ppu_addr;
+  wire                                                         ppu_read;
+  wire                                                         ppu_write;
+  wire                               [  7:0]                   ppu_dout;
+  wire                               [  7:0]                   ppu_din;
+  wire                                                         refresh;
 
-  wire                                                             mapper_has_savestate;
-  wire save_state = 0;
-  wire load_state = 0;
-  wire                               [  1:0] savestate_number = 0;
-  wire                                                             state_loaded;
+  wire                                                         state_loaded;
 
   wire downloading = ioctl_download;
 
   // pause
-  reg                                                              pausecore;
-  reg                                [  1:0]                       videopause_ce;
-  wire                                                             corepaused;
-  wire                                                             sleep_savestate;
+  reg                                                          pausecore;
+  reg                                [  1:0]                   videopause_ce;
+  wire                                                         corepaused;
+  wire                                                         sleep_savestate;
 
   always_ff @(posedge clk_ppu_21_47) begin
-    pausecore <= sleep_savestate | (!ioctl_download && !reset_nes);
+    pausecore <= sleep_savestate;
 
     if (!corepaused) begin
       videopause_ce <= nes_ce + 1'd1;
@@ -179,7 +176,7 @@ module MAIN_NES (
       .clk           (clk_ppu_21_47),
       .reset_nes     (reset_nes),
       .cold_reset    (downloading & (type_fds | type_nes)),
-      .pausecore     (pause),
+      .pausecore     (pausecore),
       .corepaused    (corepaused),
       .sys_type      (0),                                      // TODO: Hardcoded to NTSC
       .nes_div       (nes_ce),
@@ -237,7 +234,7 @@ module MAIN_NES (
 
       // savestates
       .mapper_has_savestate (mapper_has_savestate),
-      .increaseSSHeaderCount(!status[44]),
+      .increaseSSHeaderCount(0),
       .save_state           (ss_save),
       .load_state           (ss_load),
       .savestate_number     (ss_slot),
@@ -519,14 +516,14 @@ module MAIN_NES (
       .ch0_din ((downloading | loader_busy) ? loader_write_data : ppu_dout),
       .ch0_rd  (~(downloading | loader_busy) & ppu_read),
       .ch0_dout(ppu_din),
-      .ch0_busy(),
+      // .ch0_busy(),
 
       .ch1_addr(cpu_addr),
       .ch1_wr  (cpu_write),
       .ch1_din (cpu_dout),
       .ch1_rd  (cpu_read),
       .ch1_dout(cpu_din),
-      .ch1_busy(),
+      // .ch1_busy(),
 
       // reserved for backup ram save/load
       .ch2_addr(ch2_addr),
@@ -616,9 +613,9 @@ module MAIN_NES (
   assign SS_Ext_BACK[15:0]  = sdram_ss_out;
   assign SS_Ext_BACK[63:16] = 48'b0;  // free to be used
 
-  wire bk_busy = 0;
-  wire bk_loading = 0;
-  wire [8:0] sd_lba = 0;
+  // wire bk_busy = 0;
+  // wire bk_loading = 0;
+  // wire [8:0] sd_lba = 0;
   wire OSD_STATUS = 0;
   wire bk_state = 0;
 
@@ -644,12 +641,12 @@ module MAIN_NES (
   //   if (~bk_busy | save_busy | bram_en) {save_rd, save_wr} <= 0;
   // end
 
-  reg bk_pending;
-  wire save_written;
-  always @(posedge clk) begin
-    if ((mapper_flags[25] || fds) && ~OSD_STATUS && save_written) bk_pending <= 1'b1;
-    else if (bk_state) bk_pending <= 1'b0;
-  end
+  // reg bk_pending;
+  // wire save_written;
+  // always @(posedge clk) begin
+  //   if ((mapper_flags[25] || fds) && ~OSD_STATUS && save_written) bk_pending <= 1'b1;
+  //   else if (bk_state) bk_pending <= 1'b0;
+  // end
 
   // Video
   wire hold_reset;

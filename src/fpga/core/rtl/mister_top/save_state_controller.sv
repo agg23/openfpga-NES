@@ -101,20 +101,21 @@ module save_state_controller (
   );
 
   wire save_state_loader_write;
-  wire [27:0] save_state_loader_addr;
+  wire [22:0] save_state_loader_addr;
   wire [15:0] save_state_loader_data;
 
   wire save_state_unloader_read;
-  wire [27:0] save_state_unloader_addr;
+  wire [22:0] save_state_unloader_addr;
 
   data_loader #(
       .ADDRESS_MASK_UPPER_4(4'h4),
+      .ADDRESS_SIZE(22),
       .OUTPUT_WORD_SIZE(2),
-      .WRITE_MEM_CLOCK_DELAY(10)
+      .WRITE_MEM_CLOCK_DELAY(20)
       // .WRITE_MEM_EN_CYCLE_LENGTH(4)
   ) save_state_loader (
       .clk_74a(clk_74a),
-      .clk_memory(clk_ppu_21_47),
+      .clk_memory(clk_mem_85_9),
 
       .bridge_wr(bridge_wr),
       .bridge_endian_little(bridge_endian_little),
@@ -128,13 +129,15 @@ module save_state_controller (
 
   data_unloader #(
       .ADDRESS_MASK_UPPER_4(4'h4),
+      .ADDRESS_SIZE(22),
       .INPUT_WORD_SIZE(2),
       // It takes 7 cycles for a PSRAM read in the mem clock, which is 4x PPU clock, so allow
       // 14 mem cycles < 4 PPU cycles to make sure it completes
-      .READ_MEM_CLOCK_DELAY(8)
+      // Larger than 4 delay just because we have plenty of time. Decrease this if we ever speed up APF
+      .READ_MEM_CLOCK_DELAY(20)
   ) save_state_unloader (
       .clk_74a(clk_74a),
-      .clk_memory(clk_ppu_21_47),
+      .clk_memory(clk_mem_85_9),
 
       .bridge_rd(bridge_rd),
       .bridge_endian_little(bridge_endian_little),
@@ -166,7 +169,7 @@ module save_state_controller (
 
   psram #(
       .CLOCK_SPEED(85.9)
-  ) wram (
+  ) psram (
       .clk(clk_mem_85_9),
 
       .bank_sel(0),
@@ -249,17 +252,15 @@ module save_state_controller (
       // Begin ss manager
       state <= LOAD_STATE_ACK;
       shift_count <= 0;
+      ack_count <= 0;
     end else if (savestate_start_s && ~prev_savestate_start) begin
       // Begin ss manager
       state <= SAVE_STATE_ACK;
       shift_count <= 0;
+      ack_count <= 0;
     end
 
-    savestate_start_ack <= 0;
-    savestate_load_ack <= 0;
     ss_ack <= 0;
-    ss_psram_write <= 0;
-    ss_psram_read <= 0;
 
     if (state != STATE_NONE) begin
       state <= state + 1;
@@ -274,7 +275,6 @@ module save_state_controller (
     case (state)
       // Saving //
       SAVE_STATE_ACK: begin
-        // TODO: Sync these lines with 74Mhz
         savestate_start_ack <= 1;
         savestate_start_ok <= 0;
         savestate_start_err <= 0;
@@ -285,6 +285,7 @@ module save_state_controller (
         ss_save <= 1;
       end
       SAVE_STATE_WRITE_REQ: begin
+        savestate_start_ack <= 0;
         savestate_start_busy <= 1;
         ss_save <= 0;
 
@@ -301,7 +302,10 @@ module save_state_controller (
         end
       end
       SAVE_STATE_WRITE_DELAY_WAIT_ACK: begin
-        if (~(psram_write_ack && ~prev_psram_write_ack)) begin
+        if (psram_write_ack && ~prev_psram_write_ack) begin
+          // Write began
+          ss_psram_write <= 0;
+        end else begin
           // Wait for PSRAM write to ack
           state <= SAVE_STATE_WRITE_DELAY_WAIT_ACK;
         end
@@ -358,10 +362,11 @@ module save_state_controller (
       end
       // Load delay to leave ss_load high for several cycles
       LOAD_STATE_READ_REQ: begin
+        savestate_load_ack <= 0;
         savestate_load_busy <= 1;
         ss_load <= 0;
 
-        if (ss_req) begin
+        if (ss_req && ss_rnw) begin
           // Read requested
           state <= LOAD_STATE_READ_DELAY_WAIT_ACK;
           ss_psram_read <= 1;
@@ -374,11 +379,14 @@ module save_state_controller (
       end
       LOAD_STATE_READ_DELAY_WAIT_ACK: begin
         // Wait for PSRAM to ack read
-        if (~(psram_read_ack)) begin
-          state <= LOAD_STATE_READ_DELAY_WAIT_ACK;
-        end else begin
+        if (psram_read_ack) begin
+          // On ack
+          ss_psram_read   <= 0;
+
           // Shift
           ss_buffer[47:0] <= ss_buffer[63:16];
+        end else begin
+          state <= LOAD_STATE_READ_DELAY_WAIT_ACK;
         end
       end
       LOAD_STATE_READ_DELAY_WAIT_AVAIL: begin

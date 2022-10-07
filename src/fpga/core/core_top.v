@@ -372,6 +372,7 @@ module core_top (
 
   wire dataslot_allcomplete;
 
+  // TODO: Use mapper_has_savestate (and sync it)
   wire savestate_supported = 1;
   wire [31:0] savestate_addr = 32'h40000000;
   // MiSTer saves have 8 extra bytes
@@ -556,6 +557,7 @@ module core_top (
   wire ss_save;
   wire ss_load;
 
+  wire mapper_has_savestate;
   wire [31:0] save_state_bridge_read_data;
 
   save_state_controller save_state_controller (
@@ -691,8 +693,6 @@ module core_top (
       clk_ppu_21_47
   );
 
-  wire pause = savestate_start_busy || savestate_load_busy || ss_busy;
-
   reg [31:0] reset_delay = 0;
 
   MAIN_NES nes (
@@ -702,7 +702,6 @@ module core_top (
       .clock_locked(pll_core_locked),
 
       // Control
-      .pause(pause),
       .external_reset(external_reset_s),
 
       // Input
@@ -764,7 +763,7 @@ module core_top (
       .sd_buff_dout(sd_buff_dout),
 
       // Save states
-      // .ss_save(savestate_start_busy),
+      .mapper_has_savestate(mapper_has_savestate),
       .ss_save(ss_save),
       .ss_load(ss_load),
 
