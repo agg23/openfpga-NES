@@ -213,10 +213,7 @@ module save_state_controller (
   localparam SAVE_STATE_WRITE_DELAY_WAIT_ACK = SAVE_STATE_WRITE_REQ + 1;  // 6
   localparam SAVE_STATE_WRITE_DELAY_WAIT_AVAIL = SAVE_STATE_WRITE_DELAY_WAIT_ACK + 1;  // 7
   localparam SAVE_STATE_WRITE_COMPLETE = SAVE_STATE_WRITE_DELAY_WAIT_AVAIL + 1;  // 8
-  localparam SAVE_STATE_WRITE_DELAY_1 = SAVE_STATE_WRITE_COMPLETE + 1;  // 9
-  localparam SAVE_STATE_WRITE_DELAY_2 = SAVE_STATE_WRITE_COMPLETE + 2;  // 10
-  localparam SAVE_STATE_WRITE_DELAY_3 = SAVE_STATE_WRITE_COMPLETE + 3;  // 11
-  localparam SAVE_STATE_FINISH = SAVE_STATE_WRITE_DELAY_3 + 1;  // 12
+  localparam SAVE_STATE_FINISH = SAVE_STATE_WRITE_COMPLETE + 1;  // 9
 
   // LOAD
   localparam LOAD_STATE_ACK = 20;
@@ -226,15 +223,12 @@ module save_state_controller (
   localparam LOAD_STATE_READ_DELAY_WAIT_AVAIL = LOAD_STATE_READ_DELAY_WAIT_ACK + 1;  // 26
 
   localparam LOAD_STATE_FILL_BUFFER = LOAD_STATE_READ_DELAY_WAIT_AVAIL + 1;  // 27
-  localparam LOAD_STATE_SEND = LOAD_STATE_FILL_BUFFER + 1;  // 28
-  localparam LOAD_STATE_DELAY_1 = LOAD_STATE_SEND + 1;  // 29
-  localparam LOAD_STATE_DELAY_2 = LOAD_STATE_SEND + 2;  // 30
-  localparam LOAD_STATE_DELAY_3 = LOAD_STATE_SEND + 3;  // 31
-  localparam LOAD_STATE_FINISH = LOAD_STATE_DELAY_3 + 1;  // 32
+  localparam LOAD_STATE_FINISH = LOAD_STATE_FILL_BUFFER + 1;  // 28
 
   reg [7:0] state = STATE_NONE;
   reg [63:0] ss_buffer = 0;
   reg [1:0] shift_count = 0;
+  reg [1:0] ack_count = 0;
 
   reg prev_savestate_start;
   reg prev_savestate_load;
@@ -322,8 +316,18 @@ module save_state_controller (
         // Write completed
         if (shift_count == 3) begin
           // Send write ack
-          shift_count <= 0;
           ss_ack <= 1;
+
+          if (ack_count == 3) begin
+            state <= SAVE_STATE_WRITE_REQ;
+
+            ack_count <= 0;
+            shift_count <= 0;
+          end else begin
+            state <= SAVE_STATE_WRITE_COMPLETE;
+
+            ack_count <= ack_count + 1;
+          end
         end else begin
           state <= SAVE_STATE_WRITE_DELAY_WAIT_ACK;
 
@@ -333,12 +337,6 @@ module save_state_controller (
           ss_buffer[47:0] <= ss_buffer[63:16];
           shift_count <= shift_count + 1;
         end
-      end
-      SAVE_STATE_WRITE_DELAY_1: ss_ack <= 1;
-      SAVE_STATE_WRITE_DELAY_2: ss_ack <= 1;
-      SAVE_STATE_WRITE_DELAY_3: begin
-        ss_ack <= 1;
-        state  <= SAVE_STATE_WRITE_REQ;
       end
       SAVE_STATE_FINISH: begin
         savestate_start_busy <= 0;
@@ -395,7 +393,18 @@ module save_state_controller (
 
         if (shift_count == 3) begin
           // Send data
-          shift_count <= 0;
+          ss_ack <= 1;
+
+          if (ack_count == 3) begin
+            state <= LOAD_STATE_READ_REQ;
+
+            ack_count <= 0;
+            shift_count <= 0;
+          end else begin
+            state <= LOAD_STATE_FILL_BUFFER;
+
+            ack_count <= ack_count + 1;
+          end
         end else begin
           state <= LOAD_STATE_READ_DELAY_WAIT_ACK;
 
@@ -404,13 +413,6 @@ module save_state_controller (
 
           shift_count <= shift_count + 1;
         end
-      end
-      LOAD_STATE_SEND: ss_ack <= 1;
-      LOAD_STATE_DELAY_1: ss_ack <= 1;
-      LOAD_STATE_DELAY_2: ss_ack <= 1;
-      LOAD_STATE_DELAY_3: begin
-        ss_ack <= 1;
-        state  <= LOAD_STATE_READ_REQ;
       end
       LOAD_STATE_FINISH: begin
         savestate_load_busy <= 0;
