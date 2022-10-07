@@ -26,13 +26,13 @@ Expansion audio should be fully supported. If you encounter a game that is not p
 
 ### Palette Options
 
-The core has 5 palette options built in, changable with a slider in `Core Settings`. The palettes are known as:
+The core has 5 palette options built in, changable in `Core Settings`. The palettes are known as:
 
-0. Kitrinx 34 by Kitrinx
-1. Smooth by FirebrandX (Default)
-2. Wavebeam by NakedArthur
-3. Sony CXA by FirebrandX
-4. PC-10 Better by Kitrinx
+* Kitrinx 34 by Kitrinx
+* Smooth by FirebrandX (Default)
+* Wavebeam by NakedArthur
+* Sony CXA by FirebrandX
+* PC-10 Better by Kitrinx
 
 ### Video Options
 
