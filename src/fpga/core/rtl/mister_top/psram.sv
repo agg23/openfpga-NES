@@ -241,7 +241,7 @@ module psram #(
 
   reg [15:0] latched_data_in;
 
-  assign cram_dq = data_out_en ? cram_data : 16'hZZ;
+  assign cram_dq = data_out_en ? cram_data : 16'hZZZZ;
 
   always @(posedge clk) begin
     if (state != STATE_NONE) begin

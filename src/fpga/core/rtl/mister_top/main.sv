@@ -93,7 +93,6 @@ module MAIN_NES (
     output wire        dram_we_n,
 
     // Video
-    output ce_pix,
     output HSync,
     output VSync,
     output HBlank,
@@ -674,7 +673,7 @@ module MAIN_NES (
       .reticle(0),
       .pal_video(pal_video),
 
-      .ce_pix(ce_pix),
+      // .ce_pix(ce_pix),
       .HSync(HSync),
       .VSync(VSync),
       .HBlank(HBlank),
