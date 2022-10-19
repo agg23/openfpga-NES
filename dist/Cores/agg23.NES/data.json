@@ -10,15 +10,6 @@
         "address": "0x10000000"
       },
       {
-        "name": "Save State",
-        "id": 11,
-        "required": false,
-        "parameters": "0x84",
-        "nonvolatile": true,
-        "extensions": ["sss"],
-        "address": "0x40000000"
-      },
-      {
         "name": "Save",
         "id": 10,
         "required": false,
