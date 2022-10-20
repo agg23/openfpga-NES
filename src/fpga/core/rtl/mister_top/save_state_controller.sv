@@ -130,7 +130,7 @@ module save_state_controller (
   wire full;
   wire [63:0] fifo_dout;
 
-  wire [9:0] debug_used;
+  wire [10:0] debug_used;
   reg [31:0] written_words = 0;
   reg [31:0] transferred_words = 0;
 
@@ -151,7 +151,7 @@ module save_state_controller (
 
   always @(posedge clk_74a) begin
     if (bridge_wr && bridge_addr[31:28] == 4'h4 && ~prev_wr) begin
-      written_words <= written_words + 1;
+      written_words <= written_words + 4;
     end
 
     prev_wr <= bridge_wr && bridge_addr[31:28] == 4'h4;
@@ -174,9 +174,9 @@ module save_state_controller (
       // .wrusedw()
   );
   defparam dcfifo_component.intended_device_family = "Cyclone V",
-      dcfifo_component.lpm_numwords = 2048, dcfifo_component.lpm_showahead = "OFF",
+      dcfifo_component.lpm_numwords = 4096, dcfifo_component.lpm_showahead = "OFF",
       dcfifo_component.lpm_type = "dcfifo_mixed_widths", dcfifo_component.lpm_width = 32,
-      dcfifo_component.lpm_widthu = 11, dcfifo_component.lpm_widthu_r = 10,
+      dcfifo_component.lpm_widthu = 12, dcfifo_component.lpm_widthu_r = 11,
       dcfifo_component.lpm_width_r = 64, dcfifo_component.overflow_checking = "OFF",
       dcfifo_component.rdsync_delaypipe = 5, dcfifo_component.underflow_checking = "ON",
       dcfifo_component.use_eab = "ON", dcfifo_component.wrsync_delaypipe = 5;
@@ -314,7 +314,8 @@ module save_state_controller (
 
         fifo_read_req <= 0;
         ss_ack <= 1;
-        transferred_words <= transferred_words + 1;
+        // 8 bytes in each
+        transferred_words <= transferred_words + 2 * 4;
       end
       LOAD_WAIT_APF_START: begin
         if (savestate_load_s && ~prev_savestate_load) begin
