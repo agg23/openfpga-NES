@@ -188,7 +188,7 @@ module save_state_controller (
       // It takes 7 cycles for a PSRAM read in the mem clock, which is 4x PPU clock, so allow
       // 14 mem cycles < 4 PPU cycles to make sure it completes
       // Larger than 4 delay just because we have plenty of time. Decrease this if we ever speed up APF
-      .READ_MEM_CLOCK_DELAY(20)
+      .READ_MEM_CLOCK_DELAY(5)
   ) save_state_unloader (
       .clk_74a(clk_74a),
       .clk_memory(clk_ppu_21_47),
@@ -200,98 +200,199 @@ module save_state_controller (
 
       .read_en  (save_state_unloader_read),
       .read_addr(save_state_unloader_addr),
-      .read_data(psram_data_out)
+      .read_data(save_state_unloader_data)
   );
 
+  reg [20:0] last_unloader_addr = 21'hFFFF;
+  reg [15:0] save_state_unloader_data;
+
   localparam NONE = 0;
+
+  localparam SAVE_BUSY = 1;
+  localparam SAVE_WAIT_REQ = SAVE_BUSY + 1;
+  localparam SAVE_WAIT_ACK = SAVE_WAIT_REQ + 1;
+  localparam SAVE_SHIFT = SAVE_WAIT_ACK + 1;
+  localparam SAVE_FINISH = SAVE_SHIFT + 1;
 
   localparam LOAD_WAIT_REQ = 20;
   localparam LOAD_READ_REQ = LOAD_WAIT_REQ + 1;
   localparam LOAD_WAIT_APF_START = LOAD_READ_REQ + 1;
 
-  // localparam LOAD_WORD_DATA = 20;
-  // localparam LOAD_WORD_SHIFT = LOAD_WORD_DATA + 1;
-  // localparam LOAD_WORD_COMPLETE = LOAD_WORD_SHIFT + 1;
   localparam LOAD_APF_BUSY = LOAD_WAIT_APF_START + 1;
   localparam LOAD_APF_COMPLETE = LOAD_APF_BUSY + 1;
 
   reg [7:0] state = NONE;
 
+  reg save_state_saving_req = 0;
   reg save_state_loading = 0;
   reg [63:0] ss_buffer = 0;
+  // Used for duplicate reads
+  reg [63:0] last_ss_buffer = 0;
   reg [1:0] save_shift_count = 0;
 
   reg did_req = 0;
+  reg is_dup_read = 0;
 
   reg prev_savestate_start = 0;
   reg prev_savestate_load = 0;
   reg prev_ss_busy = 0;
+  reg prev_save_state_unloader_read = 0;
+
+  reg [31:0] duplicate_read_count = 0;
 
   always @(posedge clk_ppu_21_47) begin
-    // if (savestate_load_s && ~prev_savestate_load) begin
-    //   // Begin APF savestate load (data is already copied into ss manager)
-    //   state <= LOAD_APF_BUSY;
-
-    //   savestate_load_ack <= 1;
-    //   savestate_load_ok <= 0;
-    //   savestate_load_err <= 0;
-
-    //   savestate_start_ok <= 0;
-    //   savestate_start_err <= 0;
-    // end
-
-    // if (ss_req) begin
-    //   did_req <= 1;
-    // end
-
     ss_ack <= 0;
     prev_ss_busy <= ss_busy;
     prev_savestate_start <= savestate_start_s;
     prev_savestate_load <= savestate_load_s;
+    prev_save_state_unloader_read <= save_state_unloader_read;
+
     ss_load <= 0;
+    ss_save <= 0;
+
+    if (duplicate_read_count == 32'hFFFFFFFF) begin
+      state <= NONE;
+    end
 
     if (~fifo_empty && ~save_state_loading) begin
       // Begin save stating
+      state <= LOAD_WAIT_REQ;
+
       save_state_loading <= 1;
 
       ss_load <= 1;
+    end
 
-      // state <= LOAD_WORD_DATA;
-      state <= LOAD_WAIT_REQ;
+    if (savestate_start_s && ~prev_savestate_start) begin
+      // Begin saving state
+      state <= SAVE_BUSY;
+
+      savestate_start_ack <= 1;
+      savestate_start_ok <= 0;
+      savestate_start_err <= 0;
+
+      savestate_load_ok <= 0;
+      savestate_load_err <= 0;
+
+      ss_save <= 1;
+    end else if (savestate_load_s && ~prev_savestate_load) begin
+      // Begin APF savestate load (data is already copied into ss manager)
+      save_state_saving_req <= 1;
+
+      savestate_load_ack <= 1;
+      savestate_load_ok <= 0;
+      savestate_load_err <= 0;
+
+      savestate_start_ok <= 0;
+      savestate_start_err <= 0;
     end
 
 
     case (state)
-      // LOAD_WORD_DATA: begin
-      //   // Read data from loader
-      //   ss_buffer[63:48] <= save_state_loader_data;
+      // Saving
+      SAVE_BUSY: begin
+        savestate_start_ack  <= 0;
+        savestate_start_busy <= 1;
 
-      //   ss_load <= 0;
+        if (ss_req) begin
+          // First req, end busy, start loading out
+          // Duplicate of SAVE_WAIT_REQ
+          state <= SAVE_WAIT_ACK;
 
-      //   if (save_shift_count == 3) begin
-      //     state <= LOAD_WORD_COMPLETE;
-      //   end else begin
-      //     state <= LOAD_WORD_SHIFT;
-      //   end
-      // end
-      // LOAD_WORD_SHIFT: begin
-      //   state <= LOAD_WORD_DATA;
+          // Latch data
+          ss_buffer <= ss_din;
 
-      //   ss_buffer[47:0] <= ss_buffer[63:16];
-      //   save_shift_count <= save_shift_count + 1;
-      // end
-      // LOAD_WORD_COMPLETE: begin
-      //   state <= LOAD_WORD_COMPLETE;
+          savestate_start_busy <= 0;
+          savestate_start_ok <= 1;
+        end
+      end
+      SAVE_WAIT_REQ: begin
+        // Wait for SS manager to send us more data
+        if (ss_req) begin
+          state <= SAVE_WAIT_ACK;
 
-      //   // We are done shifting. Wait for req
-      //   if (ss_req || did_req) begin
-      //     did_req <= 0;
+          // Latch data
+          ss_buffer <= ss_din;
+        end else if (prev_ss_busy && ~ss_busy) begin
+          // Left busy, SS manager is done
+          state <= SAVE_FINISH;
+        end
+      end
+      SAVE_WAIT_ACK: begin
+        // Wait for bridge to request this word
+        if (save_state_unloader_read && ~prev_save_state_unloader_read) begin
+          if (save_state_unloader_addr[22:2] == last_unloader_addr) begin
+            // This is a duplicate read, return last data
+            state <= SAVE_SHIFT;
 
-      //     ss_ack  <= 1;
+            duplicate_read_count <= duplicate_read_count + 1;
 
-      //     state   <= LOAD_WORD_DATA;
-      //   end
-      // end
+            if (last_unloader_addr[0]) begin
+              // High 32 bit word
+              save_state_unloader_data <= last_ss_buffer[47:32];
+
+              // If it's the high word, set the shift count to 2 and 3
+              save_shift_count <= {1'b1, save_shift_count[0]};
+            end else begin
+              // Low 32 bit word
+              save_state_unloader_data <= last_ss_buffer[15:0];
+            end
+
+            is_dup_read <= 1;
+          end else begin
+            state <= SAVE_SHIFT;
+
+            if (save_shift_count == 0) begin
+              // This is the first read operation. Save buffer in case we have a dup read
+              last_ss_buffer <= ss_buffer;
+            end
+            is_dup_read <= 0;
+
+            save_state_unloader_data <= ss_buffer[15:0];
+          end
+        end
+      end
+      SAVE_SHIFT: begin
+        if (~save_state_unloader_read && prev_save_state_unloader_read) begin
+          // End read
+          state <= SAVE_WAIT_ACK;
+
+          if (is_dup_read) begin
+            last_ss_buffer[47:0] <= last_ss_buffer[63:16];
+          end else begin
+            ss_buffer[47:0] <= ss_buffer[63:16];
+          end
+          save_shift_count <= save_shift_count + 1;
+
+          if (save_shift_count == 1 || save_shift_count == 3) begin
+            // A single bridge write has completed
+            last_unloader_addr <= save_state_unloader_addr[22:2];
+          end
+
+          if (save_shift_count == 3) begin
+            // Sent out full 64bit word
+            if (is_dup_read) begin
+              // We want to go back to our normal loading
+              // We've already seen a req from the SS manager, so go back to wait for a read
+              state <= SAVE_WAIT_ACK;
+              is_dup_read <= 0;
+            end else begin
+              // Ack complete to SS manager
+              state  <= SAVE_WAIT_REQ;
+
+              ss_ack <= 1;
+            end
+
+            save_shift_count <= 0;
+          end
+        end
+      end
+      SAVE_FINISH: begin
+        // TODO: Remove?
+        state <= NONE;
+      end
+
+      // Loading
       LOAD_WAIT_REQ: begin
         if (prev_ss_busy && ~ss_busy) begin
           // Finished load. Wait for APF ack
@@ -318,16 +419,11 @@ module save_state_controller (
         transferred_words <= transferred_words + 2 * 4;
       end
       LOAD_WAIT_APF_START: begin
-        if (savestate_load_s && ~prev_savestate_load) begin
+        if (save_state_saving_req) begin
           // Begin APF savestate load (data is already copied into ss manager)
           state <= LOAD_APF_BUSY;
 
-          savestate_load_ack <= 1;
-          savestate_load_ok <= 0;
-          savestate_load_err <= 0;
-
-          savestate_start_ok <= 0;
-          savestate_start_err <= 0;
+          save_state_saving_req <= 0;
         end
       end
       LOAD_APF_BUSY: begin
@@ -345,17 +441,6 @@ module save_state_controller (
         save_state_loading <= 0;
       end
     endcase
-
-    if (full || debug_used > 10'd1023 || transferred_words[31] || written_words[31]) begin
-      state <= NONE;
-    end
-
-    // if (prev_ss_busy && ~ss_busy) begin
-    //   if (state >= LOAD_WORD_DATA) begin
-    //     // Finished load
-    //     state <= NONE;
-    //   end
-    // end
   end
 
 

@@ -77,7 +77,9 @@ architecture arch of savestates is
       (16#3C0000#,  262144)   -- CARTRAM  -> sdram 
    );
 
-   -- Total save size 1,323,264 bytes == 0x143100
+   -- Total mem save size 1,323,264 bytes == 0x143100
+   -- Plus 2 for header, and 64 for internals
+   -- 0x143142
 
    type tstate is
    (
@@ -162,14 +164,25 @@ begin
                elsif (settle < SETTLECOUNT) then
                   settle <= settle + 1;
                else
+                  state          <= SAVESIZEAMOUNT;
+                  bus_out_Adr    <= std_logic_vector(to_unsigned(savestate_address, 26));
+                  bus_out_Din    <= std_logic_vector(to_unsigned(STATESIZE, 32)) & std_logic_vector(header_amount);
+                  bus_out_ena    <= '1';
+                  if (increaseSSHeaderCount = '0') then
+                     bus_out_be  <= x"F0";
+                  end if;   
+               end if;
+
+            when SAVESIZEAMOUNT =>
+               if (bus_out_done = '1') then
                   state            <= SAVEINTERNALS_WAIT;
                   bus_out_Adr      <= std_logic_vector(to_unsigned(savestate_address + HEADERCOUNT, 26));
                   bus_out_rnw      <= '0';
                   BUS_adr          <= (others => '0');
                   count            <= 1;
                   saving_savestate <= '1';
-               end if;            
-            
+               end if;
+
             when SAVEINTERNALS_WAIT =>
                bus_out_Din    <= BUS_Dout;
                bus_out_ena    <= '1';
@@ -199,13 +212,9 @@ begin
                   memory_slow    <= (others => '0');
                   Save_RAMType   <= to_unsigned(savetype_counter, 3);
                else
-                  state          <= SAVESIZEAMOUNT;
-                  bus_out_Adr    <= std_logic_vector(to_unsigned(savestate_address, 26));
-                  bus_out_Din    <= std_logic_vector(to_unsigned(STATESIZE, 32)) & std_logic_vector(header_amount);
-                  bus_out_ena    <= '1';
-                  if (increaseSSHeaderCount = '0') then
-                     bus_out_be  <= x"F0";
-                  end if;
+                  state            <= IDLE;
+                  saving_savestate <= '0';
+                  sleep_savestate  <= '0';
                end if;
             
             when SAVEMEMORY_READ =>
@@ -235,15 +244,7 @@ begin
                      savetype_counter <= savetype_counter + 1;
                      state            <= SAVEMEMORY_NEXT;
                   end if;
-               end if;
-            
-            when SAVESIZEAMOUNT =>
-               if (bus_out_done = '1') then
-                  state            <= IDLE;
-                  saving_savestate <= '0';
-                  sleep_savestate  <= '0';
-               end if;
-            
+               end if;            
             
             -- #################
             -- LOAD
