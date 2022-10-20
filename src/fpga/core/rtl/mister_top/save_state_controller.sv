@@ -129,6 +129,7 @@ module save_state_controller (
   reg fifo_read_req = 0;
   wire full;
   wire [63:0] fifo_dout;
+  reg fifo_clr = 0;
 
   wire [10:0] debug_used;
   reg [31:0] written_words = 0;
@@ -165,7 +166,7 @@ module save_state_controller (
       .wrreq(bridge_wr && bridge_addr[31:28] == 4'h4),
       .q(fifo_dout),
       .rdempty(fifo_empty),
-      // .aclr(),
+      .aclr(fifo_clr),
       // .eccstatus(),
       // .rdfull(),
       .rdusedw(debug_used),
@@ -179,7 +180,8 @@ module save_state_controller (
       dcfifo_component.lpm_widthu = 12, dcfifo_component.lpm_widthu_r = 11,
       dcfifo_component.lpm_width_r = 64, dcfifo_component.overflow_checking = "OFF",
       dcfifo_component.rdsync_delaypipe = 5, dcfifo_component.underflow_checking = "ON",
-      dcfifo_component.use_eab = "ON", dcfifo_component.wrsync_delaypipe = 5;
+      dcfifo_component.use_eab = "ON", dcfifo_component.wrsync_delaypipe = 5,
+      dcfifo_component.write_aclr_synch = "ON";
 
   data_unloader #(
       .ADDRESS_MASK_UPPER_4(4'h4),
@@ -218,8 +220,7 @@ module save_state_controller (
   localparam LOAD_READ_REQ = LOAD_WAIT_REQ + 1;
   localparam LOAD_WAIT_APF_START = LOAD_READ_REQ + 1;
 
-  localparam LOAD_APF_BUSY = LOAD_WAIT_APF_START + 1;
-  localparam LOAD_APF_COMPLETE = LOAD_APF_BUSY + 1;
+  localparam LOAD_APF_COMPLETE = LOAD_WAIT_APF_START + 1;
 
   reg [7:0] state = NONE;
 
@@ -336,6 +337,9 @@ module save_state_controller (
             end else begin
               // Low 32 bit word
               save_state_unloader_data <= last_ss_buffer[15:0];
+
+              // If it's the low word, set the shift count to 0 and 1
+              save_shift_count <= {1'b0, save_shift_count[0]};
             end
 
             is_dup_read <= 1;
@@ -421,19 +425,20 @@ module save_state_controller (
       LOAD_WAIT_APF_START: begin
         if (save_state_saving_req) begin
           // Begin APF savestate load (data is already copied into ss manager)
-          state <= LOAD_APF_BUSY;
+          state <= LOAD_APF_COMPLETE;
+
+          fifo_clr <= 1;
+
+          savestate_load_ack <= 0;
+          savestate_load_busy <= 1;
 
           save_state_saving_req <= 0;
         end
       end
-      LOAD_APF_BUSY: begin
-        state <= LOAD_APF_COMPLETE;
-
-        savestate_load_ack <= 0;
-        savestate_load_busy <= 1;
-      end
       LOAD_APF_COMPLETE: begin
         state <= NONE;
+
+        fifo_clr <= 0;
 
         savestate_load_busy <= 0;
         savestate_load_ok <= 1;
