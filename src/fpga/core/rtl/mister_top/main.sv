@@ -149,7 +149,6 @@ module MAIN_NES (
   wire                                                         ppu_write;
   wire                               [  7:0]                   ppu_dout;
   wire                               [  7:0]                   ppu_din;
-  wire                                                         refresh;
 
   wire                                                         state_loaded;
 
@@ -159,6 +158,7 @@ module MAIN_NES (
   reg                                                          pausecore;
   reg                                [  1:0]                   videopause_ce;
   wire                                                         corepaused;
+  wire                                                         refresh;
   wire                                                         sleep_savestate;
 
   always_ff @(posedge clk_ppu_21_47) begin
@@ -233,10 +233,10 @@ module MAIN_NES (
 
       // savestates
       .mapper_has_savestate (mapper_has_savestate),
-      .increaseSSHeaderCount(0),
+      .increaseSSHeaderCount(1),
       .save_state           (ss_save),
       .load_state           (ss_load),
-      .savestate_number     (ss_slot),
+      .savestate_number     (0),
       .sleep_savestate      (sleep_savestate),
 
       .Savestate_SDRAMAddr     (Savestate_SDRAMAddr),

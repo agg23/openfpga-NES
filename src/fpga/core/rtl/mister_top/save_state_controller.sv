@@ -518,7 +518,7 @@ module save_state_controller (
 
         fifo_load_read_req <= 0;
         debug_hash_adder <= debug_hash_adder + ss_dout[63:32] + ss_dout[31:0];
-        debug_hash_xor <= debug_hash_xor ^ ss_dout[63:32] ^ ss_dout[31:0];
+        debug_hash_xor <= debug_hash_xor + (ss_dout[63:32] ^ ss_dout[31:0] ^ {6'b0, ss_addr});
         debug_read_value <= ss_dout;
         ss_ack <= 1;
         // 8 bytes in each
