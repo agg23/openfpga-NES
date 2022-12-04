@@ -36,21 +36,7 @@ module save_state_controller (
     input wire [7:0] ss_be,
     output reg ss_ack,
 
-    input wire ss_busy,
-
-    // PSRAM
-    output wire [21:16] cram0_a,
-    inout wire [15:0] cram0_dq,
-    input wire cram0_wait,
-    output wire cram0_clk,
-    output wire cram0_adv_n,
-    output wire cram0_cre,
-    output wire cram0_ce0_n,
-    output wire cram0_ce1_n,
-    output wire cram0_oe_n,
-    output wire cram0_we_n,
-    output wire cram0_ub_n,
-    output wire cram0_lb_n
+    input wire ss_busy
 );
   wire savestate_load_s;
   wire savestate_start_s;
@@ -107,32 +93,10 @@ module save_state_controller (
   wire save_state_unloader_read;
   wire [22:0] save_state_unloader_addr;
 
-  // data_loader #(
-  //     .ADDRESS_MASK_UPPER_4(4'h4),
-  //     .ADDRESS_SIZE(22),
-  //     .OUTPUT_WORD_SIZE(2)
-  // ) save_state_loader (
-  //     .clk_74a(clk_74a),
-  //     .clk_memory(clk_ppu_21_47),
-
-  //     .bridge_wr(bridge_wr),
-  //     .bridge_endian_little(bridge_endian_little),
-  //     .bridge_addr(bridge_addr),
-  //     .bridge_wr_data(bridge_wr_data),
-
-  //     .write_en  (save_state_loader_write),
-  //     .write_addr(save_state_loader_addr),
-  //     .write_data(save_state_loader_data)
-  // );
-
   wire fifo_load_empty;
   reg fifo_load_read_req = 0;
   wire [63:0] fifo_load_dout;
   reg fifo_load_clr = 0;
-
-  // wire [10:0] debug_used;
-  reg [31:0] written_words = 0;
-  reg [31:0] transferred_words = 0;
 
   // TODO: Add endianness
   // assign ss_dout = {fifo_load_dout[47:32], fifo_load_dout[63:48], fifo_load_dout[15:0], fifo_load_dout[31:16]};
@@ -146,24 +110,6 @@ module save_state_controller (
     fifo_load_dout[23:16],
     fifo_load_dout[31:24]
   };
-
-  reg prev_wr;
-  reg [31:0] last_write_addr;
-  reg [31:0] debug_dupe_writes = 0;
-
-  always @(posedge clk_74a) begin
-    if (bridge_wr && ~prev_wr && bridge_addr[31:28] == 4'h4) begin
-      written_words <= written_words + 4;
-
-      if (bridge_addr == last_write_addr) begin
-        debug_dupe_writes <= debug_dupe_writes + 1;
-      end
-
-      last_write_addr <= bridge_addr;
-    end
-
-    prev_wr <= bridge_wr && bridge_addr[31:28] == 4'h4;
-  end
 
   dcfifo_mixed_widths fifo_load (
       .data(bridge_wr_data),
@@ -223,36 +169,11 @@ module save_state_controller (
       fifo_save.wrsync_delaypipe = 5;
 
 
-  // data_unloader #(
-  //     .ADDRESS_MASK_UPPER_4(4'h4),
-  //     .ADDRESS_SIZE(22),
-  //     .INPUT_WORD_SIZE(2),
-  //     // It takes 7 cycles for a PSRAM read in the mem clock, which is 4x PPU clock, so allow
-  //     // 14 mem cycles < 4 PPU cycles to make sure it completes
-  //     // Larger than 4 delay just because we have plenty of time. Decrease this if we ever speed up APF
-  //     .READ_MEM_CLOCK_DELAY(5)
-  // ) save_state_unloader (
-  //     .clk_74a(clk_74a),
-  //     .clk_memory(clk_ppu_21_47),
-
-  //     .bridge_rd(bridge_rd),
-  //     .bridge_endian_little(bridge_endian_little),
-  //     .bridge_addr(bridge_addr),
-  //     .bridge_rd_data(save_state_bridge_read_data),
-
-  //     .read_en  (save_state_unloader_read),
-  //     .read_addr(save_state_unloader_addr),
-  //     .read_data(save_state_unloader_data)
-  // );
-
   reg prev_bridge_rd;
   reg [1:0] save_read_state = NONE;
 
   wire [27:0] bridge_save_addr = bridge_addr[27:0];
   wire bridge_save_rd = bridge_rd && bridge_addr[31:28] == 4'h4;
-
-  reg [31:0] fifo_empty_count = 0;
-  reg [31:0] fifo_addr_count = 0;
 
   localparam SAVE_READ_REQ = 1;
 
@@ -266,16 +187,7 @@ module save_state_controller (
         fifo_save_read_req <= 1;
 
         last_unloader_addr <= bridge_save_addr[22:2];
-      end else if (fifo_save_rd_empty) begin
-        fifo_empty_count <= fifo_empty_count + 1;
-      end else begin
-        fifo_addr_count <= fifo_addr_count + 1;
       end
-    end
-
-    // TODO: Remove
-    if (fifo_empty_count == 32'hFFFFFFFF || fifo_addr_count == 32'hFFFFFFFF || debug_dupe_writes == 32'hFFFFFFFF || transferred_words == 32'hFFFFFFFF || written_words == 32'hFFFFFFFF) begin
-      save_read_state <= NONE;
     end
 
     case (save_read_state)
@@ -321,11 +233,6 @@ module save_state_controller (
   reg prev_ss_busy = 0;
   reg prev_bridge_save_rd = 0;
 
-  reg [31:0] debug_hash_adder  /* synthesis noprune */;
-  reg [31:0] debug_hash_xor  /* synthesis noprune */;
-  reg [63:0] debug_read_value  /* synthesis noprune */;
-  reg [31:0] duplicate_read_count = 0;
-
   always @(posedge clk_ppu_21_47) begin
     prev_ss_busy <= ss_busy;
     prev_savestate_start <= savestate_start_s;
@@ -336,10 +243,6 @@ module save_state_controller (
     ss_save <= 0;
     ss_ack <= 0;
     fifo_save_write_req <= 0;
-
-    if (duplicate_read_count == 32'hFFFFFFFF) begin
-      state <= NONE;
-    end
 
     if (~fifo_load_empty && ~save_state_loading) begin
       // Begin save stating
@@ -386,7 +289,6 @@ module save_state_controller (
           state <= SAVE_WAIT_REQ_DELAY;
 
           // Latch data
-          // ss_buffer <= ss_din;
           fifo_save_write_req <= 1;
 
           savestate_start_busy <= 0;
@@ -399,7 +301,6 @@ module save_state_controller (
           state <= SAVE_WAIT_REQ_DELAY;
 
           // Latch data
-          // ss_buffer <= ss_din;
           fifo_save_write_req <= 1;
         end else if (prev_ss_busy && ~ss_busy) begin
           // Left busy, SS manager is done
@@ -418,82 +319,6 @@ module save_state_controller (
           ss_ack <= 1;
         end
       end
-
-      // Wait for bridge to request this word
-      // if (bridge_save_rd && ~prev_bridge_save_rd) begin
-      //   if (bridge_save_addr[22:2] != last_unloader_addr) begin
-      //     // This isn't a duplicate read, request data
-
-      //     // TODO: Set data to last_ss_buffer data
-      //     // Otherwise (if not duplicate) read FIFO and set to output
-
-      //     // state <= SAVE_SHIFT;
-
-      //     // duplicate_read_count <= duplicate_read_count + 1;
-
-      //     // if (last_unloader_addr[0]) begin
-      //     //   // High 32 bit word
-      //     //   save_state_unloader_data <= last_ss_buffer[47:32];
-
-      //     //   // If it's the high word, set the shift count to 2 and 3
-      //     //   save_shift_count <= {1'b1, save_shift_count[0]};
-      //     // end else begin
-      //     //   // Low 32 bit word
-      //     //   save_state_unloader_data <= last_ss_buffer[15:0];
-
-      //     //   // If it's the low word, set the shift count to 0 and 1
-      //     //   save_shift_count <= {1'b0, save_shift_count[0]};
-      //     // end
-
-      //     // is_dup_read <= 1;
-      //   end else begin
-      //     // state <= SAVE_SHIFT;
-
-      //     // if (save_shift_count == 0) begin
-      //     //   // This is the first read operation. Save buffer in case we have a dup read
-      //     //   last_ss_buffer <= ss_buffer;
-      //     // end
-      //     // is_dup_read <= 0;
-
-      //     // save_state_unloader_data <= ss_buffer[15:0];
-      //   end
-      // end
-      // end
-      // SAVE_SHIFT: begin
-      //   if (~save_state_unloader_read && prev_save_state_unloader_read) begin
-      //     // End read
-      //     state <= SAVE_WAIT_ACK;
-
-      //     if (is_dup_read) begin
-      //       last_ss_buffer[47:0] <= last_ss_buffer[63:16];
-      //     end else begin
-      //       ss_buffer[47:0] <= ss_buffer[63:16];
-      //     end
-      //     save_shift_count <= save_shift_count + 1;
-
-      //     if (save_shift_count == 1 || save_shift_count == 3) begin
-      //       // A single bridge write has completed
-      //       last_unloader_addr <= save_state_unloader_addr[22:2];
-      //     end
-
-      //     if (save_shift_count == 3) begin
-      //       // Sent out full 64bit word
-      //       if (is_dup_read) begin
-      //         // We want to go back to our normal loading
-      //         // We've already seen a req from the SS manager, so go back to wait for a read
-      //         state <= SAVE_WAIT_ACK;
-      //         is_dup_read <= 0;
-      //       end else begin
-      //         // Ack complete to SS manager
-      //         state  <= SAVE_WAIT_REQ;
-
-      //         ss_ack <= 1;
-      //       end
-
-      //       save_shift_count <= 0;
-      //     end
-      //   end
-      // end
 
       // Loading
       LOAD_WAIT_REQ: begin
@@ -517,12 +342,7 @@ module save_state_controller (
         state <= LOAD_WAIT_REQ;
 
         fifo_load_read_req <= 0;
-        debug_hash_adder <= debug_hash_adder + ss_dout[63:32] + ss_dout[31:0];
-        debug_hash_xor <= debug_hash_xor + (ss_dout[63:32] ^ ss_dout[31:0] ^ {6'b0, ss_addr});
-        debug_read_value <= ss_dout;
         ss_ack <= 1;
-        // 8 bytes in each
-        transferred_words <= transferred_words + 2 * 4;
       end
       LOAD_WAIT_APF_START: begin
         if (save_state_saving_req) begin

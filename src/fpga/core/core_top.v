@@ -259,17 +259,17 @@ module core_top (
   assign port_tran_sd_dir        = 1'b0;  // SD is input and not used
 
   // tie off the rest of the pins we are not using
-  // assign cram0_a                 = 'h0;
-  // assign cram0_dq                = {16{1'bZ}};
-  // assign cram0_clk               = 0;
-  // assign cram0_adv_n             = 1;
-  // assign cram0_cre               = 0;
-  // assign cram0_ce0_n             = 1;
-  // assign cram0_ce1_n             = 1;
-  // assign cram0_oe_n              = 1;
-  // assign cram0_we_n              = 1;
-  // assign cram0_ub_n              = 1;
-  // assign cram0_lb_n              = 1;
+  assign cram0_a                 = 'h0;
+  assign cram0_dq                = {16{1'bZ}};
+  assign cram0_clk               = 0;
+  assign cram0_adv_n             = 1;
+  assign cram0_cre               = 0;
+  assign cram0_ce0_n             = 1;
+  assign cram0_ce1_n             = 1;
+  assign cram0_oe_n              = 1;
+  assign cram0_we_n              = 1;
+  assign cram0_ub_n              = 1;
+  assign cram0_lb_n              = 1;
 
   assign cram1_a                 = 'h0;
   assign cram1_dq                = {16{1'bZ}};
@@ -598,21 +598,7 @@ module core_top (
       .ss_be  (ss_be),
       .ss_ack (ss_ack),
 
-      .ss_busy(ss_busy),
-
-      // PSRAM
-      .cram0_a(cram0_a),
-      .cram0_dq(cram0_dq),
-      .cram0_wait(cram0_wait),
-      .cram0_clk(cram0_clk),
-      .cram0_adv_n(cram0_adv_n),
-      .cram0_cre(cram0_cre),
-      .cram0_ce0_n(cram0_ce0_n),
-      .cram0_ce1_n(cram0_ce1_n),
-      .cram0_oe_n(cram0_oe_n),
-      .cram0_we_n(cram0_we_n),
-      .cram0_ub_n(cram0_ub_n),
-      .cram0_lb_n(cram0_lb_n)
+      .ss_busy(ss_busy)
   );
 
   // Core
