@@ -7,7 +7,7 @@
         "id": 10,
         "type": "action",
         "enabled": true,
-        "address": "0x00000050",
+        "address": "0x50",
         "value": 1
       },
       {
@@ -15,7 +15,7 @@
         "id": 20,
         "type": "check",
         "enabled": true,
-        "address": "0x00000300",
+        "address": "0x300",
         "persist": true,
         "writeonly": true,
         "defaultval": 0,
@@ -32,7 +32,7 @@
         "id": 40,
         "type": "check",
         "enabled": true,
-        "address": "0x00000200",
+        "address": "0x200",
         "persist": true,
         "writeonly": true,
         "defaultval": 1,
@@ -45,7 +45,7 @@
         "enabled": true,
         "persist": true,
         "writeonly": true,
-        "address": "0x00000204",
+        "address": "0x204",
         "defaultval": 3,
         "options": [
           {
@@ -71,7 +71,7 @@
         "id": 48,
         "type": "check",
         "enabled": true,
-        "address": "0x00000208",
+        "address": "0x208",
         "persist": true,
         "writeonly": true,
         "defaultval": 0,
@@ -84,7 +84,7 @@
         "enabled": true,
         "persist": true,
         "writeonly": true,
-        "address": "0x0000020C",
+        "address": "0x20C",
         "defaultval": 1,
         "options": [
           {
@@ -120,7 +120,7 @@
         "id": 81,
         "type": "check",
         "enabled": true,
-        "address": "0x00000304",
+        "address": "0x304",
         "persist": true,
         "writeonly": true,
         "defaultval": 0,
@@ -131,7 +131,7 @@
         "id": 82,
         "type": "slider_u32",
         "enabled": true,
-        "address": "0x00000308",
+        "address": "0x308",
         "persist": true,
         "writeonly": true,
         "defaultval": 3,
@@ -142,6 +142,17 @@
           "adjust_small": 1,
           "adjust_large": 4
         }
+      },
+      {
+        "name": "Swap P1 & P2",
+        "id": 83,
+        "type": "check",
+        "enabled": true,
+        "address": "0x30C",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
       }
     ],
     "messages": []

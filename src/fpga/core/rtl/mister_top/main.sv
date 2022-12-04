@@ -57,6 +57,7 @@ module MAIN_NES (
     input wire multitap_enabled,
     input wire lightgun_enabled,
     input wire [7:0] lightgun_dpad_aim_speed,
+    input wire swap_controllers,
 
     // Data in
     input wire       ioctl_wr,
@@ -274,7 +275,7 @@ module MAIN_NES (
   reg [23:0] joypad_bits;
   reg [23:0] joypad_bits2;
   reg [1:0] last_joypad_clock;
-  wire joy_swap = 0;
+  wire joy_swap = swap_controllers;
 
   wire mic = 0;
   wire paddle_en = 0;

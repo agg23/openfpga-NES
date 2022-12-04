@@ -320,29 +320,32 @@ module core_top (
 
     if (bridge_wr) begin
       casex (bridge_addr)
-        32'h00000050: begin
+        32'h050: begin
           reset_delay <= 32'h100000;
         end
-        32'h00000200: begin
+        32'h200: begin
           hide_overscan <= bridge_wr_data[0];
         end
-        32'h00000204: begin
+        32'h204: begin
           mask_vid_edges <= bridge_wr_data[1:0];
         end
-        32'h00000208: begin
+        32'h208: begin
           allow_extra_sprites <= bridge_wr_data[0];
         end
-        32'h0000020C: begin
+        32'h20C: begin
           selected_palette <= bridge_wr_data[2:0];
         end
-        32'h00000300: begin
+        32'h300: begin
           multitap_enabled <= bridge_wr_data[0];
         end
-        32'h00000304: begin
+        32'h304: begin
           lightgun_enabled <= bridge_wr_data[0];
         end
-        32'h00000308: begin
+        32'h308: begin
           lightgun_dpad_aim_speed <= bridge_wr_data[7:0];
+        end
+        32'h30C: begin
+          swap_controllers <= bridge_wr_data[0];
         end
       endcase
     end
@@ -599,39 +602,43 @@ module core_top (
   reg multitap_enabled;
   reg lightgun_enabled;
   reg [7:0] lightgun_dpad_aim_speed;
+  reg swap_controllers;
 
   wire hide_overscan_s;
   wire [1:0] mask_vid_edges_s;
   wire allow_extra_sprites_s;
   wire [2:0] selected_palette_s;
+  wire external_reset_s;
 
   wire multitap_enabled_s;
   wire lightgun_enabled_s;
   wire [7:0] lightgun_dpad_aim_speed_s;
-  wire external_reset_s;
+  wire swap_controllers_s;
 
   synch_3 #(
-      .WIDTH(18)
+      .WIDTH(19)
   ) settings_s (
       {
         hide_overscan,
         mask_vid_edges,
         allow_extra_sprites,
         selected_palette,
+        external_reset,
         multitap_enabled,
         lightgun_enabled,
         lightgun_dpad_aim_speed,
-        external_reset
+        swap_controllers
       },
       {
         hide_overscan_s,
         mask_vid_edges_s,
         allow_extra_sprites_s,
         selected_palette_s,
+        external_reset_s,
         multitap_enabled_s,
         lightgun_enabled_s,
         lightgun_dpad_aim_speed_s,
-        external_reset_s
+        swap_controllers_s
       },
       clk_ppu_21_47
   );
@@ -697,6 +704,7 @@ module core_top (
       .multitap_enabled(multitap_enabled_s),
       .lightgun_enabled(lightgun_enabled_s),
       .lightgun_dpad_aim_speed(lightgun_dpad_aim_speed_s),
+      .swap_controllers(swap_controllers_s),
 
       // APF
       .ioctl_wr(ioctl_wr),
