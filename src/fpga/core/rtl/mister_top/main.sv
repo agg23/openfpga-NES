@@ -398,8 +398,8 @@ module MAIN_NES (
       .chr_mask    (chr_mask),
       .busy        (loader_busy),
       .done        (loader_done),
-      .error       (loader_fail),
-      .rom_loaded  (rom_loaded)
+      .error       (loader_fail)
+      // .rom_loaded  (rom_loaded)
   );
 
   always @(posedge clk_ppu_21_47) if (loader_done) mapper_flags <= loader_flags;
@@ -599,7 +599,7 @@ module MAIN_NES (
   wire [63:0]                             SS_Ext;
   wire [63:0]                             SS_Ext_BACK;
   eReg_SavestateV #(SSREG_INDEX_EXT, SSREG_DEFAULT_EXT) iREG_SAVESTATE_Ext (
-      clk,
+      clk_ppu_21_47,
       SaveStateBus_Din,
       SaveStateBus_Adr,
       SaveStateBus_wren,
