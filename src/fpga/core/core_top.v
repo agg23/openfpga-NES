@@ -380,7 +380,6 @@ module core_top (
   // TODO: Use mapper_has_savestate (and sync it)
   wire savestate_supported = 1;
   wire [31:0] savestate_addr = 32'h40000000;
-  // TODO: Change to correct size
   wire [31:0] savestate_size = 32'h144008;
   // Add buffer of 0x1000 for extra data that we'll just discard on loading
   wire [31:0] savestate_maxloadsize = savestate_size + 32'h1000;
