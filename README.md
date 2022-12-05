@@ -17,7 +17,7 @@ To install the core, copy the `Assets`, `Cores`, and `Platform` folders over to 
 
 ROMs should be placed in `/Assets/nes/common`
 
-PAL ROMs should boot, but there may be timing and sound issues as the core currently doesn't properly support PAL (proper support coming soon). I highly recommend you do not play PAL games at this time
+PAL ROMs should boot, but there may be timing and sound issues as the core currently doesn't properly support PAL (proper support coming soon). I highly recommend you do not play PAL games, and instead use NTSC games (if they exist) at this time.
 
 ## Features
 
@@ -25,13 +25,21 @@ PAL ROMs should boot, but there may be timing and sound issues as the core curre
 
 Core supports four players/controllers via the Analogue Dock. To enable four player mode, turn on `Use Multitap` setting.
 
+### Mappers
+
+This core has pairity with the MiSTer core's mapper support. [See the full breakdown here](https://github.com/MiSTer-devel/NES_MiSTer#supported-mappers). Please note that the VRC7 expansion audio chip is not supported in this core (but is in MiSTer) due to space constraints.
+
+### Save States/Sleep + Wake
+
+Known as "Memories" on the Pocket, this core supports the creation and loading of save states for most mappers. See the full list in the [Mappers section](#mappers). By extension, the core supports Sleep + Wake functionality on the Pocket. In games with supported mappers, tapping the power button while playing will suspend the game, ready to be resumed when powering the Pocket back on.
+
 ### Saves
 
-Supports saves for most games and mappers. Saving on the NES is rather complicated due to the different scenarios for different mappers, so it's possible some less common mappers do not save correctly on this core. Please report all such issues to this repo
+Supports saves for most games and mappers. Saving on the NES is rather complicated due to the different scenarios for different mappers, so it's possible some less common mappers do not save correctly on this core. Please report all such issues to this repo.
 
 ### Expansion Audio
 
-Expansion audio should be fully supported. If you encounter a game that is not playing the expanded audio, please report it.
+Expansion audio should be supported for every mapper except those that use VRC7. If you encounter a game that is not playing the expanded audio outside of VRC7, please report it.
 
 ### Palette Options
 
