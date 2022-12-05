@@ -310,6 +310,8 @@ module core_top (
 
     if (bridge_addr[31:28] == 4'h2) begin
       bridge_rd_data <= sd_read_data;
+    end else if (bridge_addr[31:28] == 4'h4) begin
+      bridge_rd_data <= save_state_bridge_read_data;
     end
   end
 
@@ -375,10 +377,12 @@ module core_top (
 
   wire dataslot_allcomplete;
 
-  wire savestate_supported = 0;
-  wire [31:0] savestate_addr;
-  wire [31:0] savestate_size;
-  wire [31:0] savestate_maxloadsize;
+  // TODO: Use mapper_has_savestate (and sync it)
+  wire savestate_supported = 1;
+  wire [31:0] savestate_addr = 32'h40000000;
+  wire [31:0] savestate_size = 32'h144008;
+  // Add buffer of 0x1000 for extra data that we'll just discard on loading
+  wire [31:0] savestate_maxloadsize = savestate_size + 32'h1000;
 
   wire savestate_start;
   wire savestate_start_ack;
@@ -391,9 +395,6 @@ module core_top (
   wire savestate_load_busy;
   wire savestate_load_ok;
   wire savestate_load_err;
-
-  // bridge target commands
-  // synchronous to clk_74a
 
   core_bridge_cmd icb (
 
@@ -546,6 +547,66 @@ module core_top (
       .write_data(sd_buff_dout)
   );
 
+  // Save states
+  // Save state unloader
+  wire ss_busy;
+  wire [63:0] ss_din;
+  wire [63:0] ss_dout;
+  wire [25:0] ss_addr;
+  wire ss_rnw;
+  wire ss_req;
+  wire [7:0] ss_be;
+  wire ss_ack;
+
+  wire ss_save;
+  wire ss_load;
+
+  wire mapper_has_savestate;
+  wire [31:0] save_state_bridge_read_data;
+
+  save_state_controller save_state_controller (
+      .clk_74a(clk_74a),
+      .clk_mem_85_9(clk_85_9),
+      .clk_ppu_21_47(clk_ppu_21_47),
+
+      // APF
+      .bridge_wr(bridge_wr),
+      .bridge_rd(bridge_rd),
+      .bridge_endian_little(bridge_endian_little),
+      .bridge_addr(bridge_addr),
+      .bridge_wr_data(bridge_wr_data),
+      .save_state_bridge_read_data(save_state_bridge_read_data),
+
+      // APF Save States
+      .savestate_load(savestate_load),
+      .savestate_load_ack_s(savestate_load_ack),
+      .savestate_load_busy_s(savestate_load_busy),
+      .savestate_load_ok_s(savestate_load_ok),
+      .savestate_load_err_s(savestate_load_err),
+
+      .savestate_start(savestate_start),
+      .savestate_start_ack_s(savestate_start_ack),
+      .savestate_start_busy_s(savestate_start_busy),
+      .savestate_start_ok_s(savestate_start_ok),
+      .savestate_start_err_s(savestate_start_err),
+
+      // Save States Manager
+      .ss_save(ss_save),
+      .ss_load(ss_load),
+
+      .ss_din (ss_din),
+      .ss_dout(ss_dout),
+      .ss_addr(ss_addr),
+      .ss_rnw (ss_rnw),
+      .ss_req (ss_req),
+      .ss_be  (ss_be),
+      .ss_ack (ss_ack),
+
+      .ss_busy(ss_busy)
+  );
+
+  // Core
+
   wire [15:0] cont1_key_s;
   wire [15:0] cont2_key_s;
   wire [15:0] cont3_key_s;
@@ -652,7 +713,6 @@ module core_top (
       .clock_locked(pll_core_locked),
 
       // Control
-      .pause(0),
       .external_reset(external_reset_s),
 
       // Input
@@ -718,6 +778,21 @@ module core_top (
       .sd_buff_addr(sd_buff_addr),
       .sd_buff_din(sd_buff_din),
       .sd_buff_dout(sd_buff_dout),
+
+      // Save states
+      .mapper_has_savestate(mapper_has_savestate),
+      .ss_save(ss_save),
+      .ss_load(ss_load),
+
+      .ss_busy(ss_busy),
+
+      .ss_din (ss_din),
+      .ss_dout(ss_dout),
+      .ss_addr(ss_addr),
+      .ss_rnw (ss_rnw),
+      .ss_req (ss_req),
+      .ss_be  (ss_be),
+      .ss_ack (ss_ack),
 
       // SDRAM
       .dram_a(dram_a),

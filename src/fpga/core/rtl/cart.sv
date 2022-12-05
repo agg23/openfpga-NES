@@ -2116,37 +2116,37 @@ Mapper413 map413 (
 // Games  : Bio Miracle for audio, Various unlicensed games for compatibility. //
 //*****************************************************************************//
 tri0 [1:0] fds_diskside;
-MapperFDS mapfds(
-	.clk        (clk),
-	.ce         (ce),
-	.enable     (me[20]),
-	.flags      (flags),
-	.prg_ain    (prg_ain),
-	.prg_aout_b (prg_addr_b),
-	.prg_read   (prg_read),
-	.prg_write  (prg_write),
-	.prg_din    (prg_din),
-	.prg_dout_b (prg_dout_b),
-	.prg_allow_b(prg_allow_b),
-	.chr_ain    (chr_ain),
-	.chr_aout_b (chr_addr_b),
-	.chr_read   (chr_read),
-	.chr_allow_b(chr_allow_b),
-	.vram_a10_b (vram_a10_b),
-	.vram_ce_b  (vram_ce_b),
-	.irq_b      (irq_b),
-	.flags_out_b(flags_out_b),
-	.audio_in   (fds_audio),
-	.audio_b    (audio_out_b),
-	// Special ports
-	.prg_dbus   (prg_from_ram),
-	.audio_dout	(fds_data),
-	.diskside_b (fds_diskside),
-	.max_diskside (max_diskside),
-	.fds_busy   (fds_busy),
-	.fds_eject_btn (fds_eject),
-	.fds_auto_eject_en (fds_auto_eject)
-);
+// MapperFDS mapfds(
+// 	.clk        (clk),
+// 	.ce         (ce),
+// 	.enable     (me[20]),
+// 	.flags      (flags),
+// 	.prg_ain    (prg_ain),
+// 	.prg_aout_b (prg_addr_b),
+// 	.prg_read   (prg_read),
+// 	.prg_write  (prg_write),
+// 	.prg_din    (prg_din),
+// 	.prg_dout_b (prg_dout_b),
+// 	.prg_allow_b(prg_allow_b),
+// 	.chr_ain    (chr_ain),
+// 	.chr_aout_b (chr_addr_b),
+// 	.chr_read   (chr_read),
+// 	.chr_allow_b(chr_allow_b),
+// 	.vram_a10_b (vram_a10_b),
+// 	.vram_ce_b  (vram_ce_b),
+// 	.irq_b      (irq_b),
+// 	.flags_out_b(flags_out_b),
+// 	.audio_in   (fds_audio),
+// 	.audio_b    (audio_out_b),
+// 	// Special ports
+// 	.prg_dbus   (prg_from_ram),
+// 	.audio_dout	(fds_data),
+// 	.diskside_b (fds_diskside),
+// 	.max_diskside (max_diskside),
+// 	.fds_busy   (fds_busy),
+// 	.fds_eject_btn (fds_eject),
+// 	.fds_auto_eject_en (fds_auto_eject)
+// );
 
 //*****************************************************************************//
 // Name   : Mapper 31                                                          //
@@ -2156,38 +2156,38 @@ MapperFDS mapfds(
 // Games  : Famicompo Pico 2014, NSF 1.0                                       //
 //*****************************************************************************//
 wire [5:0] exp_audioe;
-NSF nsfplayer(
-	.clk        (clk),
-	.ce         (ce),
-	.enable     (me[31]),
-	.flags      (flags),
-	.prg_ain    (prg_ain),
-	.prg_aout_b (prg_addr_b),
-	.prg_read   (prg_read),
-	.prg_write  (prg_write),
-	.prg_din    (prg_din),
-	.prg_dout_b (prg_dout_b),
-	.prg_allow_b(prg_allow_b),
-	.chr_ain    (chr_ain),
-	.chr_aout_b (chr_addr_b),
-	.chr_read   (chr_read),
-	.chr_dout_b (chr_dout_b), // Special port
-	.chr_allow_b(chr_allow_b),
-	.vram_a10_b (vram_a10_b),
-	.vram_ce_b  (vram_ce_b),
-	.irq_b      (irq_b),
-	.flags_out_b(flags_out_b),
-	.audio_in   (exp_audioe[5] ? ss5b_audio :
-	             exp_audioe[4] ? n163_audio :
-	             exp_audioe[3] ? mmc5_audio :
-	             exp_audioe[2] ? fds_audio  :
-	             exp_audioe[1] ? vrc7_audio :
-	             exp_audioe[0] ? vrc6_audio :
-					 audio_in),
-	.exp_audioe (exp_audioe),  // Expansion Enabled (0x0=None, 0x1=VRC6, 0x2=VRC7, 0x4=FDS, 0x8=MMC5, 0x10=N163, 0x20=SS5B
-	.audio_b    (audio_out_b),
-	.fds_din    (fds_data)
-);
+// NSF nsfplayer(
+// 	.clk        (clk),
+// 	.ce         (ce),
+// 	.enable     (me[31]),
+// 	.flags      (flags),
+// 	.prg_ain    (prg_ain),
+// 	.prg_aout_b (prg_addr_b),
+// 	.prg_read   (prg_read),
+// 	.prg_write  (prg_write),
+// 	.prg_din    (prg_din),
+// 	.prg_dout_b (prg_dout_b),
+// 	.prg_allow_b(prg_allow_b),
+// 	.chr_ain    (chr_ain),
+// 	.chr_aout_b (chr_addr_b),
+// 	.chr_read   (chr_read),
+// 	.chr_dout_b (chr_dout_b), // Special port
+// 	.chr_allow_b(chr_allow_b),
+// 	.vram_a10_b (vram_a10_b),
+// 	.vram_ce_b  (vram_ce_b),
+// 	.irq_b      (irq_b),
+// 	.flags_out_b(flags_out_b),
+// 	.audio_in   (exp_audioe[5] ? ss5b_audio :
+// 	             exp_audioe[4] ? n163_audio :
+// 	             exp_audioe[3] ? mmc5_audio :
+// 	             exp_audioe[2] ? fds_audio  :
+// 	             exp_audioe[1] ? vrc7_audio :
+// 	             exp_audioe[0] ? vrc6_audio :
+// 					 audio_in),
+// 	.exp_audioe (exp_audioe),  // Expansion Enabled (0x0=None, 0x1=VRC6, 0x2=VRC7, 0x4=FDS, 0x8=MMC5, 0x10=N163, 0x20=SS5B
+// 	.audio_b    (audio_out_b),
+// 	.fds_din    (fds_data)
+// );
 
 wire [15:0] ss5b_audio;
 SS5b_mixed snd_5bm (
@@ -2261,29 +2261,29 @@ mmc5_mixed snd_mmc5 (
 
 wire [15:0] fds_audio;
 wire [7:0] fds_data;
-fds_mixed snd_fds (
-	.clk(clk),
-	.ce(ce),
-	.enable(me[20] | (me[31] && exp_audioe[2])),
-	.wren(prg_write),
-	.addr_in(prg_ain),
-	.data_in(prg_din),
-	.data_out(fds_data),
-	.audio_in(audio_in),
-	.audio_out(fds_audio)
-);
+// fds_mixed snd_fds (
+// 	.clk(clk),
+// 	.ce(ce),
+// 	.enable(me[20] | (me[31] && exp_audioe[2])),
+// 	.wren(prg_write),
+// 	.addr_in(prg_ain),
+// 	.data_in(prg_din),
+// 	.data_out(fds_data),
+// 	.audio_in(audio_in),
+// 	.audio_out(fds_audio)
+// );
 
 wire [15:0] vrc7_audio;
-vrc7_mixed snd_vrc7 (
-	.clk(clk),
-	.ce(ce),
-	.enable(me[85] | (me[31] && exp_audioe[1])),
-	.wren(prg_write),
-	.addr_in(prg_ain),
-	.data_in(prg_din),
-	.audio_in(audio_in),
-	.audio_out(vrc7_audio)
-);
+// vrc7_mixed snd_vrc7 (
+// 	.clk(clk),
+// 	.ce(ce),
+// 	.enable(me[85] | (me[31] && exp_audioe[1])),
+// 	.wren(prg_write),
+// 	.addr_in(prg_ain),
+// 	.data_in(prg_din),
+// 	.audio_in(audio_in),
+// 	.audio_out(vrc7_audio)
+// );
 
 wire [15:0] vrc6_audio;
 vrc6_mixed snd_vrc6 (
