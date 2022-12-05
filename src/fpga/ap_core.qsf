@@ -738,9 +738,7 @@ set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 # end ENTITY(mf_pllbase_0002)
 # ---------------------------
 
-# Custom settings
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/save_state_controller.sv
-set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/psram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/data_unloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/sync_fifo.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/sound_i2s.sv
