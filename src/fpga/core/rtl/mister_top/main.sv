@@ -583,8 +583,6 @@ module MAIN_NES (
   wire [7:0] save_dout;
   assign sd_buff_din = bram_en ? eeprom_dout : save_dout;
 
-  wire sd_ack = 1;
-
   wire [7:0] eeprom_dout;
   dpram #(" ", 11) save_ram (
       .clock_a(clk_85_9),
@@ -596,18 +594,13 @@ module MAIN_NES (
       .clock_b(clk_ppu_21_47),
       .address_b(sd_buff_addr),
       .data_b(sd_buff_dout),
-      .wren_b(sd_buff_wr && sd_ack),
+      .wren_b(sd_buff_wr),
       .q_b(eeprom_dout)
   );
 
   wire [17:0] save_addr = sd_buff_addr;
 
   ///////////////////////////// savestates /////////////////////////////////
-
-  // wire [63:0] ss_dout, ss_din;
-  // wire [27:2] ss_addr;
-  // wire [ 7:0] ss_be;
-  // wire ss_rnw, ss_req, ss_ack;
 
   wire [24:0]                             Savestate_SDRAMAddr;
   wire                                    Savestate_SDRAMRdEn;

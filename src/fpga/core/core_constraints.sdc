@@ -21,8 +21,5 @@ set_multicycle_path -from {ic|nes|sdram|*} -to [get_clocks {ic|mp1|mf_pllbase_in
 set_multicycle_path -from [get_clocks {ic|mp1|mf_pllbase_inst|altera_pll_i|*[1].*|divclk}] -to {ic|nes|sdram|*} -setup 2
 set_multicycle_path -from [get_clocks {ic|mp1|mf_pllbase_inst|altera_pll_i|*[1].*|divclk}] -to {ic|nes|sdram|*} -hold 1
 
-set_max_delay 10 -from [get_registers { ic|nes|nes|savestates|* }] \
-					       -to   [get_registers { ic|save_state_controller|psram|* }] 
-
 set_false_path -from {ic|nes|mapper_flags*}
 #set_false_path -from {ic|nes|downloading*}
