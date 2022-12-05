@@ -739,9 +739,6 @@ set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 # ---------------------------
 
 # Custom settings
-set_global_assignment -name FITTER_AGGRESSIVE_ROUTABILITY_OPTIMIZATION ALWAYS
-set_global_assignment -name ALM_REGISTER_PACKING_EFFORT LOW
-set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/save_state_controller.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/psram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/data_unloader.sv
