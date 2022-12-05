@@ -17,6 +17,9 @@ module MAIN_NES (
     input wire p1_dpad_left,
     input wire p1_dpad_right,
 
+    input wire [7:0] p1_lstick_x,
+    input wire [7:0] p1_lstick_y,
+
     input wire p2_button_a,
     input wire p2_button_b,
     input wire p2_button_start,
@@ -51,6 +54,9 @@ module MAIN_NES (
     input wire [2:0] selected_palette,
 
     input wire multitap_enabled,
+    input wire lightgun_enabled,
+    input wire [7:0] lightgun_dpad_aim_speed,
+    input wire swap_controllers,
 
     // Data in
     input wire       ioctl_wr,
@@ -270,14 +276,14 @@ module MAIN_NES (
   reg [23:0] joypad_bits;
   reg [23:0] joypad_bits2;
   reg [1:0] last_joypad_clock;
-  wire joy_swap = 0;
+  wire joy_swap = swap_controllers;
 
   wire mic = 0;
   wire paddle_en = 0;
   wire paddle_btn = 0;
   wire [4:0] joypad1_data = {2'b0, mic, paddle_en & paddle_btn, joypad_bits[0]};
   // Upper 4 bits are other peripherals
-  wire [4:0] joypad2_data = {4'b0, joypad_bits2[0]};
+  wire [4:0] joypad2_data = {trigger, light, 2'b0, joypad_bits2[0]};
 
   wire [7:0] nes_joy_A = {
     p1_dpad_right,
@@ -322,6 +328,29 @@ module MAIN_NES (
     p4_button_b,
     p4_button_a
   };
+
+  wire [1:0] reticle;
+  wire trigger;
+  wire light;
+
+  zapper zap (
+      .clk(clk_ppu_21_47),
+      .reset(reset_nes | ~lightgun_enabled),
+      .dpad_up(p1_dpad_up),
+      .dpad_down(p1_dpad_down),
+      .dpad_left(p1_dpad_left),
+      .dpad_right(p1_dpad_right),
+      .dpad_aim_speed(lightgun_dpad_aim_speed),
+      .analog({p1_lstick_y, p1_lstick_x}),
+      .analog_trigger(p1_button_a),
+      .cycle(cycle),
+      .scanline(scanline),
+      .vde(~VBlank),
+      .color(color),
+      .reticle(reticle),
+      .light(light),
+      .trigger(trigger)
+  );
 
   always @(posedge clk_ppu_21_47) begin
     if (reset_nes) begin
@@ -669,8 +698,7 @@ module MAIN_NES (
       // .load_color_index(pal_index),
       .emphasis(emphasis),
       // Zapper
-      // .reticle(~status[22] ? reticle : 2'b00),
-      .reticle(0),
+      .reticle(lightgun_enabled ? reticle : 2'b00),
       .pal_video(pal_video),
 
       // .ce_pix(ce_pix),

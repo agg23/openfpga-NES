@@ -295,9 +295,6 @@ module core_top (
   assign aux_scl                 = 1'bZ;
   assign vpll_feed               = 1'bZ;
 
-  //Controller YB  
-  reg controller_map_y_b_enable = 0;
-
   // for bridge write data, we just broadcast it to all bus devices
   // for bridge read data, we have to mux it
   // add your own devices here
@@ -325,25 +322,33 @@ module core_top (
 
     if (bridge_wr) begin
       casex (bridge_addr)
-        32'h00000050: begin
+        32'h050: begin
           reset_delay <= 32'h100000;
         end
-        32'h00000200: begin
+        32'h200: begin
           hide_overscan <= bridge_wr_data[0];
         end
-        32'h00000204: begin
+        32'h204: begin
           mask_vid_edges <= bridge_wr_data[1:0];
         end
-        32'h00000208: begin
+        32'h208: begin
           allow_extra_sprites <= bridge_wr_data[0];
         end
-        32'h0000020C: begin
+        32'h20C: begin
           selected_palette <= bridge_wr_data[2:0];
         end
-        32'h00000300: begin
+        32'h300: begin
           multitap_enabled <= bridge_wr_data[0];
         end
-        32'h00000310: controller_map_y_b_enable <= bridge_wr_data[0];
+        32'h304: begin
+          lightgun_enabled <= bridge_wr_data[0];
+        end
+        32'h308: begin
+          lightgun_dpad_aim_speed <= bridge_wr_data[7:0];
+        end
+        32'h30C: begin
+          swap_controllers <= bridge_wr_data[0];
+        end
       endcase
     end
   end
@@ -641,6 +646,14 @@ module core_top (
       clk_ppu_21_47
   );
 
+  synch_3 #(
+      .WIDTH(32)
+  ) joy1_s (
+      cont1_joy,
+      cont1_joy_s,
+      clk_ppu_21_47
+  );
+
   // Settings
   reg hide_overscan;
   reg [1:0] mask_vid_edges;
@@ -649,32 +662,45 @@ module core_top (
   wire external_reset = reset_delay > 0;
 
   reg multitap_enabled;
+  reg lightgun_enabled;
+  reg [7:0] lightgun_dpad_aim_speed;
+  reg swap_controllers;
 
   wire hide_overscan_s;
   wire [1:0] mask_vid_edges_s;
   wire allow_extra_sprites_s;
   wire [2:0] selected_palette_s;
-  wire multitap_enabled_s;
   wire external_reset_s;
 
+  wire multitap_enabled_s;
+  wire lightgun_enabled_s;
+  wire [7:0] lightgun_dpad_aim_speed_s;
+  wire swap_controllers_s;
+
   synch_3 #(
-      .WIDTH(8)
+      .WIDTH(19)
   ) settings_s (
       {
         hide_overscan,
         mask_vid_edges,
         allow_extra_sprites,
         selected_palette,
+        external_reset,
         multitap_enabled,
-        external_reset
+        lightgun_enabled,
+        lightgun_dpad_aim_speed,
+        swap_controllers
       },
       {
         hide_overscan_s,
         mask_vid_edges_s,
         allow_extra_sprites_s,
         selected_palette_s,
+        external_reset_s,
         multitap_enabled_s,
-        external_reset_s
+        lightgun_enabled_s,
+        lightgun_dpad_aim_speed_s,
+        swap_controllers_s
       },
       clk_ppu_21_47
   );
@@ -691,14 +717,17 @@ module core_top (
       .external_reset(external_reset_s),
 
       // Input
-      .p1_button_a(controller_map_y_b_enable ? cont1_key_s[5] : cont1_key_s[4]),
-      .p1_button_b(controller_map_y_b_enable ? cont1_key_s[7] : cont1_key_s[5]),
+      .p1_button_a(cont1_key_s[4]),
+      .p1_button_b(cont1_key_s[5]),
       .p1_button_start(cont1_key_s[15]),
       .p1_button_select(cont1_key_s[14]),
       .p1_dpad_up(cont1_key_s[0]),
       .p1_dpad_down(cont1_key_s[1]),
       .p1_dpad_left(cont1_key_s[2]),
       .p1_dpad_right(cont1_key_s[3]),
+
+      .p1_lstick_x(cont1_joy_s[7:0]),
+      .p1_lstick_y(cont1_joy_s[15:8]),
 
       .p2_button_a(cont2_key_s[4]),
       .p2_button_b(cont2_key_s[5]),
@@ -734,6 +763,9 @@ module core_top (
       .selected_palette(selected_palette_s),
 
       .multitap_enabled(multitap_enabled_s),
+      .lightgun_enabled(lightgun_enabled_s),
+      .lightgun_dpad_aim_speed(lightgun_dpad_aim_speed_s),
+      .swap_controllers(swap_controllers_s),
 
       // APF
       .ioctl_wr(ioctl_wr),

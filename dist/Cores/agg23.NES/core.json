@@ -7,8 +7,8 @@
       "description": "Nintendo Entertainment System and Famicom. Nintendo's first home console",
       "author": "agg23",
       "url": "https://github.com/agg23/openFPGA-NES",
-      "version": "0.1.1",
-      "date_release": "2022-09-26"
+      "version": "0.2.0",
+      "date_release": "2022-10-07"
     },
     "framework": {
       "target_product": "Analogue Pocket",

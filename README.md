@@ -4,6 +4,15 @@ Ported from the core originally developed by [Ludvig Strigeus](https://github.co
 
 Please report any issues encountered to this repo. Most likely any problems are a result of my port, not the original core. Issues will be upstreamed as necessary.
 
+## Installation
+
+### Easy mode
+
+I highly recommend the updater tools by [@mattpannella](https://github.com/mattpannella) and [@RetroDriven](https://github.com/RetroDriven). If you're running Windows, use [the RetroDriven GUI](https://github.com/RetroDriven/Pocket_Updater), or if you prefer the CLI, use [the mattpannella tool](https://github.com/mattpannella/pocket_core_autoupdate_net). Either of these will allow you to automatically download and install openFPGA cores onto your Analogue Pocket. Go donate to them if you can
+
+### Manual mode
+To install the core, copy the `Assets`, `Cores`, and `Platform` folders over to the root of your SD card. Please note that Finder on macOS automatically _replaces_ folders, rather than merging them like Windows does, so you have to manually merge the folders.
+
 ## Usage
 
 ROMs should be placed in `/Assets/nes/common`
@@ -26,13 +35,13 @@ Expansion audio should be fully supported. If you encounter a game that is not p
 
 ### Palette Options
 
-The core has 5 palette options built in, changable with a slider in `Core Settings`. The palettes are known as:
+The core has 5 palette options built in, changable in `Core Settings`. The palettes are known as:
 
-0. Kitrinx 34 by Kitrinx
-1. Smooth by FirebrandX (Default)
-2. Wavebeam by NakedArthur
-3. Sony CXA by FirebrandX
-4. PC-10 Better by Kitrinx
+* Kitrinx 34 by Kitrinx
+* Smooth by FirebrandX (Default)
+* Wavebeam by NakedArthur
+* Sony CXA by FirebrandX
+* PC-10 Better by Kitrinx
 
 ### Video Options
 
@@ -42,6 +51,8 @@ There are several options provided for tweaking the displayed video:
 * `Edge Masking` - Masks the sides of the screen in black, depending on the chosen option. The auto setting automatically masks the left side when certain conditions are met.
 * `Extra Sprites` - Allows an extra 8 sprites to be displayed per line (up to 16 from the original 8). Will decrease flickering in some games
 
-### Controller Options
+### Lightguns
 
-* `Use Y + B Buttons` - Option to map controller to use Y + B buttons instead of the default A + B. Handy if your used to the snes controller with Y as run and B as jump in Super Mario Games.
+Core supports virtual lightguns by enabling the "Use Zapper" setting. The crosshair can be controlled with the D-Pad or left joystick, using the A button to fire. D-Pad aim sensitivity can be adjusted with the "D-Pad Aim Speed" setting.
+
+**NOTE:** Joystick support for aiming only appears to work when a controller is paired over Bluetooth and not connected to the Analogue Dock directly by USB.

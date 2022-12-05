@@ -7,7 +7,7 @@
         "id": 10,
         "type": "action",
         "enabled": true,
-        "address": "0x00000050",
+        "address": "0x50",
         "value": 1
       },
       {
@@ -15,29 +15,24 @@
         "id": 20,
         "type": "check",
         "enabled": true,
-        "address": "0x00000300",
+        "address": "0x300",
         "persist": true,
         "writeonly": true,
         "defaultval": 0,
         "value": 1
       },
       {
-        "name": "Use Y + B Buttons",
-        "id": 499,
-        "type": "check",
-        "enabled": true,
-        "persist": true,
-        "address": "0x00000310",
-        "writeonly": true,
-        "defaultval": 0,
-        "value": 1
+        "name": "Video Options",
+        "id": 39,
+        "type": "action",
+        "enabled": false
       },
       {
         "name": "Hide Overscan",
         "id": 40,
         "type": "check",
         "enabled": true,
-        "address": "0x00000200",
+        "address": "0x200",
         "persist": true,
         "writeonly": true,
         "defaultval": 1,
@@ -50,7 +45,7 @@
         "enabled": true,
         "persist": true,
         "writeonly": true,
-        "address": "0x00000204",
+        "address": "0x204",
         "defaultval": 3,
         "options": [
           {
@@ -76,7 +71,7 @@
         "id": 48,
         "type": "check",
         "enabled": true,
-        "address": "0x00000208",
+        "address": "0x208",
         "persist": true,
         "writeonly": true,
         "defaultval": 0,
@@ -85,19 +80,79 @@
       {
         "name": "Palette",
         "id": 60,
-        "type": "slider_u32",
+        "type": "list",
         "enabled": true,
-        "address": "0x0000020C",
         "persist": true,
         "writeonly": true,
+        "address": "0x20C",
         "defaultval": 1,
+        "options": [
+          {
+            "value": 0,
+            "name": "Kitrinx 34"
+          },
+          {
+            "value": 1,
+            "name": "Smooth"
+          },
+          {
+            "value": 2,
+            "name": "Wavebeam"
+          },
+          {
+            "value": 3,
+            "name": "Sony CXA"
+          },
+          {
+            "value": 4,
+            "name": "PC-10 Better"
+          }
+        ]
+      },
+      {
+        "name": "Lightgun Options",
+        "id": 80,
+        "type": "action",
+        "enabled": false
+      },
+      {
+        "name": "Use Zapper",
+        "id": 81,
+        "type": "check",
+        "enabled": true,
+        "address": "0x304",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
+        "name": "D-Pad Aim Speed",
+        "id": 82,
+        "type": "slider_u32",
+        "enabled": true,
+        "address": "0x308",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 3,
         "graphical": {
           "signed": false,
-          "min": 0,
-          "max": 4,
+          "min": 1,
+          "max": 10,
           "adjust_small": 1,
-          "adjust_large": 1
+          "adjust_large": 4
         }
+      },
+      {
+        "name": "Swap P1 & P2",
+        "id": 83,
+        "type": "check",
+        "enabled": true,
+        "address": "0x30C",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
       }
     ],
     "messages": []
