@@ -463,7 +463,7 @@ module MAIN_NES (
   //     ;
   //   end
 
-  wire reset_nes = ~init_reset_n || download_reset || loader_fail || hold_reset || external_reset;
+  wire reset_nes = ~init_reset_n || download_reset || loader_fail || hold_reset || external_reset || clearing_ram;
   // arm_reset || bk_loading || bk_loading_req || (old_sys_type != status[24:23]);
 
   //   reg [1:0] old_sys_type;
@@ -555,8 +555,8 @@ module MAIN_NES (
 
       // reserved for backup ram save/load
       .ch2_addr(ch2_addr),
-      .ch2_wr  (ch2_wr),
-      .ch2_din (ch2_din),
+      .ch2_wr  (clearing_ram ? clear_wr : ch2_wr),
+      .ch2_din (clearing_ram ? 0 : ch2_din),
       .ch2_rd  (ch2_rd),
       .ch2_dout(save_dout),
       .ch2_busy(save_busy),
@@ -583,12 +583,55 @@ module MAIN_NES (
   wire [7:0] save_dout;
   assign sd_buff_din = bram_en ? eeprom_dout : save_dout;
 
+  reg did_load_save = 0;
+  reg clearing_ram = 0;
+  reg [17:0] clear_ram_addr = 0;
+  reg [3:0] clear_div = 0;
+  reg clear_wr = 0;
+
+  reg prev_ioctl_download = 0;
+
+  always @(posedge clk_85_9) begin
+    prev_ioctl_download <= ioctl_download;
+
+    if (sd_buff_wr) begin
+      // Save has been loaded, don't clear save RAM
+      did_load_save <= 1;
+    end
+
+    if (prev_ioctl_download && ~ioctl_download && ~did_load_save) begin
+      // All assets have been loaded and no save was loaded
+      clearing_ram <= 1;
+    end
+
+    if (clearing_ram) begin
+      if (clear_div > 0) begin
+        clear_div <= clear_div - 1;
+      end else begin
+        clear_wr <= 0;
+      end
+
+      if (~clear_wr && ~save_busy) begin
+        if (&clear_ram_addr) begin
+          // Finished clearing RAM
+          clearing_ram <= 0;
+        end else begin
+          // Move to next address and write
+          clear_wr <= 1;
+          clear_div <= 15;
+
+          clear_ram_addr <= clear_ram_addr + 1;
+        end
+      end
+    end
+  end
+
   wire [7:0] eeprom_dout;
   dpram #(" ", 11) save_ram (
       .clock_a(clk_85_9),
-      .address_a(bram_addr),
-      .data_a(bram_dout),
-      .wren_a(bram_write),
+      .address_a(clearing_ram ? clear_ram_addr : bram_addr),
+      .data_a(clearing_ram ? 0 : bram_dout),
+      .wren_a(clearing_ram ? clear_wr : bram_write),
       .q_a(bram_din),
 
       .clock_b(clk_ppu_21_47),
@@ -598,28 +641,28 @@ module MAIN_NES (
       .q_b(eeprom_dout)
   );
 
-  wire [17:0] save_addr = sd_buff_addr;
+  wire [17:0] save_addr = clearing_ram ? clear_ram_addr : sd_buff_addr;
 
   ///////////////////////////// savestates /////////////////////////////////
 
-  wire [24:0]                             Savestate_SDRAMAddr;
-  wire                                    Savestate_SDRAMRdEn;
-  wire                                    Savestate_SDRAMWrEn;
-  wire [ 7:0]                             Savestate_SDRAMWriteData;
-  wire [ 7:0]                             Savestate_SDRAMReadData;
+  wire [24:0]                                                           Savestate_SDRAMAddr;
+  wire                                                                  Savestate_SDRAMRdEn;
+  wire                                                                  Savestate_SDRAMWrEn;
+  wire [ 7:0]                                                           Savestate_SDRAMWriteData;
+  wire [ 7:0]                                                           Savestate_SDRAMReadData;
 
-  wire [63:0]                             SaveStateBus_Din;
-  wire [ 9:0]                             SaveStateBus_Adr;
-  wire                                    SaveStateBus_wren;
-  wire                                    SaveStateBus_rst;
-  wire [63:0]                             SaveStateBus_Dout;
-  wire                                    savestate_load;
+  wire [63:0]                                                           SaveStateBus_Din;
+  wire [ 9:0]                                                           SaveStateBus_Adr;
+  wire                                                                  SaveStateBus_wren;
+  wire                                                                  SaveStateBus_rst;
+  wire [63:0]                                                           SaveStateBus_Dout;
+  wire                                                                  savestate_load;
 
   wire [15:0] sdram_ss_in = SS_Ext[15:0];
-  wire [15:0]                             sdram_ss_out;
+  wire [15:0]                                                           sdram_ss_out;
 
-  wire [63:0]                             SS_Ext;
-  wire [63:0]                             SS_Ext_BACK;
+  wire [63:0]                                                           SS_Ext;
+  wire [63:0]                                                           SS_Ext_BACK;
   eReg_SavestateV #(SSREG_INDEX_EXT, SSREG_DEFAULT_EXT) iREG_SAVESTATE_Ext (
       clk_ppu_21_47,
       SaveStateBus_Din,

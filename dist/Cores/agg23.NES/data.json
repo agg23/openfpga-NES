@@ -13,7 +13,7 @@
         "name": "Save",
         "id": 10,
         "required": false,
-        "parameters": "0xA4",
+        "parameters": "0x84",
         "nonvolatile": true,
         "extensions": ["sav", "srm"],
         "address": "0x20000000",
