@@ -471,7 +471,7 @@ module core_top (
     end else begin
       // Write sram size
       datatable_wren <= 1;
-      datatable_data <= has_save ? 32'h40000 : 32'h0;
+      datatable_data <= has_save ? 32'h40_000 : 32'h0;
       // Data slot index 1, not id 1
       datatable_addr <= 1 * 2 + 1;
     end
@@ -665,6 +665,8 @@ module core_top (
   reg [7:0] lightgun_dpad_aim_speed;
   reg swap_controllers;
 
+  wire ioctl_download_s;
+
   wire hide_overscan_s;
   wire [1:0] mask_vid_edges_s;
   wire allow_extra_sprites_s;
@@ -677,9 +679,10 @@ module core_top (
   wire swap_controllers_s;
 
   synch_3 #(
-      .WIDTH(19)
+      .WIDTH(20)
   ) settings_s (
       {
+        ioctl_download,
         hide_overscan,
         mask_vid_edges,
         allow_extra_sprites,
@@ -691,6 +694,7 @@ module core_top (
         swap_controllers
       },
       {
+        ioctl_download_s,
         hide_overscan_s,
         mask_vid_edges_s,
         allow_extra_sprites_s,
@@ -769,7 +773,7 @@ module core_top (
       // APF
       .ioctl_wr(ioctl_wr),
       .ioctl_dout(ioctl_dout),
-      .ioctl_download(ioctl_download),
+      .ioctl_download(ioctl_download_s),
 
       // Save data
       .has_save(has_save),
