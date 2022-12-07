@@ -59,9 +59,12 @@ module MAIN_NES (
     input wire swap_controllers,
 
     // Data in
-    input wire       ioctl_wr,
-    input wire [7:0] ioctl_dout,
-    input wire       ioctl_download,
+    input wire        ioctl_wr,
+    input wire [27:0] ioctl_addr,
+    input wire [ 7:0] ioctl_dout,
+    input wire        ioctl_download,
+
+    input wire palette_download,
 
     // Save data
     output wire has_save,
@@ -120,8 +123,6 @@ module MAIN_NES (
   wire is_bios = 0;
 
   // Temp wires
-  wire ioctl_addr = 0;
-
   wire                               [127:0] status = 0;
 
   wire                               [  1:0]                   nes_ce;
@@ -712,6 +713,42 @@ module MAIN_NES (
   //   else if (bk_state) bk_pending <= 1'b0;
   // end
 
+  ///////////////////////////////////////////////////
+  // palette loader
+  reg [23:0] pal_color;
+  reg [5:0] pal_index;
+  reg [1:0] pal_count;
+
+  wire pal_write = palette_download ? ~|pal_count : 1'b0;
+
+  always @(posedge clk_ppu_21_47) begin
+    if (palette_download && loader_clk && ioctl_addr < 192) begin
+      pal_count <= pal_count == 2 ? 2'd0 : pal_count + 2'd1;
+      case (pal_count)
+        0: begin
+          pal_color[23:16] <= file_input;
+          //pal_write <= 0;
+          pal_index <= ioctl_addr > 0 ? pal_index + 1'd1 : pal_index;
+        end
+
+        1: begin
+          pal_color[15:8] <= file_input;
+        end
+
+        2: begin
+          pal_color[7:0] <= file_input;
+          //pal_write <= 1;
+        end
+      endcase
+    end
+
+    if (!palette_download) begin
+      //pal_write <= 0;
+      pal_count <= 0;
+      pal_index <= 0;
+    end
+  end
+
   // Video
   wire hold_reset;
   wire [1:0] nes_ce_video = corepaused ? videopause_ce : nes_ce;
@@ -728,10 +765,9 @@ module MAIN_NES (
       .count_h(cycle),
       .hide_overscan(hide_overscan),
       .palette(selected_palette),
-      // TODO: Custom palette loading not enabled
-      // .load_color(pal_write && ioctl_download),
-      // .load_color_data(pal_color),
-      // .load_color_index(pal_index),
+      .load_color(pal_write),
+      .load_color_data(pal_color),
+      .load_color_index(pal_index),
       .emphasis(emphasis),
       // Zapper
       .reticle(lightgun_enabled ? reticle : 2'b00),

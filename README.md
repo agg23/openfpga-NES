@@ -43,13 +43,17 @@ Expansion audio should be supported for every mapper except those that use VRC7.
 
 ### Palette Options
 
-The core has 5 palette options built in, changable in `Core Settings`. The palettes are known as:
+The core has 5 palette options built in, changable in `Core Settings/Palette`. The palettes are known as:
 
 * Kitrinx 34 by Kitrinx
 * Smooth by FirebrandX (Default)
 * Wavebeam by NakedArthur
 * Sony CXA by FirebrandX
 * PC-10 Better by Kitrinx
+
+You can load external palettes as well. This palette is stored at `Assets/nes/agg23.NES/custom.pal`, and can be selected by the sixth option (`Custom`).
+
+For testing, or to temporarily load a new palette, you can choose the `Load Custom Palette` option (make sure to choose `Core Settings/Palette/Custom`). This palette selection is temporary, and will be reset when quitting and reopening the core.
 
 ### Video Options
 

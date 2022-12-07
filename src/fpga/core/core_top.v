@@ -454,13 +454,16 @@ module core_top (
   reg [31:0] datatable_data;
   wire [31:0] datatable_q;
 
-  reg ioctl_download = 0;
+  reg is_downloading = 0;
+
+  wire ioctl_download = is_downloading && dataslot_requestwrite_id == 0;
+  wire palette_download = is_downloading && dataslot_requestwrite_id == 11;
 
   wire has_save;
 
   always @(posedge clk_74a) begin
-    if (dataslot_requestwrite) ioctl_download <= 1;
-    else if (dataslot_allcomplete) ioctl_download <= 0;
+    if (dataslot_requestwrite) is_downloading <= 1;
+    else if (dataslot_allcomplete) is_downloading <= 0;
   end
 
   always @(posedge clk_74a or negedge pll_core_locked) begin
@@ -480,6 +483,7 @@ module core_top (
   // Data Loader 8
   wire ioctl_wr;
   wire [7:0] ioctl_dout;
+  wire [27:0] ioctl_addr;
 
   data_loader #(
       .ADDRESS_MASK_UPPER_4(4'h1)
@@ -493,7 +497,7 @@ module core_top (
       .bridge_wr_data(bridge_wr_data),
 
       .write_en  (ioctl_wr),
-      //   .write_addr(apf_write_addr), // Unused
+      .write_addr(ioctl_addr),  // Unused
       .write_data(ioctl_dout)
   );
 
@@ -665,8 +669,6 @@ module core_top (
   reg [7:0] lightgun_dpad_aim_speed;
   reg swap_controllers;
 
-  wire ioctl_download_s;
-
   wire hide_overscan_s;
   wire [1:0] mask_vid_edges_s;
   wire allow_extra_sprites_s;
@@ -679,10 +681,9 @@ module core_top (
   wire swap_controllers_s;
 
   synch_3 #(
-      .WIDTH(20)
+      .WIDTH(19)
   ) settings_s (
       {
-        ioctl_download,
         hide_overscan,
         mask_vid_edges,
         allow_extra_sprites,
@@ -694,7 +695,6 @@ module core_top (
         swap_controllers
       },
       {
-        ioctl_download_s,
         hide_overscan_s,
         mask_vid_edges_s,
         allow_extra_sprites_s,
@@ -772,8 +772,11 @@ module core_top (
 
       // APF
       .ioctl_wr(ioctl_wr),
+      .ioctl_addr(ioctl_addr),
       .ioctl_dout(ioctl_dout),
-      .ioctl_download(ioctl_download_s),
+      .ioctl_download(ioctl_download),
+
+      .palette_download(palette_download),
 
       // Save data
       .has_save(has_save),
