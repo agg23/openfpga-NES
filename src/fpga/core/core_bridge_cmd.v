@@ -299,6 +299,9 @@ always @(posedge clk) begin
             // Data slot request read
             dataslot_requestread <= 1;
             dataslot_requestread_id <= host_20[15:0];
+
+            dataslot_allcomplete <= 0;
+
             if(dataslot_requestread_ack) begin
                 host_resultcode <= 0;
                 if(!dataslot_requestread_ok) host_resultcode <= 2;
@@ -309,6 +312,9 @@ always @(posedge clk) begin
             // Data slot request write
             dataslot_requestwrite <= 1;
             dataslot_requestwrite_id <= host_20[15:0];
+
+            dataslot_allcomplete <= 0;
+
             if(dataslot_requestwrite_ack) begin
                 host_resultcode <= 0;
                 if(!dataslot_requestwrite_ok) host_resultcode <= 2;
