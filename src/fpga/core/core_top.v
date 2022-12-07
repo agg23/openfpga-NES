@@ -777,6 +777,7 @@ module core_top (
       .ioctl_download(ioctl_download),
 
       .palette_download(palette_download),
+      .is_downloading  (is_downloading),
 
       // Save data
       .has_save(has_save),
