@@ -3,7 +3,7 @@
     "magic": "APF_VER_1",
     "data_slots": [
       {
-        "name": "NES",
+        "name": "Cartridge",
         "id": 0,
         "required": true,
         "parameters": "0x109",
