@@ -65,6 +65,7 @@ module MAIN_NES (
     input wire        ioctl_download,
 
     input wire palette_download,
+    input wire is_downloading,
 
     // Save data
     output wire has_save,
@@ -590,17 +591,17 @@ module MAIN_NES (
   reg [3:0] clear_div = 0;
   reg clear_wr = 0;
 
-  reg prev_ioctl_download = 0;
+  reg prev_is_downloading = 0;
 
   always @(posedge clk_85_9) begin
-    prev_ioctl_download <= ioctl_download;
+    prev_is_downloading <= is_downloading;
 
     if (sd_buff_wr) begin
       // Save has been loaded, don't clear save RAM
       did_load_save <= 1;
     end
 
-    if (prev_ioctl_download && ~ioctl_download && ~did_load_save) begin
+    if (prev_is_downloading && ~is_downloading && ~did_load_save) begin
       // All assets have been loaded and no save was loaded
       clearing_ram <= 1;
     end
