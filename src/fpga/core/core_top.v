@@ -337,9 +337,6 @@ module core_top (
         32'h20C: begin
           selected_palette <= bridge_wr_data[2:0];
         end
-        32'h210: begin
-          use_4_3_video <= bridge_wr_data[0];
-        end
         32'h300: begin
           multitap_enabled <= bridge_wr_data[0];
         end
@@ -665,7 +662,6 @@ module core_top (
   reg [1:0] mask_vid_edges;
   reg allow_extra_sprites;
   reg [2:0] selected_palette;
-  reg use_4_3_video;
   wire external_reset = reset_delay > 0;
 
   reg multitap_enabled;
@@ -677,7 +673,6 @@ module core_top (
   wire [1:0] mask_vid_edges_s;
   wire allow_extra_sprites_s;
   wire [2:0] selected_palette_s;
-  wire use_4_3_video_s;
   wire external_reset_s;
 
   wire multitap_enabled_s;
@@ -686,14 +681,13 @@ module core_top (
   wire swap_controllers_s;
 
   synch_3 #(
-      .WIDTH(20)
+      .WIDTH(19)
   ) settings_s (
       {
         hide_overscan,
         mask_vid_edges,
         allow_extra_sprites,
         selected_palette,
-        use_4_3_video,
         external_reset,
         multitap_enabled,
         lightgun_enabled,
@@ -705,7 +699,6 @@ module core_top (
         mask_vid_edges_s,
         allow_extra_sprites_s,
         selected_palette_s,
-        use_4_3_video_s,
         external_reset_s,
         multitap_enabled_s,
         lightgun_enabled_s,
@@ -859,7 +852,7 @@ module core_top (
 
   wire de = ~(h_blank || v_blank);
   // TODO: Add PAL
-  wire [23:0] video_slot_rgb = {9'b0, use_4_3_video_s, hide_overscan_s, 10'b0, 3'b0};
+  wire [23:0] video_slot_rgb = {10'b0, hide_overscan, 10'b0, 3'b0};
 
   always @(posedge clk_video_5_37) begin
     video_hs_reg  <= 0;
