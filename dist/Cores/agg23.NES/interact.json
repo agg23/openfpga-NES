@@ -67,6 +67,17 @@
         ]
       },
       {
+        "name": "Use 4:3 video",
+        "id": 42,
+        "type": "check",
+        "enabled": true,
+        "address": "0x210",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
         "name": "Extra Sprites",
         "id": 48,
         "type": "check",
