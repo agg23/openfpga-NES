@@ -14,6 +14,16 @@
             "id": 1,
             "name": "B Button",
             "key": "pad_btn_b"
+          },
+          {
+            "id": 2,
+            "name": "Start",
+            "key": "pad_btn_start"
+          },
+          {
+            "id": 3,
+            "name": "Select",
+            "key": "pad_btn_select"
           }
         ]
       }
