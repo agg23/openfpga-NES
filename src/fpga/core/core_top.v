@@ -251,12 +251,12 @@ module core_top (
   // link port is input only
   assign port_tran_so            = 1'bz;
   assign port_tran_so_dir        = 1'b0;  // SO is output only
-  assign port_tran_si            = 1'bz;
-  assign port_tran_si_dir        = 1'b0;  // SI is input only
-  assign port_tran_sck           = 1'bz;
-  assign port_tran_sck_dir       = 1'b0;  // clock direction can change
-  assign port_tran_sd            = 1'bz;
-  assign port_tran_sd_dir        = 1'b0;  // SD is input and not used
+  // assign port_tran_si            = 1'bz;
+  // assign port_tran_si_dir        = 1'b0;  // SI is input only
+  // assign port_tran_sck           = 1'bz;
+  // assign port_tran_sck_dir       = 1'b0;  // clock direction can change
+  // assign port_tran_sd            = 1'bz;
+  // assign port_tran_sd_dir        = 1'b0;  // SD is input and not used
 
   // tie off the rest of the pins we are not using
   assign cram0_a                 = 'h0;
@@ -708,6 +708,31 @@ module core_top (
       clk_ppu_21_47
   );
 
+  // assign port_tran_si      = 1'bz;
+  // assign port_tran_si_dir  = 1'b0;  // SI is input only for controller
+  assign port_tran_si_dir  = 1'b1;
+  // assign port_tran_sck     = 1'bz;
+  assign port_tran_sck_dir = 1'b1;  // clock direction can change
+  // assign port_tran_sd      = 1'bz;
+  assign port_tran_sd_dir  = 1'b1;  // SD is input and not used
+
+  reg output_270ohm = 0;
+  reg output_330ohm = 0;
+  reg output_470ohm = 0;
+
+  assign port_tran_si  = output_270ohm;
+  assign port_tran_sck = output_330ohm;
+  assign port_tran_sd  = output_470ohm;
+
+  // wire p1_data_s;
+
+  // // High clock speed to ensure data arrives early enough (probably doesn't matter)
+  // synch_3 external_controller_s (
+  //     port_tran_si,
+  //     p1_data_s,
+  //     clk_85_9
+  // );
+
   reg [31:0] reset_delay = 0;
 
   MAIN_NES nes (
@@ -758,6 +783,12 @@ module core_top (
       .p4_dpad_down(cont4_key_s[1]),
       .p4_dpad_left(cont4_key_s[2]),
       .p4_dpad_right(cont4_key_s[3]),
+
+      // Raw controller
+      // .p1_latch(port_tran_sd),
+      // .p1_clk  (port_tran_sck),
+      // .p1_data (port_tran_si),
+      .p1_data(1),
 
       // Settings
       .hide_overscan(hide_overscan_s),
@@ -824,6 +855,55 @@ module core_top (
 
       .audio(audio)
   );
+
+  wire [15:0] red_product = 8'h4C * video_rgb_nes[23:16];  // 0.3 * R
+  wire [15:0] green_product = 8'h97 * video_rgb_nes[15:8];  // 0.59 * G
+  wire [15:0] blue_product = 8'h1C * video_rgb_nes[7:0];  // 0.11 * B
+
+  wire [15:0] color_sum = red_product + green_product + blue_product;
+
+  wire [ 3:0] pixel = color_sum[15:12];
+
+  always @(posedge clk_video_5_37) begin
+    output_270ohm <= 0;
+    output_330ohm <= 0;
+    output_470ohm <= 0;
+
+    if (pixel >= 4'd12) begin
+      // Brightest, 1
+      output_270ohm <= 1;
+      output_330ohm <= 1;
+    end else if (pixel >= 4'd9) begin
+      // 0.87
+      output_270ohm <= 1;
+      output_470ohm <= 1;
+    end else if (pixel >= 4'd6) begin
+      // 0.76
+      output_330ohm <= 1;
+      output_470ohm <= 1;
+    end else if (pixel >= 4'd4) begin
+      // 0.55
+      output_270ohm <= 1;
+    end else if (pixel >= 4'd2) begin
+      // 0.45
+      output_330ohm <= 1;
+    end else begin
+      // Darkest, 0.32
+      output_470ohm <= 1;
+    end
+
+    if (v_blank || h_blank) begin
+      // Default to black
+      output_270ohm <= 0;
+      output_330ohm <= 0;
+      output_470ohm <= 1;
+
+      if (video_vs_nes || video_hs_nes) begin
+        // Sync level
+        output_470ohm <= 0;
+      end
+    end
+  end
 
   // Video
 

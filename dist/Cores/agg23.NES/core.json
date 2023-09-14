@@ -19,8 +19,8 @@
         "analog_output": false
       },
       "hardware": {
-        "link_port": false,
-        "cartridge_adapter": -1
+        "link_port": true,
+        "cartridge_adapter": 0
       }
     },
     "cores": [

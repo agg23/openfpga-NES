@@ -47,6 +47,11 @@ module MAIN_NES (
     input wire p4_dpad_left,
     input wire p4_dpad_right,
 
+    // Raw controller
+    output wire p1_latch,
+    output wire p1_clk,
+    input  wire p1_data,
+
     // Settings
     input wire hide_overscan,
     input wire [1:0] mask_vid_edges,
@@ -283,9 +288,14 @@ module MAIN_NES (
   wire mic = 0;
   wire paddle_en = 0;
   wire paddle_btn = 0;
-  wire [4:0] joypad1_data = {2'b0, mic, paddle_en & paddle_btn, joypad_bits[0]};
+  // wire [4:0] joypad1_data = {2'b0, mic, paddle_en & paddle_btn, joypad_bits[0]};
+  // This core uses active high data. Real NESes use active low
+  wire [4:0] joypad1_data = {2'b0, mic, paddle_en & paddle_btn, ~p1_data || joypad_bits[0]};
   // Upper 4 bits are other peripherals
   wire [4:0] joypad2_data = {trigger, light, 2'b0, joypad_bits2[0]};
+
+  assign p1_latch = joypad_out[0];
+  assign p1_clk   = ~joypad_clock[0];
 
   wire [7:0] nes_joy_A = {
     p1_dpad_right,
