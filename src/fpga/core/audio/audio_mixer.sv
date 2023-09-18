@@ -110,6 +110,39 @@ module audio_mixer #(
   //                );
 
   //! ------------------------------------------------------------------------
+  //! Synchronization
+  //! ------------------------------------------------------------------------
+
+  logic [15:0] core_al_s, core_ar_s;
+
+  sync_fifo #(
+      .WIDTH(32)
+  ) sync_fifo (
+      .clk_write(clk_audio),
+      .clk_read (audio_mclk),
+
+      .write_en(write_en),
+      .data({core_al, core_ar}),
+      .data_s({core_al_s, core_ar_s})
+  );
+
+  reg write_en = 0;
+  reg [15:0] prev_left;
+  reg [15:0] prev_right;
+
+  // Mark write when necessary
+  always @(posedge clk_audio) begin
+    prev_left  <= core_al;
+    prev_right <= core_ar;
+
+    write_en   <= 0;
+
+    if (core_al != prev_left || core_ar != prev_right) begin
+      write_en <= 1;
+    end
+  end
+
+  //! ------------------------------------------------------------------------
   //! Audio Filters
   //! ------------------------------------------------------------------------
   logic [15:0] audio_l, audio_r;
@@ -132,8 +165,8 @@ module audio_mixer #(
       .cy2      (acy2),
       // Audio from Core
       .is_signed(is_signed),
-      .core_l   (core_al),
-      .core_r   (core_ar),
+      .core_l   (core_al_s),
+      .core_r   (core_ar_s),
       // Filtered Audio Output
       .audio_l  (audio_l),
       .audio_r  (audio_r)
@@ -142,21 +175,8 @@ module audio_mixer #(
   //! ------------------------------------------------------------------------
   //! Pocket I2S Output
   //! ------------------------------------------------------------------------
-  // pocket_i2s pocket_i2s
-  //            (
-  //                // Serial Clock
-  //                .audio_sclk ( audio_sclk ), // [i]
-  //                // Audio Input
-  //                .audio_l    ( audio_l    ), // [i]
-  //                .audio_r    ( audio_r    ), // [i]
-  //                // Pocket I2S Interface
-  //                .audio_dac  ( audio_dac  ), // [o]
-  //                .audio_lrck ( audio_lrck )  // [o]
-  //            );
 
   sound_i2s sound_i2s (
-      .clk_74a(clk_74b),
-      .clk_audio(clk_audio),
       .audio_sclk(audio_sclk),
 
       .audio_l(audio_l),

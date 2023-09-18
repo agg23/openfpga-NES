@@ -28,10 +28,10 @@ module sound_i2s #(
     parameter SIGNED_INPUT  = 0
 ) (
     // input wire clk_74a,
-    input wire clk_audio,
+    // input wire clk_audio,
     input wire audio_sclk,
 
-    // Left and right audio channels. Can be in an arbitrary `clk_audio` domain
+    // Left and right audio channels. ~~Can be in an arbitrary `clk_audio` domain~~
     input wire [CHANNEL_WIDTH - 1:0] audio_l,
     input wire [CHANNEL_WIDTH - 1:0] audio_r,
 
@@ -101,37 +101,37 @@ module sound_i2s #(
     end
   endgenerate
 
-  sync_fifo #(
-      .WIDTH(32)
-  ) sync_fifo (
-      .clk_write(clk_audio),
-      .clk_read (audio_sclk),
+  // sync_fifo #(
+  //     .WIDTH(32)
+  // ) sync_fifo (
+  //     .clk_write(clk_audio),
+  //     .clk_read (audio_sclk),
 
-      .write_en(write_en),
-      .data(audgen_sampdata),
-      .data_s(audgen_sampdata_s)
-  );
+  //     .write_en(write_en),
+  //     .data(audgen_sampdata),
+  //     .data_s(audgen_sampdata_s)
+  // );
 
-  reg write_en = 0;
-  reg [CHANNEL_WIDTH - 1:0] prev_left;
-  reg [CHANNEL_WIDTH - 1:0] prev_right;
+  // reg write_en = 0;
+  // reg [CHANNEL_WIDTH - 1:0] prev_left;
+  // reg [CHANNEL_WIDTH - 1:0] prev_right;
 
-  // Mark write when necessary
-  always @(posedge clk_audio) begin
-    prev_left  <= audio_l;
-    prev_right <= audio_r;
+  // // Mark write when necessary
+  // always @(posedge clk_audio) begin
+  //   prev_left  <= audio_l;
+  //   prev_right <= audio_r;
 
-    write_en   <= 0;
+  //   write_en   <= 0;
 
-    if (audio_l != prev_left || audio_r != prev_right) begin
-      write_en <= 1;
-    end
-  end
+  //   if (audio_l != prev_left || audio_r != prev_right) begin
+  //     write_en <= 1;
+  //   end
+  // end
 
-  wire [31:0] audgen_sampdata_s;
+  // wire [31:0] audgen_sampdata_s;
 
-  reg  [31:0] audgen_sampshift;
-  reg  [ 4:0] audio_lrck_cnt;
+  reg [31:0] audgen_sampshift;
+  reg [ 4:0] audio_lrck_cnt;
   always @(posedge audio_sclk) begin
     // output the next bit
     audio_dac <= audgen_sampshift[31];
@@ -144,7 +144,7 @@ module sound_i2s #(
 
       // Reload sample shifter
       if (~audio_lrck) begin
-        audgen_sampshift <= audgen_sampdata_s;
+        audgen_sampshift <= audgen_sampdata;
       end
     end else if (audio_lrck_cnt < 16) begin
       // only shift for 16 clocks per channel
