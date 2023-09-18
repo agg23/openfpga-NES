@@ -745,7 +745,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/sound_i2s.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/data_loader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/gameloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mister_top/main.sv
-set_global_assignment -name VERILOG_FILE core/sys/iir_filter.v
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mappers/VRC.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mappers/Sunsoft.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/rtl/mappers/Sachen.sv
@@ -811,6 +810,7 @@ set_global_assignment -name SDC_FILE core/core_constraints.sdc
 set_global_assignment -name SIGNALTAP_FILE core/stp1.stp
 set_global_assignment -name QIP_FILE core/mf_pllbase.qip
 set_global_assignment -name SIP_FILE core/mf_pllbase.sip
+set_global_assignment -name QIP_FILE core/audio/audio.qip
 
 # Custom settings
 set_global_assignment -name FITTER_AGGRESSIVE_ROUTABILITY_OPTIMIZATION ALWAYS

@@ -891,12 +891,28 @@ module core_top (
 
   wire [15:0] audio;
 
-  sound_i2s sound_i2s (
-      .clk_74a  (clk_74a),
+  reg  [15:0] audio_buffer = 0;
+
+  // Buffer audio to have better fitting on audio route
+  always @(posedge clk_ppu_21_47) begin
+    audio_buffer <= audio;
+  end
+
+  audio_mixer #(
+      .DW(16),
+      .STEREO(0)
+  ) audio_mixer (
+      .clk_74b  (clk_74b),
       .clk_audio(clk_ppu_21_47),
 
-      .audio_l(audio[15:1]),
-      .audio_r(audio[15:1]),
+      // .reset()
+
+      .vol_att(0),
+      .mix(0),
+
+      .is_signed(0),
+      .core_l(audio_buffer),
+      .core_r(audio_buffer),
 
       .audio_mclk(audio_mclk),
       .audio_lrck(audio_lrck),
