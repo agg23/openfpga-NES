@@ -592,17 +592,19 @@ module MAIN_NES (
   reg clear_wr = 0;
 
   reg prev_is_downloading = 0;
+  reg prev_palette_download = 0;
 
   always @(posedge clk_85_9) begin
-    prev_is_downloading <= is_downloading;
+    prev_is_downloading   <= is_downloading;
+    prev_palette_download <= palette_download;
 
     if (sd_buff_wr) begin
       // Save has been loaded, don't clear save RAM
       did_load_save <= 1;
     end
 
-    if (prev_is_downloading && ~is_downloading && ~did_load_save) begin
-      // All assets have been loaded and no save was loaded
+    if (prev_is_downloading && ~is_downloading && ~did_load_save && ~prev_palette_download) begin
+      // All assets have been loaded and no save was loaded and we didn't just load a palette
       clearing_ram <= 1;
     end
 
