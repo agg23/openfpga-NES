@@ -8,10 +8,10 @@ set_clock_groups -asynchronous \
  -group { bridge_spiclk } \
  -group { clk_74a } \
  -group { clk_74b } \
- -group { ic|mp1|mf_pllbase_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk \
-          ic|mp1|mf_pllbase_inst|altera_pll_i|general[1].gpll~PLL_OUTPUT_COUNTER|divclk } \
- -group { ic|mp1|mf_pllbase_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk } \
- -group { ic|mp1|mf_pllbase_inst|altera_pll_i|general[3].gpll~PLL_OUTPUT_COUNTER|divclk } \
+ -group { ic|mp1|mf_pllbase_inst|altera_pll_i|*[0].*|divclk \
+          ic|mp1|mf_pllbase_inst|altera_pll_i|*[1].*|divclk } \
+ -group { ic|mp1|mf_pllbase_inst|altera_pll_i|*[2].*|divclk } \
+ -group { ic|mp1|mf_pllbase_inst|altera_pll_i|*[3].*|divclk } \
  -group { ic|audio_mixer|audio_pll|mf_audio_pll_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk \
           ic|audio_mixer|audio_pll|mf_audio_pll_inst|altera_pll_i|general[1].gpll~PLL_OUTPUT_COUNTER|divclk }
 

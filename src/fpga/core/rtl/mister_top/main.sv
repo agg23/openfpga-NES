@@ -4,6 +4,8 @@ module MAIN_NES (
     input clk_85_9,
     input clock_locked,
 
+    input [1:0] sys_type,
+
     // Control
     input wire external_reset,
 
@@ -169,6 +171,8 @@ module MAIN_NES (
   wire                                                         refresh;
   wire                                                         sleep_savestate;
 
+  wire pal_video = |sys_type;
+
   always_ff @(posedge clk_ppu_21_47) begin
     pausecore <= sleep_savestate;
 
@@ -179,13 +183,14 @@ module MAIN_NES (
     end
   end
 
+
   NES nes (
       .clk           (clk_ppu_21_47),
       .reset_nes     (reset_nes),
       .cold_reset    (downloading & (type_fds | type_nes)),
       .pausecore     (pausecore),
       .corepaused    (corepaused),
-      .sys_type      (0),                                      // TODO: Hardcoded to NTSC
+      .sys_type      (sys_type),
       .nes_div       (nes_ce),
       .mapper_flags  (downloading ? 64'd0 : mapper_flags),
       .gg            (status[20]),
@@ -755,8 +760,6 @@ module MAIN_NES (
   // Video
   wire hold_reset;
   wire [1:0] nes_ce_video = corepaused ? videopause_ce : nes_ce;
-
-  wire pal_video = 0;
 
   video video (
       .clk(clk_ppu_21_47),

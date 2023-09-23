@@ -808,7 +808,6 @@ set_global_assignment -name VERILOG_FILE core/core_top.v
 set_global_assignment -name VERILOG_FILE core/core_bridge_cmd.v
 set_global_assignment -name SDC_FILE core/core_constraints.sdc
 set_global_assignment -name SIGNALTAP_FILE core/stp1.stp
-set_global_assignment -name QIP_FILE core/mf_pllbase.qip
 set_global_assignment -name SIP_FILE core/mf_pllbase.sip
 set_global_assignment -name QIP_FILE core/audio/audio.qip
 
@@ -816,5 +815,8 @@ set_global_assignment -name QIP_FILE core/audio/audio.qip
 set_global_assignment -name FITTER_AGGRESSIVE_ROUTABILITY_OPTIMIZATION ALWAYS
 set_global_assignment -name ALM_REGISTER_PACKING_EFFORT LOW
 set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+set_global_assignment -name QIP_FILE core/pll_reconfig.qip
+set_global_assignment -name SIP_FILE core/pll_reconfig.sip
+set_global_assignment -name QIP_FILE core/mf_pllbase.qip
 set_global_assignment -name SLD_FILE db/stp1_auto_stripped.stp
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

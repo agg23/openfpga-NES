@@ -11,6 +11,30 @@
         "value": 1
       },
       {
+        "name": "System Type",
+        "id": 11,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x54",
+        "defaultval": 0,
+        "options": [
+          {
+            "value": 0,
+            "name": "NTSC"
+          },
+          {
+            "value": 1,
+            "name": "PAL"
+          },
+          {
+            "value": 2,
+            "name": "Dendy"
+          }
+        ]
+      },
+      {
         "name": "Use Multitap",
         "id": 20,
         "type": "check",

@@ -1,5 +1,5 @@
 
-# (C) 2001-2022 Altera Corporation. All rights reserved.
+# (C) 2001-2023 Altera Corporation. All rights reserved.
 # Your use of Altera Corporation's design tools, logic functions and 
 # other software and tools, and its AMPP partner logic functions, and 
 # any output files any of the foregoing (including device programming 
@@ -12,7 +12,7 @@
 # or its authorized distributors. Please refer to the applicable 
 # agreement for further details.
 
-# ACDS 21.1 850 win32 2022.09.10.17:51:51
+# ACDS 21.1 850 win32 2023.09.23.14:21:07
 
 # ----------------------------------------
 # ncsim - auto-generated simulation script
@@ -106,7 +106,7 @@
 # within the Quartus project, and generate a unified
 # script which supports all the Altera IP within the design.
 # ----------------------------------------
-# ACDS 21.1 850 win32 2022.09.10.17:51:51
+# ACDS 21.1 850 win32 2023.09.23.14:21:07
 # ----------------------------------------
 # initialize variables
 TOP_LEVEL_NAME="mf_pllbase"
