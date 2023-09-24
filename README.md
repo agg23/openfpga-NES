@@ -17,7 +17,7 @@ To install the core, copy the `Assets`, `Cores`, and `Platform` folders over to 
 
 ROMs should be placed in `/Assets/nes/common`
 
-PAL ROMs should boot, but there may be timing and sound issues as the core currently doesn't properly support PAL (proper support coming soon). I highly recommend you do not play PAL games, and instead use NTSC games (if they exist) at this time.
+PAL ROMs should boot, but there will be timing and sound issues as the core currently doesn't properly support PAL (proper support coming soon). I highly recommend you do not play PAL games, and instead use NTSC games (if they exist) at this time.
 
 ## Features
 
@@ -32,10 +32,6 @@ This core has pairity with the MiSTer core's mapper support. [See the full break
 ### Save States/Sleep + Wake
 
 Known as "Memories" on the Pocket, this core supports the creation and loading of save states for most mappers. See the full list in the [Mappers section](#mappers). By extension, the core supports Sleep + Wake functionality on the Pocket. In games with supported mappers, tapping the power button while playing will suspend the game, ready to be resumed when powering the Pocket back on.
-
-### PAL Support
-
-In order to have proper timing on PAL titles, you must configure the `System Type` option. This cannot be autodetected due to how complicated NES headers are. You can select between `NTSC`, `PAL`, and `Dendy` systems.
 
 ### Saves
 
