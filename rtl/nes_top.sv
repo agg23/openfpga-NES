@@ -1,4 +1,4 @@
-module MAIN_NES (
+module nes_top (
     input clk_74a,
     input clk_ppu_21_47,
     input clk_85_9,

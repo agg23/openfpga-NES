@@ -1,13 +1,8 @@
 # ==============================================================================
 # RTL
 # ==============================================================================
-set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "mister_top/save_state_controller.sv"]
-set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "mister_top/data_unloader.sv"]
-set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "mister_top/sync_fifo.sv"]
-set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "mister_top/sound_i2s.sv"]
-set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "mister_top/data_loader.sv"]
-set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "mister_top/gameloader.sv"]
-set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "mister_top/main.sv"]
+set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "gameloader.sv"]
+set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "nes_top.sv"]
 set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "mappers/VRC.sv"]
 set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "mappers/Sunsoft.sv"]
 set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "mappers/Sachen.sv"]

@@ -725,7 +725,7 @@ module core_top (
 
   reg [31:0] reset_delay = 0;
 
-  MAIN_NES nes (
+  nes_top nes (
       .clk_74a(clk_74a),
       .clk_ppu_21_47(clk_ppu_21_47),
       .clk_85_9(clk_85_9),
