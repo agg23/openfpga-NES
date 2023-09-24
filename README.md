@@ -33,6 +33,10 @@ This core has pairity with the MiSTer core's mapper support. [See the full break
 
 Known as "Memories" on the Pocket, this core supports the creation and loading of save states for most mappers. See the full list in the [Mappers section](#mappers). By extension, the core supports Sleep + Wake functionality on the Pocket. In games with supported mappers, tapping the power button while playing will suspend the game, ready to be resumed when powering the Pocket back on.
 
+### PAL Support
+
+In order to have proper timing on PAL titles, you must configure the `System Type` option. This cannot be autodetected due to how complicated NES headers are. You can select between `NTSC`, `PAL`, and `Dendy` systems.
+
 ### Saves
 
 Supports saves for most games and mappers. Saving on the NES is rather complicated due to the different scenarios for different mappers, so it's possible some less common mappers do not save correctly on this core. Please report all such issues to this repo.
@@ -59,8 +63,9 @@ For testing, or to temporarily load a new palette, you can choose the `Load Cust
 
 There are several options provided for tweaking the displayed video:
 
-* `Hide Overscan` - Hides the top and bottom 8 pixels of the video, which would normally be masked by the CRT. Adjusts the aspect ratio to correspond with this modification
+* `Hide Overscan` - Hides the top and bottom 8 pixels of the video, which would normally be masked by the CRT. Adjusts the aspect ratio to correspond with this modification. This option does nothing in PAL mode
 * `Edge Masking` - Masks the sides of the screen in black, depending on the chosen option. The auto setting automatically masks the left side when certain conditions are met.
+* `Square Pixels` - The internal resolution of the NES is a 8:7 pixel aspect ratio (wide pixels), which roughly corresponds to what users would see on 4:3 display aspect ratio CRTs. Some games are designed to be displayed at 8:7 PAR (the core's default), and others at 1:1 PAR (square pixels). The `Square Pixels` option is provided to switch to a 1:1 pixel aspect ratio.
 * `Extra Sprites` - Allows an extra 8 sprites to be displayed per line (up to 16 from the original 8). Will decrease flickering in some games
 
 ### Lightguns

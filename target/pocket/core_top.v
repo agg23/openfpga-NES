@@ -340,6 +340,9 @@ module core_top (
         32'h20C: begin
           selected_palette <= bridge_wr_data[2:0];
         end
+        32'h210: begin
+          square_pixels <= bridge_wr_data[0];
+        end
         32'h300: begin
           multitap_enabled <= bridge_wr_data[0];
         end
@@ -665,6 +668,7 @@ module core_top (
 
   reg hide_overscan = 0;
   reg [1:0] mask_vid_edges = 0;
+  reg square_pixels = 0;
   reg allow_extra_sprites = 0;
   reg [2:0] selected_palette = 0;
   wire external_reset = reset_delay > 0;
@@ -678,6 +682,7 @@ module core_top (
 
   wire hide_overscan_s;
   wire [1:0] mask_vid_edges_s;
+  wire square_pixels_s;
   wire allow_extra_sprites_s;
   wire [2:0] selected_palette_s;
   wire external_reset_s;
@@ -688,12 +693,13 @@ module core_top (
   wire swap_controllers_s;
 
   synch_3 #(
-      .WIDTH(21)
+      .WIDTH(22)
   ) settings_s (
       {
         region,
         hide_overscan,
         mask_vid_edges,
+        square_pixels,
         allow_extra_sprites,
         selected_palette,
         external_reset,
@@ -706,6 +712,7 @@ module core_top (
         region_s,
         hide_overscan_s,
         mask_vid_edges_s,
+        square_pixels_s,
         allow_extra_sprites_s,
         selected_palette_s,
         external_reset_s,
@@ -724,6 +731,8 @@ module core_top (
   end
 
   reg [31:0] reset_delay = 0;
+
+  wire hide_overscan_with_region = hide_overscan_s && region_s == 2'b0;
 
   nes_top nes (
       .clk_74a(clk_74a),
@@ -778,7 +787,7 @@ module core_top (
       .p4_dpad_right(cont4_key_s[3]),
 
       // Settings
-      .hide_overscan(hide_overscan_s),
+      .hide_overscan(hide_overscan_with_region),
       .mask_vid_edges(mask_vid_edges_s),
       .allow_extra_sprites(allow_extra_sprites_s),
       .selected_palette(selected_palette_s),
@@ -869,7 +878,7 @@ module core_top (
   reg de_prev;
 
   wire de = ~(h_blank || v_blank);
-  wire [23:0] video_slot_rgb = {10'b0, hide_overscan_s && region_s == 2'b0, 10'b0, 3'b0};
+  wire [23:0] video_slot_rgb = {9'b0, hide_overscan_with_region, square_pixels_s, 10'b0, 3'b0};
 
   always @(posedge clk_video_5_37) begin
     video_hs_reg  <= 0;
