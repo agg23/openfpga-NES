@@ -325,9 +325,9 @@ module core_top (
         32'h050: begin
           reset_delay <= 32'h100000;
         end
-        32'h054: begin
-          region <= bridge_wr_data[1:0];
-        end
+        // 32'h054: begin
+        //   region <= bridge_wr_data[1:0];
+        // end
         32'h200: begin
           hide_overscan <= bridge_wr_data[0];
         end
@@ -971,12 +971,12 @@ module core_top (
   wire clk_video_5_37;
   wire clk_video_5_37_90deg;
 
-  wire [63:0] reconfig_to_pll;
-  wire [63:0] reconfig_from_pll;
+  // wire [63:0] reconfig_to_pll;
+  // wire [63:0] reconfig_from_pll;
 
   wire pll_core_locked;
 
-  reg pll_reset = 0;
+  reg  pll_reset = 0;
 
   mf_pllbase mp1 (
       .refclk(clk_74a),
@@ -988,125 +988,127 @@ module core_top (
       .outclk_2(clk_video_5_37),
       .outclk_3(clk_video_5_37_90deg),
 
-      .reconfig_to_pll  (reconfig_to_pll),
-      .reconfig_from_pll(reconfig_from_pll),
+      // .reconfig_to_pll  (reconfig_to_pll),
+      // .reconfig_from_pll(reconfig_from_pll),
 
       .locked(pll_core_locked)
   );
 
-  wire        cfg_waitrequest;
-  reg         cfg_write;
-  reg  [ 5:0] cfg_address;
-  reg  [31:0] cfg_data;
+  // See https://github.com/agg23/openfpga-NES/issues/26
 
-  pll_reconfig pll_reconfig (
-      .mgmt_clk(clk_74a),
-      .mgmt_reset(0),
-      .mgmt_waitrequest(cfg_waitrequest),
-      .mgmt_read(0),
-      .mgmt_readdata(),
-      .mgmt_write(cfg_write),
-      .mgmt_address(cfg_address),
-      .mgmt_writedata(cfg_data),
-      .reconfig_to_pll(reconfig_to_pll),
-      .reconfig_from_pll(reconfig_from_pll)
-  );
+  // wire        cfg_waitrequest;
+  // reg         cfg_write;
+  // reg  [ 5:0] cfg_address;
+  // reg  [31:0] cfg_data;
 
-  wire pal = region != 0;
+  // pll_reconfig pll_reconfig (
+  //     .mgmt_clk(clk_74a),
+  //     .mgmt_reset(0),
+  //     .mgmt_waitrequest(cfg_waitrequest),
+  //     .mgmt_read(0),
+  //     .mgmt_readdata(),
+  //     .mgmt_write(cfg_write),
+  //     .mgmt_address(cfg_address),
+  //     .mgmt_writedata(cfg_data),
+  //     .reconfig_to_pll(reconfig_to_pll),
+  //     .reconfig_from_pll(reconfig_from_pll)
+  // );
 
-  reg prev_pal = 0;
-  reg write_pal = 0;
+  // wire pal = region != 0;
 
-  reg [3:0] state = 0;
+  // reg prev_pal = 0;
+  // reg write_pal = 0;
 
-  reg prev_pll_core_locked = 0;
-  reg [19:0] pll_reset_delay = 0;
+  // reg [3:0] state = 0;
 
-  always @(posedge clk_74a) begin
-    prev_pal <= pal;
-    prev_pll_core_locked <= pll_core_locked;
+  // reg prev_pll_core_locked = 0;
+  // reg [19:0] pll_reset_delay = 0;
 
-    cfg_write <= 0;
-    if (prev_pal != pal) begin
-      state <= 1;
-      write_pal <= pal;
-    end
+  // always @(posedge clk_74a) begin
+  //   prev_pal <= pal;
+  //   prev_pll_core_locked <= pll_core_locked;
 
-    if (~pll_core_locked && prev_pll_core_locked) begin
-      pll_reset_delay <= 20'hF_FFFF;
-    end
+  //   cfg_write <= 0;
+  //   if (prev_pal != pal) begin
+  //     state <= 1;
+  //     write_pal <= pal;
+  //   end
 
-    if (pll_reset_delay == 20'hFFFF) begin
-      pll_reset <= 1;
-    end else if (pll_reset_delay == 20'h0) begin
-      pll_reset <= 0;
-    end
+  //   if (~pll_core_locked && prev_pll_core_locked) begin
+  //     pll_reset_delay <= 20'hF_FFFF;
+  //   end
 
-    if (pll_reset_delay > 20'h0) begin
-      pll_reset_delay <= pll_reset_delay - 20'h1;
-    end
+  //   if (pll_reset_delay == 20'hFFFF) begin
+  //     pll_reset <= 1;
+  //   end else if (pll_reset_delay == 20'h0) begin
+  //     pll_reset <= 0;
+  //   end
 
-    if (!cfg_waitrequest) begin
-      if (state) state <= state + 1'd1;
-      case (state)
-        1: begin
-          cfg_address <= 0;
-          cfg_data <= 0;
-          cfg_write <= 1;
-        end
-        3: begin
-          // Set fractional division
-          // Config addresses come from https://www.intel.com/content/www/us/en/docs/programmable/683640/current/fractional-pll-dynamic-reconfiguration.html
-          cfg_address <= 7;
-          // NTSC: 425907062
-          //   Mem: 85.908992 MHz
-          //   Main: 21.477248 MHz
-          //   Vid: 5.369312 MHz
-          // PAL: 737738000
-          //   Mem: 85.125472 MHz
-          //   Main: 21.281368 MHz
-          //   Vid: 5.320342 MHz
-          cfg_data <= write_pal ? 737738000 : 425907062;
-          cfg_write <= 1;
-        end
-        5: begin
-          // Set counter C0
-          cfg_address <= 'h5;
-          cfg_data <= write_pal ? 32'h000404 : 32'h020403;
-          cfg_write <= 1;
-        end
-        7: begin
-          // Set counter C1
-          cfg_address <= 'h5;
-          cfg_data <= write_pal ? 32'h041010 : 32'h040E0E;
-          cfg_write <= 1;
-        end
-        9: begin
-          // Set counter C2
-          cfg_address <= 'h5;
-          cfg_data <= write_pal ? 32'h084040 : 32'h083838;
-          cfg_write <= 1;
-        end
-        11: begin
-          // Set counter C3
-          cfg_address <= 'h5;
-          cfg_data <= write_pal ? 32'h0C4040 : 32'h0C3838;
-          cfg_write <= 1;
-        end
-        13: begin
-          // Set counter M
-          cfg_address <= 'h4;
-          cfg_data <= write_pal ? 32'h20504 : 32'h00404;
-          cfg_write <= 1;
-        end
-        15: begin
-          // Begin fractional PLL reconfig
-          cfg_address <= 2;
-          cfg_data <= 0;
-          cfg_write <= 1;
-        end
-      endcase
-    end
-  end
+  //   if (pll_reset_delay > 20'h0) begin
+  //     pll_reset_delay <= pll_reset_delay - 20'h1;
+  //   end
+
+  //   if (!cfg_waitrequest) begin
+  //     if (state) state <= state + 1'd1;
+  //     case (state)
+  //       1: begin
+  //         cfg_address <= 0;
+  //         cfg_data <= 0;
+  //         cfg_write <= 1;
+  //       end
+  //       3: begin
+  //         // Set fractional division
+  //         // Config addresses come from https://www.intel.com/content/www/us/en/docs/programmable/683640/current/fractional-pll-dynamic-reconfiguration.html
+  //         cfg_address <= 7;
+  //         // NTSC: 425907062
+  //         //   Mem: 85.908992 MHz
+  //         //   Main: 21.477248 MHz
+  //         //   Vid: 5.369312 MHz
+  //         // PAL: 737738000
+  //         //   Mem: 85.125472 MHz
+  //         //   Main: 21.281368 MHz
+  //         //   Vid: 5.320342 MHz
+  //         cfg_data <= write_pal ? 737738000 : 425907062;
+  //         cfg_write <= 1;
+  //       end
+  //       5: begin
+  //         // Set counter C0
+  //         cfg_address <= 'h5;
+  //         cfg_data <= write_pal ? 32'h000404 : 32'h020403;
+  //         cfg_write <= 1;
+  //       end
+  //       7: begin
+  //         // Set counter C1
+  //         cfg_address <= 'h5;
+  //         cfg_data <= write_pal ? 32'h041010 : 32'h040E0E;
+  //         cfg_write <= 1;
+  //       end
+  //       9: begin
+  //         // Set counter C2
+  //         cfg_address <= 'h5;
+  //         cfg_data <= write_pal ? 32'h084040 : 32'h083838;
+  //         cfg_write <= 1;
+  //       end
+  //       11: begin
+  //         // Set counter C3
+  //         cfg_address <= 'h5;
+  //         cfg_data <= write_pal ? 32'h0C4040 : 32'h0C3838;
+  //         cfg_write <= 1;
+  //       end
+  //       13: begin
+  //         // Set counter M
+  //         cfg_address <= 'h4;
+  //         cfg_data <= write_pal ? 32'h20504 : 32'h00404;
+  //         cfg_write <= 1;
+  //       end
+  //       15: begin
+  //         // Begin fractional PLL reconfig
+  //         cfg_address <= 2;
+  //         cfg_data <= 0;
+  //         cfg_write <= 1;
+  //       end
+  //     endcase
+  //   end
+  // end
 
 endmodule
