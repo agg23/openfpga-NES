@@ -41,6 +41,20 @@ In order to have proper timing on PAL titles, you must configure the `System Typ
 
 Supports saves for most games and mappers. Saving on the NES is rather complicated due to the different scenarios for different mappers, so it's possible some less common mappers do not save correctly on this core. Please report all such issues to this repo.
 
+### Controller Turbo
+
+By configuring the `Turbo Speed` controller option in `Core Settings`, you can use the `X` and `Y` buttons (by default) as `A`/`B` turbo buttons. The period for each of the settings in NTSC are below (PAL will have different timings):
+
+| Setting | Period |
+| ------- | ------ |
+| 0       | Off    |
+| 1       | 3 Hz   |
+| 2       | 5 Hz   |
+| 3       | 7.5 Hz |
+| 4       | 10 Hz  |
+| 5       | 15 Hz  |
+| 6       | 30 Hz  |
+
 ### Expansion Audio
 
 Expansion audio should be supported for every mapper except those that use VRC7. If you encounter a game that is not playing the expanded audio outside of VRC7, please report it.

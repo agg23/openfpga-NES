@@ -60,6 +60,7 @@ set_global_assignment -name VERILOG_FILE              [file join $::quartus(qip_
 set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "cheatcodes.sv"]
 set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "cart.sv"]
 set_global_assignment -name VHDL_FILE                 [file join $::quartus(qip_path) "bus_savestates.vhd"]
+set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "button_turbo.sv"]
 set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "apu.sv"]
 set_global_assignment -name QIP_FILE                  [file join $::quartus(qip_path) "audio/audio.qip"]
 

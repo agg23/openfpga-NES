@@ -12,6 +12,8 @@ module nes_top (
     // Inputs
     input wire p1_button_a,
     input wire p1_button_b,
+    input wire p1_button_a_turbo,
+    input wire p1_button_b_turbo,
     input wire p1_button_start,
     input wire p1_button_select,
     input wire p1_dpad_up,
@@ -24,6 +26,8 @@ module nes_top (
 
     input wire p2_button_a,
     input wire p2_button_b,
+    input wire p2_button_a_turbo,
+    input wire p2_button_b_turbo,
     input wire p2_button_start,
     input wire p2_button_select,
     input wire p2_dpad_up,
@@ -33,6 +37,8 @@ module nes_top (
 
     input wire p3_button_a,
     input wire p3_button_b,
+    input wire p3_button_a_turbo,
+    input wire p3_button_b_turbo,
     input wire p3_button_start,
     input wire p3_button_select,
     input wire p3_dpad_up,
@@ -42,6 +48,8 @@ module nes_top (
 
     input wire p4_button_a,
     input wire p4_button_b,
+    input wire p4_button_a_turbo,
+    input wire p4_button_b_turbo,
     input wire p4_button_start,
     input wire p4_button_select,
     input wire p4_dpad_up,
@@ -58,6 +66,8 @@ module nes_top (
     input wire multitap_enabled,
     input wire lightgun_enabled,
     input wire [7:0] lightgun_dpad_aim_speed,
+
+    input wire [2:0] turbo_speed,
     input wire swap_controllers,
 
     // Data in
@@ -276,6 +286,72 @@ module nes_top (
       .SAVE_out_done(ss_ack)  // should be one cycle high when write is done or read value is valid
   );
 
+  // Turbo
+
+  wire p1_a_turbo;
+  wire p1_b_turbo;
+
+  wire p2_a_turbo;
+  wire p2_b_turbo;
+
+  wire p3_a_turbo;
+  wire p3_b_turbo;
+
+  wire p4_a_turbo;
+  wire p4_b_turbo;
+
+  button_turbo p1_turbo (
+      .clk(clk_ppu_21_47),
+
+      .turbo_speed(turbo_speed),
+      .vsync(VSync),
+
+      .a_button_turbo(p1_button_a_turbo),
+      .b_button_turbo(p1_button_b_turbo),
+
+      .a_turbo(p1_a_turbo),
+      .b_turbo(p1_b_turbo)
+  );
+
+  button_turbo p2_turbo (
+      .clk(clk_ppu_21_47),
+
+      .turbo_speed(turbo_speed),
+      .vsync(VSync),
+
+      .a_button_turbo(p2_button_a_turbo),
+      .b_button_turbo(p2_button_b_turbo),
+
+      .a_turbo(p2_a_turbo),
+      .b_turbo(p2_b_turbo)
+  );
+
+  button_turbo p3_turbo (
+      .clk(clk_ppu_21_47),
+
+      .turbo_speed(turbo_speed),
+      .vsync(VSync),
+
+      .a_button_turbo(p3_button_a_turbo),
+      .b_button_turbo(p3_button_b_turbo),
+
+      .a_turbo(p3_a_turbo),
+      .b_turbo(p3_b_turbo)
+  );
+
+  button_turbo p4_turbo (
+      .clk(clk_ppu_21_47),
+
+      .turbo_speed(turbo_speed),
+      .vsync(VSync),
+
+      .a_button_turbo(p4_button_a_turbo),
+      .b_button_turbo(p4_button_b_turbo),
+
+      .a_turbo(p4_a_turbo),
+      .b_turbo(p4_b_turbo)
+  );
+
   // Controllers
 
   wire [2:0] joypad_out;
@@ -299,8 +375,8 @@ module nes_top (
     p1_dpad_up,
     p1_button_start,
     p1_button_select,
-    p1_button_b,
-    p1_button_a
+    p1_button_b || p1_b_turbo,
+    p1_button_a || p1_a_turbo
   };
 
   wire [7:0] nes_joy_B = {
@@ -310,8 +386,8 @@ module nes_top (
     p2_dpad_up,
     p2_button_start,
     p2_button_select,
-    p2_button_b,
-    p2_button_a
+    p2_button_b || p2_b_turbo,
+    p2_button_a || p2_a_turbo
   };
 
   wire [7:0] nes_joy_C = {
@@ -321,8 +397,8 @@ module nes_top (
     p3_dpad_up,
     p3_button_start,
     p3_button_select,
-    p3_button_b,
-    p3_button_a
+    p3_button_b || p3_b_turbo,
+    p3_button_a || p3_a_turbo
   };
 
   wire [7:0] nes_joy_D = {
@@ -332,8 +408,8 @@ module nes_top (
     p4_dpad_up,
     p4_button_start,
     p4_button_select,
-    p4_button_b,
-    p4_button_a
+    p4_button_b || p4_b_turbo,
+    p4_button_a || p4_a_turbo
   };
 
   wire [1:0] reticle;

@@ -355,6 +355,9 @@ module core_top (
         32'h30C: begin
           swap_controllers <= bridge_wr_data[0];
         end
+        32'h310: begin
+          turbo_speed <= bridge_wr_data[2:0];
+        end
       endcase
     end
   end
@@ -676,6 +679,8 @@ module core_top (
   reg multitap_enabled = 0;
   reg lightgun_enabled = 0;
   reg [7:0] lightgun_dpad_aim_speed = 0;
+
+  reg [2:0] turbo_speed = 0;
   reg swap_controllers = 0;
 
   wire [1:0] region_s;
@@ -690,10 +695,12 @@ module core_top (
   wire multitap_enabled_s;
   wire lightgun_enabled_s;
   wire [7:0] lightgun_dpad_aim_speed_s;
+
+  wire [2:0] turbo_speed_s;
   wire swap_controllers_s;
 
   synch_3 #(
-      .WIDTH(22)
+      .WIDTH(24)
   ) settings_s (
       {
         region,
@@ -706,6 +713,7 @@ module core_top (
         multitap_enabled,
         lightgun_enabled,
         lightgun_dpad_aim_speed,
+        turbo_speed,
         swap_controllers
       },
       {
@@ -719,6 +727,7 @@ module core_top (
         multitap_enabled_s,
         lightgun_enabled_s,
         lightgun_dpad_aim_speed_s,
+        turbo_speed_s,
         swap_controllers_s
       },
       clk_ppu_21_47
@@ -749,6 +758,8 @@ module core_top (
       // Input
       .p1_button_a(cont1_key_s[4]),
       .p1_button_b(cont1_key_s[5]),
+      .p1_button_a_turbo(cont1_key_s[6]),
+      .p1_button_b_turbo(cont1_key_s[7]),
       .p1_button_start(cont1_key_s[15]),
       .p1_button_select(cont1_key_s[14]),
       .p1_dpad_up(cont1_key_s[0]),
@@ -761,6 +772,8 @@ module core_top (
 
       .p2_button_a(cont2_key_s[4]),
       .p2_button_b(cont2_key_s[5]),
+      .p2_button_a_turbo(cont2_key_s[6]),
+      .p2_button_b_turbo(cont2_key_s[7]),
       .p2_button_start(cont2_key_s[15]),
       .p2_button_select(cont2_key_s[14]),
       .p2_dpad_up(cont2_key_s[0]),
@@ -770,6 +783,8 @@ module core_top (
 
       .p3_button_a(cont3_key_s[4]),
       .p3_button_b(cont3_key_s[5]),
+      .p3_button_a_turbo(cont3_key_s[6]),
+      .p3_button_b_turbo(cont3_key_s[7]),
       .p3_button_start(cont3_key_s[15]),
       .p3_button_select(cont3_key_s[14]),
       .p3_dpad_up(cont3_key_s[0]),
@@ -779,6 +794,8 @@ module core_top (
 
       .p4_button_a(cont4_key_s[4]),
       .p4_button_b(cont4_key_s[5]),
+      .p4_button_a_turbo(cont4_key_s[6]),
+      .p4_button_b_turbo(cont4_key_s[7]),
       .p4_button_start(cont4_key_s[15]),
       .p4_button_select(cont4_key_s[14]),
       .p4_dpad_up(cont4_key_s[0]),
@@ -795,6 +812,8 @@ module core_top (
       .multitap_enabled(multitap_enabled_s),
       .lightgun_enabled(lightgun_enabled_s),
       .lightgun_dpad_aim_speed(lightgun_dpad_aim_speed_s),
+
+      .turbo_speed(turbo_speed_s),
       .swap_controllers(swap_controllers_s),
 
       // APF
