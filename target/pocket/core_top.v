@@ -234,19 +234,19 @@ module core_top (
 
   // cart is unused, so set all level translators accordingly
   // directions are 0:IN, 1:OUT
-  assign cart_tran_bank3         = 8'hzz;
-  assign cart_tran_bank3_dir     = 1'b0;
-  assign cart_tran_bank2         = 8'hzz;
-  assign cart_tran_bank2_dir     = 1'b0;
-  assign cart_tran_bank1         = 8'hzz;
-  assign cart_tran_bank1_dir     = 1'b0;
-  assign cart_tran_bank0         = 4'hf;
-  assign cart_tran_bank0_dir     = 1'b1;
-  assign cart_tran_pin30         = 1'b0;  // reset or cs2, we let the hw control it by itself
-  assign cart_tran_pin30_dir     = 1'bz;
-  assign cart_pin30_pwroff_reset = 1'b0;  // hardware can control this
-  assign cart_tran_pin31         = 1'bz;  // input
-  assign cart_tran_pin31_dir     = 1'b0;  // input
+//  assign cart_tran_bank3         = 8'hzz;
+//  assign cart_tran_bank3_dir     = 1'b0;
+//  assign cart_tran_bank2         = 8'hzz;
+//  assign cart_tran_bank2_dir     = 1'b0;
+//  assign cart_tran_bank1         = 8'hzz;
+//  assign cart_tran_bank1_dir     = 1'b0;
+//  assign cart_tran_bank0         = 4'hf;
+//  assign cart_tran_bank0_dir     = 1'b1;
+//  assign cart_tran_pin30         = 1'b0;  // reset or cs2, we let the hw control it by itself
+//  assign cart_tran_pin30_dir     = 1'bz;
+//  assign cart_pin30_pwroff_reset = 1'b0;  // hardware can control this
+//  assign cart_tran_pin31         = 1'bz;  // input
+//  assign cart_tran_pin31_dir     = 1'b0;  // input
 
   // link port is input only
   assign port_tran_so            = 1'bz;
@@ -303,9 +303,8 @@ module core_top (
       default: begin
         bridge_rd_data <= 0;
       end
-      32'hF8xxxxxx: begin
-        bridge_rd_data <= cmd_bridge_rd_data;
-      end
+      32'hF7000000: begin bridge_rd_data <= analogizer_settings; end
+      32'hF8xxxxxx: begin bridge_rd_data <= cmd_bridge_rd_data; end
     endcase
 
     if (bridge_addr[31:28] == 4'h2) begin
@@ -325,9 +324,9 @@ module core_top (
         32'h050: begin
           reset_delay <= 32'h100000;
         end
-        // 32'h054: begin
-        //   region <= bridge_wr_data[1:0];
-        // end
+        32'h054: begin
+          region <= bridge_wr_data[1:0];
+        end
         32'h200: begin
           hide_overscan <= bridge_wr_data[0];
         end
@@ -358,6 +357,9 @@ module core_top (
         32'h310: begin
           turbo_speed <= bridge_wr_data[2:0];
         end
+        /*[ANALOGIZER_HOOK_BEGIN]*/
+				32'hF7000000: analogizer_settings  <=  bridge_wr_data;
+				/*[ANALOGIZER_HOOK_END]*/
       endcase
     end
   end
@@ -743,6 +745,113 @@ module core_top (
 
   wire hide_overscan_with_region = hide_overscan_s && region_s == 2'b0;
 
+/*[ANALOGIZER_HOOK_BEGIN]*/
+//Pocket Menu settings
+reg [31:0] analogizer_settings = 0;
+wire [31:0] analogizer_settings_s;
+
+synch_3 #(.WIDTH(32)) sync_analogizer(analogizer_settings, analogizer_settings_s, clk_ppu_21_47);
+
+always @(*) begin
+	game_cont_type                     = analogizer_settings_s[4:0];
+	p1_interface                       = analogizer_settings_s[7];
+	p2_interface                       = analogizer_settings_s[6];
+	game_cont_sample_rate              = analogizer_settings_s[10:8];
+	analog_video_type                  = analogizer_settings_s[15:12];
+	blank_pocket_screen                = analogizer_settings_s[16];
+  // DBG_CSYNC                          = analogizer_settings_s[27:24];
+  // DBG_DE                             = analogizer_settings_s[28];
+end
+
+wire clk_vid = video_rgb_clock; //video_rgb_clock; //Fixed one bit shift error on RGB channels.
+
+// reg SYNC;
+// reg ANALOGIZER_DE;
+// always @(posedge clk_ppu_21_47) begin
+//   case(DBG_CSYNC)
+//     4'd0: SYNC <= ~^{video_hs_nes, video_vs_nes}; //XNOR
+//     4'd1: SYNC <= &{video_hs_nes, video_vs_nes};  //AND
+//     4'd2: SYNC <= ^{video_hs_nes, video_vs_nes};  //XOR
+//     4'd4: SYNC <= |{video_hs_nes, video_vs_nes};  //OR
+//     default: SYNC <= ^{video_hs_nes, video_vs_nes}; //DEFAULT: XOR
+//   endcase
+
+//   ANALOGIZER_DE <= (DBG_DE) ? ~de : de;
+// end
+wire SYNC = ~^{video_hs_nes, video_vs_nes};
+
+//*** Analogizer Interface V1.0 ***
+reg analogizer_ena;
+reg [3:0] analog_video_type;
+reg [4:0] game_cont_type /* synthesis keep */;
+reg [2:0] game_cont_sample_rate /* synthesis keep */;
+reg p1_interface /* synthesis keep */;
+reg p2_interface /* synthesis keep */;
+reg blank_pocket_screen;
+// reg [3:0] DBG_CSYNC;
+// reg DBG_DE;
+// wire BtnCasAplusSEL = 0;
+// wire PauseAsSelplusStart = 0;
+// wire ShowTestPattern = 0;
+
+wire [15:0] p1_btn;
+wire [15:0] p2_btn;
+//switch between Analogizer SNAC and Pocket Controls for P1,P2 only
+wire [15:0] p1_controls, p2_controls;
+wire [15:0] p1_stick;
+assign p1_controls = (1'b1) ? p1_btn : cont1_key_s;
+assign p2_controls = (1'b1) ? p2_btn : cont2_key_s;
+assign p1_stick = (1'b1) ? 16'h0000: cont1_joy_s; 
+
+  //create aditional switch to blank Pocket screen.
+  wire [23:0] video_rgb_pocket;
+  assign video_rgb_pocket = (1'b1) ? video_rgb_nes : 24'h000000;
+ 
+//21_477_248
+openFPGA_Pocket_Analogizer #(.MASTER_CLK_FREQ(21_477_248)) analogizer (
+	.i_clk(clk_ppu_21_47),
+	.i_rst(external_reset_s), //i_rst is active high
+	.i_ena(1'b1),
+	//Video interface
+	.analog_video_type(analog_video_type),
+  //.analog_video_type(4'd0),
+	.R(video_rgb_nes[23:16]),
+	.G(video_rgb_nes[15:8]),
+	.B(video_rgb_nes[7:0]),
+	//.BLANKn(ANALOGIZER_DE),
+  .BLANKn(de),
+	.Hsync(SYNC), //composite SYNC on HSync.
+	.Vsync(1'b1),
+	.video_clk(clk_vid),
+	//SNAC interface
+	.conf_AB((game_cont_type >= 5'd16)),              //0 conf. A(default), 1 conf. B (see graph above)
+  //.conf_AB((5'd0)), 
+	.game_cont_type(game_cont_type), //0-15 Conf. A, 16-31 Conf. B
+  //.game_cont_type(5'd2), //NES
+	.game_cont_sample_rate(game_cont_sample_rate), //0 compatibility mode (slowest), 1 normal mode, 2 fast mode, 3 superfast mode
+	//.game_cont_sample_rate(3'b01), //0 compatibility mode (slowest), 1 normal mode, 2 fast mode, 3 superfast mode
+	.p1_btn_state(p1_btn),
+	.p2_btn_state(p2_btn),
+	.busy(),   
+	//Pocket Analogizer IO interface to the Pocket cartridge port
+	.cart_tran_bank2(cart_tran_bank2),
+	.cart_tran_bank2_dir(cart_tran_bank2_dir),
+	.cart_tran_bank3(cart_tran_bank3),
+	.cart_tran_bank3_dir(cart_tran_bank3_dir),
+	.cart_tran_bank1(cart_tran_bank1),
+	.cart_tran_bank1_dir(cart_tran_bank1_dir),
+	.cart_tran_bank0(cart_tran_bank0),
+	.cart_tran_bank0_dir(cart_tran_bank0_dir),
+	.cart_tran_pin30(cart_tran_pin30),
+	.cart_tran_pin30_dir(cart_tran_pin30_dir),
+	.cart_pin30_pwroff_reset(cart_pin30_pwroff_reset),
+	.cart_tran_pin31(cart_tran_pin31),
+	.cart_tran_pin31_dir(cart_tran_pin31_dir),
+	//debug
+	.o_stb()
+);
+/*[ANALOGIZER_HOOK_END]*/
+
   nes_top nes (
       .clk_74a(clk_74a),
       .clk_ppu_21_47(clk_ppu_21_47),
@@ -756,30 +865,30 @@ module core_top (
       .external_reset(external_reset_s || prev_region != region_s || pll_reset),
 
       // Input
-      .p1_button_a(cont1_key_s[4]),
-      .p1_button_b(cont1_key_s[5]),
-      .p1_button_a_turbo(cont1_key_s[6]),
-      .p1_button_b_turbo(cont1_key_s[7]),
-      .p1_button_start(cont1_key_s[15]),
-      .p1_button_select(cont1_key_s[14]),
-      .p1_dpad_up(cont1_key_s[0]),
-      .p1_dpad_down(cont1_key_s[1]),
-      .p1_dpad_left(cont1_key_s[2]),
-      .p1_dpad_right(cont1_key_s[3]),
+      .p1_button_a(p1_controls[4]),
+      .p1_button_b(p1_controls[5]),
+      .p1_button_a_turbo(p1_controls[6]),
+      .p1_button_b_turbo(p1_controls[7]),
+      .p1_button_start(p1_controls[15]),
+      .p1_button_select(p1_controls[14]),
+      .p1_dpad_up(p1_controls[0]),
+      .p1_dpad_down(p1_controls[1]),
+      .p1_dpad_left(p1_controls[2]),
+      .p1_dpad_right(p1_controls[3]),
 
-      .p1_lstick_x(cont1_joy_s[7:0]),
-      .p1_lstick_y(cont1_joy_s[15:8]),
+      .p1_lstick_x(p1_stick[7:0]),
+      .p1_lstick_y(p1_stick[15:8]),
 
-      .p2_button_a(cont2_key_s[4]),
-      .p2_button_b(cont2_key_s[5]),
-      .p2_button_a_turbo(cont2_key_s[6]),
-      .p2_button_b_turbo(cont2_key_s[7]),
-      .p2_button_start(cont2_key_s[15]),
-      .p2_button_select(cont2_key_s[14]),
-      .p2_dpad_up(cont2_key_s[0]),
-      .p2_dpad_down(cont2_key_s[1]),
-      .p2_dpad_left(cont2_key_s[2]),
-      .p2_dpad_right(cont2_key_s[3]),
+      .p2_button_a(p2_controls[4]),
+      .p2_button_b(p2_controls[5]),
+      .p2_button_a_turbo(p2_controls[6]),
+      .p2_button_b_turbo(p2_controls[7]),
+      .p2_button_start(p2_controls[15]),
+      .p2_button_select(p2_controls[14]),
+      .p2_dpad_up(p2_controls[0]),
+      .p2_dpad_down(p2_controls[1]),
+      .p2_dpad_left(p2_controls[2]),
+      .p2_dpad_right(p2_controls[3]),
 
       .p3_button_a(cont3_key_s[4]),
       .p3_button_b(cont3_key_s[5]),
@@ -804,17 +913,27 @@ module core_top (
       .p4_dpad_right(cont4_key_s[3]),
 
       // Settings
-      .hide_overscan(hide_overscan_with_region),
-      .mask_vid_edges(mask_vid_edges_s),
-      .allow_extra_sprites(allow_extra_sprites_s),
-      .selected_palette(selected_palette_s),
+      //.hide_overscan(hide_overscan_with_region),
+      .hide_overscan(1'd0),
+      //.mask_vid_edges(mask_vid_edges_s),
+      .mask_vid_edges(2'd0),
+      //.allow_extra_sprites(allow_extra_sprites_s),
+      .allow_extra_sprites(1'd0),
+      //.selected_palette(selected_palette_s),
+      .selected_palette(3'd0),
 
-      .multitap_enabled(multitap_enabled_s),
-      .lightgun_enabled(lightgun_enabled_s),
-      .lightgun_dpad_aim_speed(lightgun_dpad_aim_speed_s),
+      //.multitap_enabled(multitap_enabled_s),
+      .multitap_enabled(1'b0),
+      //.lightgun_enabled(lightgun_enabled_s),
+      .lightgun_enabled(1'b0),
 
-      .turbo_speed(turbo_speed_s),
-      .swap_controllers(swap_controllers_s),
+      //.lightgun_dpad_aim_speed(lightgun_dpad_aim_speed_s),
+      .lightgun_dpad_aim_speed(8'd0),
+
+      //.turbo_speed(turbo_speed_s),
+      .turbo_speed(3'd0),
+      //.swap_controllers(swap_controllers_s),
+      .swap_controllers(1'b0),
 
       // APF
       .ioctl_wr(ioctl_wr),
@@ -906,8 +1025,8 @@ module core_top (
 
     if (de) begin
       video_de_reg  <= 1;
-
-      video_rgb_reg <= video_rgb_nes;
+      //video_rgb_reg <= video_rgb_nes;
+      video_rgb_reg <= video_rgb_pocket;
     end else if (de_prev && ~de) begin
       video_rgb_reg <= video_slot_rgb;
     end
