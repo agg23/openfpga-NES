@@ -216,7 +216,7 @@ module openFPGA_Pocket_Analogizer_SNAC #(parameter MASTER_CLK_FREQ=50_000_000)
         endcase
     end
 
-    always @(posedge i_clk) begin
+    always @(*) begin
         case (conf_AB)         
             CONF_A: begin
                 CART_BK0_DIR                   <= 1'b0;                                           //INPUT

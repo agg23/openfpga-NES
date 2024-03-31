@@ -303,7 +303,7 @@ module core_top (
       default: begin
         bridge_rd_data <= 0;
       end
-      32'hF7000000: begin bridge_rd_data <= analogizer_settings; end
+      32'hF7000000: begin bridge_rd_data <= {15'h0,analogizer_settings}; end
       32'hF8xxxxxx: begin bridge_rd_data <= cmd_bridge_rd_data; end
     endcase
 
@@ -324,41 +324,41 @@ module core_top (
         32'h050: begin
           reset_delay <= 32'h100000;
         end
-        32'h054: begin
-          region <= bridge_wr_data[1:0];
-        end
-        32'h200: begin
-          hide_overscan <= bridge_wr_data[0];
-        end
-        32'h204: begin
-          mask_vid_edges <= bridge_wr_data[1:0];
-        end
-        32'h208: begin
-          allow_extra_sprites <= bridge_wr_data[0];
-        end
-        32'h20C: begin
-          selected_palette <= bridge_wr_data[2:0];
-        end
-        32'h210: begin
-          square_pixels <= bridge_wr_data[0];
-        end
-        32'h300: begin
-          multitap_enabled <= bridge_wr_data[0];
-        end
-        32'h304: begin
-          lightgun_enabled <= bridge_wr_data[0];
-        end
-        32'h308: begin
-          lightgun_dpad_aim_speed <= bridge_wr_data[7:0];
-        end
-        32'h30C: begin
-          swap_controllers <= bridge_wr_data[0];
-        end
-        32'h310: begin
-          turbo_speed <= bridge_wr_data[2:0];
-        end
+        // 32'h054: begin
+        //   region <= bridge_wr_data[1:0];
+        // end
+        // 32'h200: begin
+        //   hide_overscan <= bridge_wr_data[0];
+        // end
+        // 32'h204: begin
+        //   mask_vid_edges <= bridge_wr_data[1:0];
+        // end
+        // 32'h208: begin
+        //   allow_extra_sprites <= bridge_wr_data[0];
+        // end
+        // 32'h20C: begin
+        //   selected_palette <= bridge_wr_data[2:0];
+        // end
+        // 32'h210: begin
+        //   square_pixels <= bridge_wr_data[0];
+        // end
+        // 32'h300: begin
+        //   multitap_enabled <= bridge_wr_data[0];
+        // end
+        // 32'h304: begin
+        //   lightgun_enabled <= bridge_wr_data[0];
+        // end
+        // 32'h308: begin
+        //   lightgun_dpad_aim_speed <= bridge_wr_data[7:0];
+        // end
+        // 32'h30C: begin
+        //   swap_controllers <= bridge_wr_data[0];
+        // end
+        // 32'h310: begin
+        //   turbo_speed <= bridge_wr_data[2:0];
+        // end
         /*[ANALOGIZER_HOOK_BEGIN]*/
-				32'hF7000000: analogizer_settings  <=  bridge_wr_data;
+				32'hF7000000: analogizer_settings  <=  bridge_wr_data[17:0];
 				/*[ANALOGIZER_HOOK_END]*/
       endcase
     end
@@ -669,21 +669,21 @@ module core_top (
   );
 
   // Settings
-  reg [1:0] region = 0;
+  //reg [1:0] region = 0;
 
   reg hide_overscan = 0;
-  reg [1:0] mask_vid_edges = 0;
+  // reg [1:0] mask_vid_edges = 0;
   reg square_pixels = 0;
-  reg allow_extra_sprites = 0;
-  reg [2:0] selected_palette = 0;
-  wire external_reset = reset_delay > 0;
+  // reg allow_extra_sprites = 0;
+  // reg [2:0] selected_palette = 0;
+  // wire external_reset = reset_delay > 0;
 
-  reg multitap_enabled = 0;
-  reg lightgun_enabled = 0;
-  reg [7:0] lightgun_dpad_aim_speed = 0;
+  // reg multitap_enabled = 0;
+  // reg lightgun_enabled = 0;
+  // reg [7:0] lightgun_dpad_aim_speed = 0;
 
-  reg [2:0] turbo_speed = 0;
-  reg swap_controllers = 0;
+  // reg [2:0] turbo_speed = 0;
+  // reg swap_controllers = 0;
 
   wire [1:0] region_s;
 
@@ -701,39 +701,39 @@ module core_top (
   wire [2:0] turbo_speed_s;
   wire swap_controllers_s;
 
-  synch_3 #(
-      .WIDTH(24)
-  ) settings_s (
-      {
-        region,
-        hide_overscan,
-        mask_vid_edges,
-        square_pixels,
-        allow_extra_sprites,
-        selected_palette,
-        external_reset,
-        multitap_enabled,
-        lightgun_enabled,
-        lightgun_dpad_aim_speed,
-        turbo_speed,
-        swap_controllers
-      },
-      {
-        region_s,
-        hide_overscan_s,
-        mask_vid_edges_s,
-        square_pixels_s,
-        allow_extra_sprites_s,
-        selected_palette_s,
-        external_reset_s,
-        multitap_enabled_s,
-        lightgun_enabled_s,
-        lightgun_dpad_aim_speed_s,
-        turbo_speed_s,
-        swap_controllers_s
-      },
-      clk_ppu_21_47
-  );
+  // synch_3 #(
+  //     .WIDTH(24)
+  // ) settings_s (
+  //     {
+  //       region,
+  //       hide_overscan,
+  //       mask_vid_edges,
+  //       square_pixels,
+  //       allow_extra_sprites,
+  //       selected_palette,
+  //       external_reset,
+  //       multitap_enabled,
+  //       lightgun_enabled,
+  //       lightgun_dpad_aim_speed,
+  //       turbo_speed,
+  //       swap_controllers
+  //     },
+  //     {
+  //       region_s,
+  //       hide_overscan_s,
+  //       mask_vid_edges_s,
+  //       square_pixels_s,
+  //       allow_extra_sprites_s,
+  //       selected_palette_s,
+  //       external_reset_s,
+  //       multitap_enabled_s,
+  //       lightgun_enabled_s,
+  //       lightgun_dpad_aim_speed_s,
+  //       turbo_speed_s,
+  //       swap_controllers_s
+  //     },
+  //     clk_ppu_21_47
+  // );
 
   reg [1:0] prev_region = 0;
 
@@ -747,10 +747,12 @@ module core_top (
 
 /*[ANALOGIZER_HOOK_BEGIN]*/
 //Pocket Menu settings
-reg [31:0] analogizer_settings = 0;
-wire [31:0] analogizer_settings_s;
+// reg [31:0] analogizer_settings = 0;
+// wire [31:0] analogizer_settings_s;
+reg [16:0] analogizer_settings = 0;
+wire [16:0] analogizer_settings_s;
 
-synch_3 #(.WIDTH(32)) sync_analogizer(analogizer_settings, analogizer_settings_s, clk_ppu_21_47);
+synch_3 #(.WIDTH(17)) sync_analogizer(analogizer_settings, analogizer_settings_s, clk_ppu_21_47);
 
 always @(*) begin
 	game_cont_type                     = analogizer_settings_s[4:0];
@@ -917,23 +919,23 @@ openFPGA_Pocket_Analogizer #(.MASTER_CLK_FREQ(21_477_248)) analogizer (
       .hide_overscan(1'd0),
       //.mask_vid_edges(mask_vid_edges_s),
       .mask_vid_edges(2'd0),
-      //.allow_extra_sprites(allow_extra_sprites_s),
-      .allow_extra_sprites(1'd0),
-      //.selected_palette(selected_palette_s),
-      .selected_palette(3'd0),
+      .allow_extra_sprites(allow_extra_sprites_s),
+      //.allow_extra_sprites(1'd0),
+      .selected_palette(selected_palette_s),
+      //.selected_palette(3'd0),
 
-      //.multitap_enabled(multitap_enabled_s),
-      .multitap_enabled(1'b0),
-      //.lightgun_enabled(lightgun_enabled_s),
-      .lightgun_enabled(1'b0),
+      .multitap_enabled(multitap_enabled_s),
+      //.multitap_enabled(1'b0),
+      .lightgun_enabled(lightgun_enabled_s),
+      //.lightgun_enabled(1'b0),
 
-      //.lightgun_dpad_aim_speed(lightgun_dpad_aim_speed_s),
-      .lightgun_dpad_aim_speed(8'd0),
+      .lightgun_dpad_aim_speed(lightgun_dpad_aim_speed_s),
+      //.lightgun_dpad_aim_speed(8'd0),
 
-      //.turbo_speed(turbo_speed_s),
-      .turbo_speed(3'd0),
-      //.swap_controllers(swap_controllers_s),
-      .swap_controllers(1'b0),
+      .turbo_speed(turbo_speed_s),
+      //.turbo_speed(3'd0),
+      .swap_controllers(swap_controllers_s),
+      //.swap_controllers(1'b0),
 
       // APF
       .ioctl_wr(ioctl_wr),

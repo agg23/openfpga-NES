@@ -188,7 +188,7 @@ module openFPGA_Pocket_Analogizer #(parameter MASTER_CLK_FREQ=50_000_000) (
 		.csync(Hsync),
 		.de(BLANKn),
 
-		.din({R,G,B}),
+		.din({R&{8{BLANKn}},G&{8{BLANKn}},B&{8{BLANKn}}}),
 		.dout({PrOut,Yout,PbOut}),
 
 		.hsync_o(),
