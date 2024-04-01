@@ -153,6 +153,26 @@
               }
           ]
       },
+      {
+        "name": "Blank Pocket Screen",
+        "id": 43,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "address": "0xF7000000",
+        "defaultval": "0x0",
+        "mask": "0xFFFEFFFF",
+        "options": [
+            {
+            "value": "0x0",
+            "name": "Off"
+            },
+            {
+            "value": "0x10000",
+            "name": "On"
+            }
+        ]
+    },
 	  {
         "name": "Extra Sprites",
         "id": 48,

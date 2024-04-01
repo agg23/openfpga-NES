@@ -324,39 +324,39 @@ module core_top (
         32'h050: begin
           reset_delay <= 32'h100000;
         end
-        // 32'h054: begin
-        //   region <= bridge_wr_data[1:0];
-        // end
+//        32'h054: begin
+//          region <= bridge_wr_data[1:0];
+//        end
         // 32'h200: begin
         //   hide_overscan <= bridge_wr_data[0];
         // end
         // 32'h204: begin
         //   mask_vid_edges <= bridge_wr_data[1:0];
         // end
-        // 32'h208: begin
-        //   allow_extra_sprites <= bridge_wr_data[0];
-        // end
-        // 32'h20C: begin
-        //   selected_palette <= bridge_wr_data[2:0];
-        // end
+        32'h208: begin
+          allow_extra_sprites <= bridge_wr_data[0];
+        end
+        32'h20C: begin
+          selected_palette <= bridge_wr_data[2:0];
+        end
         // 32'h210: begin
         //   square_pixels <= bridge_wr_data[0];
         // end
-        // 32'h300: begin
-        //   multitap_enabled <= bridge_wr_data[0];
-        // end
-        // 32'h304: begin
-        //   lightgun_enabled <= bridge_wr_data[0];
-        // end
-        // 32'h308: begin
-        //   lightgun_dpad_aim_speed <= bridge_wr_data[7:0];
-        // end
-        // 32'h30C: begin
-        //   swap_controllers <= bridge_wr_data[0];
-        // end
-        // 32'h310: begin
-        //   turbo_speed <= bridge_wr_data[2:0];
-        // end
+        32'h300: begin
+          multitap_enabled <= bridge_wr_data[0];
+        end
+        32'h304: begin
+          lightgun_enabled <= bridge_wr_data[0];
+        end
+        32'h308: begin
+          lightgun_dpad_aim_speed <= bridge_wr_data[7:0];
+        end
+        32'h30C: begin
+          swap_controllers <= bridge_wr_data[0];
+        end
+        32'h310: begin
+          turbo_speed <= bridge_wr_data[2:0];
+        end
         /*[ANALOGIZER_HOOK_BEGIN]*/
 				32'hF7000000: analogizer_settings  <=  bridge_wr_data[17:0];
 				/*[ANALOGIZER_HOOK_END]*/
@@ -629,7 +629,7 @@ module core_top (
   wire [31:0] cont1_joy_s;
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont1_s (
       cont1_key,
       cont1_key_s,
@@ -637,7 +637,7 @@ module core_top (
   );
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont2_s (
       cont2_key,
       cont2_key_s,
@@ -645,7 +645,7 @@ module core_top (
   );
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont3_s (
       cont3_key,
       cont3_key_s,
@@ -653,7 +653,7 @@ module core_top (
   );
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont4_s (
       cont4_key,
       cont4_key_s,
@@ -671,25 +671,25 @@ module core_top (
   // Settings
   //reg [1:0] region = 0;
 
-  reg hide_overscan = 0;
+  //reg hide_overscan = 0;
   // reg [1:0] mask_vid_edges = 0;
-  reg square_pixels = 0;
-  // reg allow_extra_sprites = 0;
-  // reg [2:0] selected_palette = 0;
-  // wire external_reset = reset_delay > 0;
+  //reg square_pixels = 0;
+   reg allow_extra_sprites = 0;
+   reg [2:0] selected_palette = 0;
+   wire external_reset = reset_delay > 0;
 
-  // reg multitap_enabled = 0;
-  // reg lightgun_enabled = 0;
-  // reg [7:0] lightgun_dpad_aim_speed = 0;
+   reg multitap_enabled = 0;
+   reg lightgun_enabled = 0;
+   reg [7:0] lightgun_dpad_aim_speed = 0;
 
-  // reg [2:0] turbo_speed = 0;
-  // reg swap_controllers = 0;
+   reg [2:0] turbo_speed = 0;
+   reg swap_controllers = 0;
 
-  wire [1:0] region_s;
+  //wire [1:0] region_s;
 
-  wire hide_overscan_s;
-  wire [1:0] mask_vid_edges_s;
-  wire square_pixels_s;
+  //wire hide_overscan_s;
+  //wire [1:0] mask_vid_edges_s;
+  //wire square_pixels_s;
   wire allow_extra_sprites_s;
   wire [2:0] selected_palette_s;
   wire external_reset_s;
@@ -701,49 +701,49 @@ module core_top (
   wire [2:0] turbo_speed_s;
   wire swap_controllers_s;
 
-  // synch_3 #(
-  //     .WIDTH(24)
-  // ) settings_s (
-  //     {
-  //       region,
-  //       hide_overscan,
-  //       mask_vid_edges,
-  //       square_pixels,
-  //       allow_extra_sprites,
-  //       selected_palette,
-  //       external_reset,
-  //       multitap_enabled,
-  //       lightgun_enabled,
-  //       lightgun_dpad_aim_speed,
-  //       turbo_speed,
-  //       swap_controllers
-  //     },
-  //     {
-  //       region_s,
-  //       hide_overscan_s,
-  //       mask_vid_edges_s,
-  //       square_pixels_s,
-  //       allow_extra_sprites_s,
-  //       selected_palette_s,
-  //       external_reset_s,
-  //       multitap_enabled_s,
-  //       lightgun_enabled_s,
-  //       lightgun_dpad_aim_speed_s,
-  //       turbo_speed_s,
-  //       swap_controllers_s
-  //     },
-  //     clk_ppu_21_47
-  // );
+  synch_3 #(
+      .WIDTH(19)
+  ) settings_s (
+      {
+        //region,
+        //hide_overscan,
+        //mask_vid_edges,
+        //square_pixels,
+        allow_extra_sprites, //1
+        selected_palette,    //3
+        external_reset,      //1
+        multitap_enabled,    //1
+        lightgun_enabled,    //1
+        lightgun_dpad_aim_speed, //8
+        turbo_speed,         //3
+        swap_controllers     //1
+      },
+      {
+        //region_s,
+        //hide_overscan_s,
+        //mask_vid_edges_s,
+        //square_pixels_s,
+        allow_extra_sprites_s,
+        selected_palette_s,
+        external_reset_s,
+        multitap_enabled_s,
+        lightgun_enabled_s,
+        lightgun_dpad_aim_speed_s,
+        turbo_speed_s,
+        swap_controllers_s
+      },
+      clk_ppu_21_47
+  );
 
-  reg [1:0] prev_region = 0;
+  //reg [1:0] prev_region = 0;
 
-  always @(posedge clk_ppu_21_47) begin
-    prev_region <= region_s;
-  end
+  // always @(posedge clk_ppu_21_47) begin
+  //   prev_region <= region_s;
+  // end
 
   reg [31:0] reset_delay = 0;
 
-  wire hide_overscan_with_region = hide_overscan_s && region_s == 2'b0;
+  //wire hide_overscan_with_region = hide_overscan_s && region_s == 2'b0;
 
 /*[ANALOGIZER_HOOK_BEGIN]*/
 //Pocket Menu settings
@@ -761,8 +761,6 @@ always @(*) begin
 	game_cont_sample_rate              = analogizer_settings_s[10:8];
 	analog_video_type                  = analogizer_settings_s[15:12];
 	blank_pocket_screen                = analogizer_settings_s[16];
-  // DBG_CSYNC                          = analogizer_settings_s[27:24];
-  // DBG_DE                             = analogizer_settings_s[28];
 end
 
 wire clk_vid = video_rgb_clock; //video_rgb_clock; //Fixed one bit shift error on RGB channels.
@@ -801,13 +799,13 @@ wire [15:0] p2_btn;
 //switch between Analogizer SNAC and Pocket Controls for P1,P2 only
 wire [15:0] p1_controls, p2_controls;
 wire [15:0] p1_stick;
-assign p1_controls = (1'b1) ? p1_btn : cont1_key_s;
-assign p2_controls = (1'b1) ? p2_btn : cont2_key_s;
-assign p1_stick = (1'b1) ? 16'h0000: cont1_joy_s; 
+assign p1_controls = (p1_interface) ? p1_btn : cont1_key_s;
+assign p2_controls = (p2_interface) ? p2_btn : cont2_key_s;
+assign p1_stick = (p1_interface) ? 16'h0000: cont1_joy_s; 
 
   //create aditional switch to blank Pocket screen.
   wire [23:0] video_rgb_pocket;
-  assign video_rgb_pocket = (1'b1) ? video_rgb_nes : 24'h000000;
+  assign video_rgb_pocket = (blank_pocket_screen) ? 24'h000000: video_rgb_nes;
  
 //21_477_248
 openFPGA_Pocket_Analogizer #(.MASTER_CLK_FREQ(21_477_248)) analogizer (
@@ -860,11 +858,13 @@ openFPGA_Pocket_Analogizer #(.MASTER_CLK_FREQ(21_477_248)) analogizer (
       .clk_85_9(clk_85_9),
       .clock_locked(pll_core_locked),
 
-      .sys_type(region_s),
+      //.sys_type(region_s),
+		.sys_type(2'd0),
 
       // Control
       // Region changed, reset
-      .external_reset(external_reset_s || prev_region != region_s || pll_reset),
+      //.external_reset(external_reset_s || prev_region != region_s || pll_reset),
+		.external_reset(external_reset_s || pll_reset),
 
       // Input
       .p1_button_a(p1_controls[4]),
@@ -916,9 +916,9 @@ openFPGA_Pocket_Analogizer #(.MASTER_CLK_FREQ(21_477_248)) analogizer (
 
       // Settings
       //.hide_overscan(hide_overscan_with_region),
-      .hide_overscan(1'd0),
+      .hide_overscan(1'd1), //Hide overscan
       //.mask_vid_edges(mask_vid_edges_s),
-      .mask_vid_edges(2'd0),
+      .mask_vid_edges(2'd2), //mask both edges
       .allow_extra_sprites(allow_extra_sprites_s),
       //.allow_extra_sprites(1'd0),
       .selected_palette(selected_palette_s),
@@ -1018,7 +1018,7 @@ openFPGA_Pocket_Analogizer #(.MASTER_CLK_FREQ(21_477_248)) analogizer (
   reg de_prev;
 
   wire de = ~(h_blank || v_blank);
-  wire [23:0] video_slot_rgb = {9'b0, hide_overscan_with_region, square_pixels_s, 10'b0, 3'b0};
+  wire [23:0] video_slot_rgb = {9'b0, 1'b1, 1'b1, 10'b0, 3'b0};
 
   always @(posedge clk_video_5_37) begin
     video_hs_reg  <= 0;

@@ -164,7 +164,7 @@ module openFPGA_Pocket_Analogizer #(parameter MASTER_CLK_FREQ=50_000_000) (
 				Bout = PbOut[7:2];
 				HsyncOut = 1'b1;
 				VsyncOut = YPbPr_sync; //to DAC SYNC pin, SWITCH SOG ON
-				BLANKnOut = 1'b1; // YPbPr_blank; //FIX with 1'b0 ???
+				BLANKnOut = 1'b1; //ADV7123 needs this
 			end
 			default: begin
 				Rout = R[7:2];
@@ -188,7 +188,7 @@ module openFPGA_Pocket_Analogizer #(parameter MASTER_CLK_FREQ=50_000_000) (
 		.csync(Hsync),
 		.de(BLANKn),
 
-		.din({R&{8{BLANKn}},G&{8{BLANKn}},B&{8{BLANKn}}}),
+		.din({R&{8{BLANKn}},G&{8{BLANKn}},B&{8{BLANKn}}}), //NES specific override, because not zero color data while blanking period.
 		.dout({PrOut,Yout,PbOut}),
 
 		.hsync_o(),
