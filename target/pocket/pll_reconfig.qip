@@ -1,5 +1,5 @@
 set_global_assignment -entity "pll_reconfig" -library "pll_reconfig" -name IP_TOOL_NAME "altera_pll_reconfig"
-set_global_assignment -entity "pll_reconfig" -library "pll_reconfig" -name IP_TOOL_VERSION "21.1"
+set_global_assignment -entity "pll_reconfig" -library "pll_reconfig" -name IP_TOOL_VERSION "18.1"
 set_global_assignment -entity "pll_reconfig" -library "pll_reconfig" -name IP_TOOL_ENV "mwpim"
 set_global_assignment -library "pll_reconfig" -name MISC_FILE [file join $::quartus(qip_path) "pll_reconfig.cmp"]
 set_global_assignment -entity "pll_reconfig" -library "pll_reconfig" -name IP_TARGETED_DEVICE_FAMILY "Cyclone V"
@@ -41,5 +41,5 @@ set_global_assignment -library "pll_reconfig" -name VERILOG_FILE [file join $::q
 set_global_assignment -library "pll_reconfig" -name VERILOG_FILE [file join $::quartus(qip_path) "pll_reconfig/altera_std_synchronizer.v"]
 
 set_global_assignment -entity "altera_pll_reconfig_top" -library "pll_reconfig" -name IP_TOOL_NAME "altera_pll_reconfig"
-set_global_assignment -entity "altera_pll_reconfig_top" -library "pll_reconfig" -name IP_TOOL_VERSION "21.1"
+set_global_assignment -entity "altera_pll_reconfig_top" -library "pll_reconfig" -name IP_TOOL_VERSION "18.1"
 set_global_assignment -entity "altera_pll_reconfig_top" -library "pll_reconfig" -name IP_TOOL_ENV "mwpim"

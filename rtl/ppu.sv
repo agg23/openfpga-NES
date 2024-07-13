@@ -393,8 +393,7 @@ wire [4:0] bits_orig =
 	bits4[1:0]  != 0 ? bits4 :
 	bits5[1:0]  != 0 ? bits5 :
 	bits6[1:0]  != 0 ? bits6 :
-	bits7[1:0]  != 0 || ~extra_sprites ? bits7 :
-	bits_ex;
+	bits7[1:0]  != 0 || ~extra_sprites ? bits7 : bits_ex;
 
 wire [4:0] bits_ex =
 	bits8[1:0]  != 0 ? bits8 :

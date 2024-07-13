@@ -11,7 +11,7 @@
 // agreement for further details.
 
 
-// $Id: //acds/rel/21.1std/ip/sopc/components/primitives/altera_std_synchronizer/altera_std_synchronizer.v#1 $
+// $Id: //acds/rel/18.1std/ip/sopc/components/primitives/altera_std_synchronizer/altera_std_synchronizer.v#1 $
 // $Revision: #1 $
 // $Date: 2020/06/22 $
 // $Author: psgswbuild $

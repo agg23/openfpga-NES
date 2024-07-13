@@ -234,19 +234,19 @@ module core_top (
 
   // cart is unused, so set all level translators accordingly
   // directions are 0:IN, 1:OUT
-  assign cart_tran_bank3         = 8'hzz;
-  assign cart_tran_bank3_dir     = 1'b0;
-  assign cart_tran_bank2         = 8'hzz;
-  assign cart_tran_bank2_dir     = 1'b0;
-  assign cart_tran_bank1         = 8'hzz;
-  assign cart_tran_bank1_dir     = 1'b0;
-  assign cart_tran_bank0         = 4'hf;
-  assign cart_tran_bank0_dir     = 1'b1;
-  assign cart_tran_pin30         = 1'b0;  // reset or cs2, we let the hw control it by itself
-  assign cart_tran_pin30_dir     = 1'bz;
-  assign cart_pin30_pwroff_reset = 1'b0;  // hardware can control this
-  assign cart_tran_pin31         = 1'bz;  // input
-  assign cart_tran_pin31_dir     = 1'b0;  // input
+//  assign cart_tran_bank3         = 8'hzz;
+//  assign cart_tran_bank3_dir     = 1'b0;
+//  assign cart_tran_bank2         = 8'hzz;
+//  assign cart_tran_bank2_dir     = 1'b0;
+//  assign cart_tran_bank1         = 8'hzz;
+//  assign cart_tran_bank1_dir     = 1'b0;
+//  assign cart_tran_bank0         = 4'hf;
+//  assign cart_tran_bank0_dir     = 1'b1;
+//  assign cart_tran_pin30         = 1'b0;  // reset or cs2, we let the hw control it by itself
+//  assign cart_tran_pin30_dir     = 1'bz;
+//  assign cart_pin30_pwroff_reset = 1'b0;  // hardware can control this
+//  assign cart_tran_pin31         = 1'bz;  // input
+//  assign cart_tran_pin31_dir     = 1'b0;  // input
 
   // link port is input only
   assign port_tran_so            = 1'bz;
@@ -303,9 +303,8 @@ module core_top (
       default: begin
         bridge_rd_data <= 0;
       end
-      32'hF8xxxxxx: begin
-        bridge_rd_data <= cmd_bridge_rd_data;
-      end
+      32'hF7000000: begin bridge_rd_data <= {12'h0,analogizer_settings}; end
+      32'hF8xxxxxx: begin bridge_rd_data <= cmd_bridge_rd_data; end
     endcase
 
     if (bridge_addr[31:28] == 4'h2) begin
@@ -325,9 +324,9 @@ module core_top (
         32'h050: begin
           reset_delay <= 32'h100000;
         end
-        // 32'h054: begin
-        //   region <= bridge_wr_data[1:0];
-        // end
+//        32'h054: begin
+//          region <= bridge_wr_data[1:0];
+//        end
         32'h200: begin
           hide_overscan <= bridge_wr_data[0];
         end
@@ -340,9 +339,9 @@ module core_top (
         32'h20C: begin
           selected_palette <= bridge_wr_data[2:0];
         end
-        32'h210: begin
-          square_pixels <= bridge_wr_data[0];
-        end
+        // 32'h210: begin
+        //   square_pixels <= bridge_wr_data[0];
+        // end
         32'h300: begin
           multitap_enabled <= bridge_wr_data[0];
         end
@@ -358,6 +357,9 @@ module core_top (
         32'h310: begin
           turbo_speed <= bridge_wr_data[2:0];
         end
+        /*[ANALOGIZER_HOOK_BEGIN]*/
+				32'hF7000000: analogizer_settings  <=  bridge_wr_data[19:0];
+				/*[ANALOGIZER_HOOK_END]*/
       endcase
     end
   end
@@ -577,46 +579,46 @@ module core_top (
   wire mapper_has_savestate;
   wire [31:0] save_state_bridge_read_data;
 
-  save_state_controller save_state_controller (
-      .clk_74a(clk_74a),
-      .clk_mem_85_9(clk_85_9),
-      .clk_ppu_21_47(clk_ppu_21_47),
+  // save_state_controller save_state_controller (
+  //     .clk_74a(clk_74a),
+  //     .clk_mem_85_9(clk_85_9),
+  //     .clk_ppu_21_47(clk_ppu_21_47),
 
-      // APF
-      .bridge_wr(bridge_wr),
-      .bridge_rd(bridge_rd),
-      .bridge_endian_little(bridge_endian_little),
-      .bridge_addr(bridge_addr),
-      .bridge_wr_data(bridge_wr_data),
-      .save_state_bridge_read_data(save_state_bridge_read_data),
+  //     // APF
+  //     .bridge_wr(bridge_wr),
+  //     .bridge_rd(bridge_rd),
+  //     .bridge_endian_little(bridge_endian_little),
+  //     .bridge_addr(bridge_addr),
+  //     .bridge_wr_data(bridge_wr_data),
+  //     .save_state_bridge_read_data(save_state_bridge_read_data),
 
-      // APF Save States
-      .savestate_load(savestate_load),
-      .savestate_load_ack_s(savestate_load_ack),
-      .savestate_load_busy_s(savestate_load_busy),
-      .savestate_load_ok_s(savestate_load_ok),
-      .savestate_load_err_s(savestate_load_err),
+  //     // APF Save States
+  //     .savestate_load(savestate_load),
+  //     .savestate_load_ack_s(savestate_load_ack),
+  //     .savestate_load_busy_s(savestate_load_busy),
+  //     .savestate_load_ok_s(savestate_load_ok),
+  //     .savestate_load_err_s(savestate_load_err),
 
-      .savestate_start(savestate_start),
-      .savestate_start_ack_s(savestate_start_ack),
-      .savestate_start_busy_s(savestate_start_busy),
-      .savestate_start_ok_s(savestate_start_ok),
-      .savestate_start_err_s(savestate_start_err),
+  //     .savestate_start(savestate_start),
+  //     .savestate_start_ack_s(savestate_start_ack),
+  //     .savestate_start_busy_s(savestate_start_busy),
+  //     .savestate_start_ok_s(savestate_start_ok),
+  //     .savestate_start_err_s(savestate_start_err),
 
-      // Save States Manager
-      .ss_save(ss_save),
-      .ss_load(ss_load),
+  //     // Save States Manager
+  //     .ss_save(ss_save),
+  //     .ss_load(ss_load),
 
-      .ss_din (ss_din),
-      .ss_dout(ss_dout),
-      .ss_addr(ss_addr),
-      .ss_rnw (ss_rnw),
-      .ss_req (ss_req),
-      .ss_be  (ss_be),
-      .ss_ack (ss_ack),
+  //     .ss_din (ss_din),
+  //     .ss_dout(ss_dout),
+  //     .ss_addr(ss_addr),
+  //     .ss_rnw (ss_rnw),
+  //     .ss_req (ss_req),
+  //     .ss_be  (ss_be),
+  //     .ss_ack (ss_ack),
 
-      .ss_busy(ss_busy)
-  );
+  //     .ss_busy(ss_busy)
+  // );
 
   // Core
 
@@ -627,7 +629,7 @@ module core_top (
   wire [31:0] cont1_joy_s;
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont1_s (
       cont1_key,
       cont1_key_s,
@@ -635,7 +637,7 @@ module core_top (
   );
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont2_s (
       cont2_key,
       cont2_key_s,
@@ -643,7 +645,7 @@ module core_top (
   );
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont3_s (
       cont3_key,
       cont3_key_s,
@@ -651,7 +653,7 @@ module core_top (
   );
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont4_s (
       cont4_key,
       cont4_key_s,
@@ -667,27 +669,27 @@ module core_top (
   );
 
   // Settings
-  reg [1:0] region = 0;
+  //reg [1:0] region = 0;
 
   reg hide_overscan = 0;
   reg [1:0] mask_vid_edges = 0;
-  reg square_pixels = 0;
-  reg allow_extra_sprites = 0;
-  reg [2:0] selected_palette = 0;
-  wire external_reset = reset_delay > 0;
+  //reg square_pixels = 0;
+   reg allow_extra_sprites = 0;
+   reg [2:0] selected_palette = 0;
+   wire external_reset = reset_delay > 0;
 
-  reg multitap_enabled = 0;
-  reg lightgun_enabled = 0;
-  reg [7:0] lightgun_dpad_aim_speed = 0;
+   reg multitap_enabled = 0;
+   reg lightgun_enabled = 0;
+   reg [7:0] lightgun_dpad_aim_speed = 0;
 
-  reg [2:0] turbo_speed = 0;
-  reg swap_controllers = 0;
+   reg [2:0] turbo_speed = 0;
+   reg swap_controllers = 0;
 
-  wire [1:0] region_s;
+  //wire [1:0] region_s;
 
   wire hide_overscan_s;
   wire [1:0] mask_vid_edges_s;
-  wire square_pixels_s;
+  //wire square_pixels_s;
   wire allow_extra_sprites_s;
   wire [2:0] selected_palette_s;
   wire external_reset_s;
@@ -700,27 +702,27 @@ module core_top (
   wire swap_controllers_s;
 
   synch_3 #(
-      .WIDTH(24)
+      .WIDTH(21)
   ) settings_s (
       {
-        region,
+        //region,
         hide_overscan,
         mask_vid_edges,
-        square_pixels,
-        allow_extra_sprites,
-        selected_palette,
-        external_reset,
-        multitap_enabled,
-        lightgun_enabled,
-        lightgun_dpad_aim_speed,
-        turbo_speed,
-        swap_controllers
+        //square_pixels,
+        allow_extra_sprites, //1
+        selected_palette,    //3
+        external_reset,      //1
+        multitap_enabled,    //1
+        lightgun_enabled,    //1
+        lightgun_dpad_aim_speed, //8
+        turbo_speed,         //3
+        swap_controllers     //1
       },
       {
-        region_s,
+        //region_s,
         hide_overscan_s,
         mask_vid_edges_s,
-        square_pixels_s,
+        //square_pixels_s,
         allow_extra_sprites_s,
         selected_palette_s,
         external_reset_s,
@@ -733,15 +735,202 @@ module core_top (
       clk_ppu_21_47
   );
 
-  reg [1:0] prev_region = 0;
+  // reg [1:0] prev_region = 0;
 
-  always @(posedge clk_ppu_21_47) begin
-    prev_region <= region_s;
-  end
+  // always @(posedge clk_ppu_21_47) begin
+  //   prev_region <= region_s;
+  // end
 
   reg [31:0] reset_delay = 0;
 
-  wire hide_overscan_with_region = hide_overscan_s && region_s == 2'b0;
+  // wire hide_overscan_with_region = hide_overscan_s && region_s == 2'b0;
+
+/*[ANALOGIZER_HOOK_BEGIN]*/
+//Pocket Menu settings
+// reg [31:0] analogizer_settings = 0;
+// wire [31:0] analogizer_settings_s;
+reg [19:0] analogizer_settings = 0;
+reg [3:0] sd_mode = 4'd0; //0 no scanlines, 1 25% SL, 2 50% SL, 3 75% SL, 4 HQ2X
+wire [19:0] analogizer_settings_s;
+
+synch_3 #(.WIDTH(20)) sync_analogizer(analogizer_settings, analogizer_settings_s, clk_analogizer);
+
+always @(*) begin
+  snac_game_cont_type   = analogizer_settings_s[4:0];
+  snac_cont_assignment  = analogizer_settings_s[9:6];
+  analogizer_video_type = analogizer_settings_s[13:10];
+  sd_mode = analogizer_settings_s[19:16];
+end
+
+wire  ANALOGIZER_DE = ~(h_blank || v_blank);
+  //create aditional switch to blank Pocket screen.
+  wire [23:0] video_rgb_pocket;
+  assign video_rgb_pocket = (analogizer_video_type[3]) ? 24'h000000: video_rgb_nes;
+
+reg analogizer_ena;
+reg [3:0] analogizer_video_type;
+reg [4:0] snac_game_cont_type /* synthesis keep */;
+reg [3:0] snac_cont_assignment /* synthesis keep */;
+
+
+//switch between Analogizer SNAC and Pocket Controls for P1-P4 (P3,P4 when uses PCEngine Multitap)
+  wire [15:0] p1_btn, p2_btn, p3_btn, p4_btn;
+  reg  [15:0] p1_controls, p2_controls, p3_controls, p4_controls;
+  reg  [31:0] p1_stick;
+
+  always @(posedge clk_analogizer) begin
+    if(snac_game_cont_type == 5'h0) begin //SNAC is disabled
+                  p1_controls <= cont1_key_s;
+                  p1_stick <= cont1_joy_s;
+                  p2_controls <= cont2_key_s;
+                  p3_controls <= cont3_key_s;
+                  p4_controls <= cont4_key_s;
+    end
+    else begin
+      case(snac_cont_assignment)
+      4'h0:    begin 
+                  p1_controls <= p1_btn;
+                  p1_stick <= 32'd0;
+                  p2_controls <= cont2_key_s;
+                  p3_controls <= cont3_key_s;
+                  p4_controls <= cont4_key_s;
+                end
+      4'h1:    begin 
+                  p1_controls <= cont1_key_s;
+                  p1_stick <= cont1_joy_s;
+                  p2_controls <= p1_btn;
+                  p3_controls <= cont3_key_s;
+                  p4_controls <= cont4_key_s;
+                end
+      4'h2:    begin
+                  p1_controls <= p1_btn;
+                  p1_stick <= 32'd0;
+                  p2_controls <= p2_btn;
+                  p3_controls <= cont3_key_s;
+                  p4_controls <= cont4_key_s;
+                end
+      4'h3:    begin
+                  p1_controls <= p2_btn;
+                  p1_stick <= 32'd0;
+                  p2_controls <= p1_btn;
+                  p3_controls <= cont3_key_s;
+                  p4_controls <= cont4_key_s;
+                end
+      4'h4:    begin
+                  p1_controls <= p1_btn;
+                  p1_stick <= 32'd0;
+                  p2_controls <= p2_btn;
+                  p3_controls <= p3_btn;
+                  p4_controls <= p4_btn;
+                end
+      4'h5:    begin
+                  p1_controls <= p4_btn;
+                  p1_stick <= 32'd0;
+                  p2_controls <= p3_btn;
+                  p3_controls <= p2_btn;
+                  p4_controls <= p1_btn;
+                end
+      4'h6:    begin
+                  p1_controls <= cont1_key_s;
+                  p1_stick <= cont1_joy_s;
+                  p2_controls <= cont2_key_s;
+                  p3_controls <= p1_btn;
+                  p4_controls <= p2_btn;
+                end
+      default: begin
+                  p1_controls <= cont1_key_s;
+                  p1_stick <= cont1_joy_s;
+                  p2_controls <= cont2_key_s;
+                  p3_controls <= cont3_key_s;
+                  p4_controls <= cont4_key_s;
+                end
+      endcase
+    end
+  end
+
+
+wire clk_vid = video_rgb_clock; //video_rgb_clock; //Fixed one bit shift error on RGB channels.
+
+wire SYNC = ~^{video_hs_nes, video_vs_nes};
+
+//*** Analogizer Interface V1.0 ***
+//reg analogizer_ena;
+reg [3:0] analog_video_type;
+reg [4:0] game_cont_type /* synthesis keep */;
+
+// Video Y/C Encoder settings
+// Follows the Mike Simone Y/C encoder settings:
+// https://github.com/MikeS11/MiSTerFPGA_YC_Encoder
+// SET PAL and NTSC TIMING and pass through status bits. ** YC must be enabled in the qsf file **
+wire [39:0] CHROMA_PHASE_INC;
+wire PALFLAG;
+
+parameter NTSC_REF = 3.579545;   
+parameter PAL_REF = 4.43361875;
+
+// Parameters to be modifed
+parameter CLK_VIDEO_NTSC = 42.954496; // Must be filled E.g XX.X Hz - CLK_VIDEO
+parameter CLK_VIDEO_PAL  = 42.954496; // Must be filled E.g XX.X Hz - CLK_VIDEO
+
+//PAL CLOCK FREQUENCY SHOULD BE 42.56274
+localparam [39:0] NTSC_PHASE_INC = 40'd91626062837; //d91_625_958_315; //d91_625_968_981; // ((NTSC_REF**2^40) / CLK_VIDEO_NTSC) - SNES Example;
+//localparam [39:0] NTSC_PHASE_INC = 40'd183251916632; //for CLK_VIDEO_NTSC = 21.4772725
+localparam [39:0] PAL_PHASE_INC = 40'd113487895860; //FAKE PAL, using same frequency as CLK_VIDEO_NTSC
+//localparam [39:0] PAL_PHASE_INC =  40'd229064922453; //for CLK_VIDEO_PAL  = 21.28137;
+
+assign CHROMA_PHASE_INC = (analogizer_video_type == 4'h4) || (analogizer_video_type == 4'hC) ? PAL_PHASE_INC : NTSC_PHASE_INC; 
+assign PALFLAG = (analogizer_video_type == 4'h4) || (analogizer_video_type == 4'hC); 
+
+//42_954_496
+openFPGA_Pocket_Analogizer #(.MASTER_CLK_FREQ(42_954_496), .LINE_LENGTH(260)) analogizer (
+	.i_clk(clk_analogizer),
+	.i_rst(external_reset_s), //i_rst is active high
+	.i_ena(1'b1),
+	//Video interface
+  .video_clk(clk_analogizer),
+	.analog_video_type(analogizer_video_type),
+	.R(video_rgb_nes[23:16]),
+	.G(video_rgb_nes[15:8]),
+	.B(video_rgb_nes[7:0]),
+  .Hblank(h_blank),
+  .Vblank(v_blank),
+  .BLANKn(de),
+	.Hsync(video_hs_nes), //composite SYNC on HSync.
+	.Vsync(video_vs_nes),
+  .Csync(SYNC),
+  //Video Y/C Encoder interface
+  .CHROMA_PHASE_INC(CHROMA_PHASE_INC),
+  .PALFLAG(PALFLAG),
+  //Video SVGA Scandoubler interface
+  .ce_pix(clk_video_5_37),
+	.scandoubler(1'b1), //logic for disable/enable the scandoubler
+	.fx(sd_mode[2:0]), //0 disable, 1 scanlines 25%, 2 scanlines 50%, 3 scanlines 75%, 4 hq2x
+
+	//SNAC interface
+	.conf_AB((snac_game_cont_type >= 5'd16)),              //0 conf. A(default), 1 conf. B (see graph above)
+	.game_cont_type(snac_game_cont_type), //0-15 Conf. A, 16-31 Conf. B
+	.p1_btn_state(p1_btn),
+	.p2_btn_state(p2_btn),  
+  .p3_btn_state(p3_btn),
+	.p4_btn_state(p4_btn),   
+	//Pocket Analogizer IO interface to the Pocket cartridge port
+	.cart_tran_bank2(cart_tran_bank2),
+	.cart_tran_bank2_dir(cart_tran_bank2_dir),
+	.cart_tran_bank3(cart_tran_bank3),
+	.cart_tran_bank3_dir(cart_tran_bank3_dir),
+	.cart_tran_bank1(cart_tran_bank1),
+	.cart_tran_bank1_dir(cart_tran_bank1_dir),
+	.cart_tran_bank0(cart_tran_bank0),
+	.cart_tran_bank0_dir(cart_tran_bank0_dir),
+	.cart_tran_pin30(cart_tran_pin30),
+	.cart_tran_pin30_dir(cart_tran_pin30_dir),
+	.cart_pin30_pwroff_reset(cart_pin30_pwroff_reset),
+	.cart_tran_pin31(cart_tran_pin31),
+	.cart_tran_pin31_dir(cart_tran_pin31_dir),
+	//debug
+	.o_stb()
+);
+/*[ANALOGIZER_HOOK_END]*/
 
   nes_top nes (
       .clk_74a(clk_74a),
@@ -749,72 +938,82 @@ module core_top (
       .clk_85_9(clk_85_9),
       .clock_locked(pll_core_locked),
 
-      .sys_type(region_s),
+      //.sys_type(region_s),
+		.sys_type(2'd0),
 
       // Control
       // Region changed, reset
-      .external_reset(external_reset_s || prev_region != region_s || pll_reset),
+      //.external_reset(external_reset_s || prev_region != region_s || pll_reset),
+		.external_reset(external_reset_s || pll_reset),
 
       // Input
-      .p1_button_a(cont1_key_s[4]),
-      .p1_button_b(cont1_key_s[5]),
-      .p1_button_a_turbo(cont1_key_s[6]),
-      .p1_button_b_turbo(cont1_key_s[7]),
-      .p1_button_start(cont1_key_s[15]),
-      .p1_button_select(cont1_key_s[14]),
-      .p1_dpad_up(cont1_key_s[0]),
-      .p1_dpad_down(cont1_key_s[1]),
-      .p1_dpad_left(cont1_key_s[2]),
-      .p1_dpad_right(cont1_key_s[3]),
+      .p1_button_a(p1_controls[4]),
+      .p1_button_b(p1_controls[5]),
+      .p1_button_a_turbo(p1_controls[6]),
+      .p1_button_b_turbo(p1_controls[7]),
+      .p1_button_start(p1_controls[15]),
+      .p1_button_select(p1_controls[14]),
+      .p1_dpad_up(p1_controls[0]),
+      .p1_dpad_down(p1_controls[1]),
+      .p1_dpad_left(p1_controls[2]),
+      .p1_dpad_right(p1_controls[3]),
 
-      .p1_lstick_x(cont1_joy_s[7:0]),
-      .p1_lstick_y(cont1_joy_s[15:8]),
+      .p1_lstick_x(p1_stick[7:0]),
+      .p1_lstick_y(p1_stick[15:8]),
 
-      .p2_button_a(cont2_key_s[4]),
-      .p2_button_b(cont2_key_s[5]),
-      .p2_button_a_turbo(cont2_key_s[6]),
-      .p2_button_b_turbo(cont2_key_s[7]),
-      .p2_button_start(cont2_key_s[15]),
-      .p2_button_select(cont2_key_s[14]),
-      .p2_dpad_up(cont2_key_s[0]),
-      .p2_dpad_down(cont2_key_s[1]),
-      .p2_dpad_left(cont2_key_s[2]),
-      .p2_dpad_right(cont2_key_s[3]),
+      .p2_button_a(p2_controls[4]),
+      .p2_button_b(p2_controls[5]),
+      .p2_button_a_turbo(p2_controls[6]),
+      .p2_button_b_turbo(p2_controls[7]),
+      .p2_button_start(p2_controls[15]),
+      .p2_button_select(p2_controls[14]),
+      .p2_dpad_up(p2_controls[0]),
+      .p2_dpad_down(p2_controls[1]),
+      .p2_dpad_left(p2_controls[2]),
+      .p2_dpad_right(p2_controls[3]),
 
-      .p3_button_a(cont3_key_s[4]),
-      .p3_button_b(cont3_key_s[5]),
-      .p3_button_a_turbo(cont3_key_s[6]),
-      .p3_button_b_turbo(cont3_key_s[7]),
-      .p3_button_start(cont3_key_s[15]),
-      .p3_button_select(cont3_key_s[14]),
-      .p3_dpad_up(cont3_key_s[0]),
-      .p3_dpad_down(cont3_key_s[1]),
-      .p3_dpad_left(cont3_key_s[2]),
-      .p3_dpad_right(cont3_key_s[3]),
+      .p3_button_a(p3_controls[4]),
+      .p3_button_b(p3_controls[5]),
+      .p3_button_a_turbo(p3_controls[6]),
+      .p3_button_b_turbo(p3_controls[7]),
+      .p3_button_start(p3_controls[15]),
+      .p3_button_select(p3_controls[14]),
+      .p3_dpad_up(p3_controls[0]),
+      .p3_dpad_down(p3_controls[1]),
+      .p3_dpad_left(p3_controls[2]),
+      .p3_dpad_right(p3_controls[3]),
 
-      .p4_button_a(cont4_key_s[4]),
-      .p4_button_b(cont4_key_s[5]),
-      .p4_button_a_turbo(cont4_key_s[6]),
-      .p4_button_b_turbo(cont4_key_s[7]),
-      .p4_button_start(cont4_key_s[15]),
-      .p4_button_select(cont4_key_s[14]),
-      .p4_dpad_up(cont4_key_s[0]),
-      .p4_dpad_down(cont4_key_s[1]),
-      .p4_dpad_left(cont4_key_s[2]),
-      .p4_dpad_right(cont4_key_s[3]),
+      .p4_button_a(p4_controls[4]),
+      .p4_button_b(p4_controls[5]),
+      .p4_button_a_turbo(p4_controls[6]),
+      .p4_button_b_turbo(p4_controls[7]),
+      .p4_button_start(p4_controls[15]),
+      .p4_button_select(p4_controls[14]),
+      .p4_dpad_up(p4_controls[0]),
+      .p4_dpad_down(p4_controls[1]),
+      .p4_dpad_left(p4_controls[2]),
+      .p4_dpad_right(p4_controls[3]),
 
       // Settings
-      .hide_overscan(hide_overscan_with_region),
+      .hide_overscan(hide_overscan_s), //Don't Hide overscan
       .mask_vid_edges(mask_vid_edges_s),
+      //.mask_vid_edges(2'd2), //mask both edges
       .allow_extra_sprites(allow_extra_sprites_s),
       .selected_palette(selected_palette_s),
+      //.selected_palette(3'd0),
 
       .multitap_enabled(multitap_enabled_s),
+      //.multitap_enabled(1'b0),
       .lightgun_enabled(lightgun_enabled_s),
+      //.lightgun_enabled(1'b0),
+
       .lightgun_dpad_aim_speed(lightgun_dpad_aim_speed_s),
+      //.lightgun_dpad_aim_speed(8'd0),
 
       .turbo_speed(turbo_speed_s),
+      //.turbo_speed(3'd0),
       .swap_controllers(swap_controllers_s),
+      //.swap_controllers(1'b0),
 
       // APF
       .ioctl_wr(ioctl_wr),
@@ -897,7 +1096,7 @@ module core_top (
   reg de_prev;
 
   wire de = ~(h_blank || v_blank);
-  wire [23:0] video_slot_rgb = {9'b0, hide_overscan_with_region, square_pixels_s, 10'b0, 3'b0};
+  wire [23:0] video_slot_rgb = {9'b0, 1'b1, 1'b1, 10'b0, 3'b0};
 
   always @(posedge clk_video_5_37) begin
     video_hs_reg  <= 0;
@@ -906,8 +1105,8 @@ module core_top (
 
     if (de) begin
       video_de_reg  <= 1;
-
-      video_rgb_reg <= video_rgb_nes;
+      //video_rgb_reg <= video_rgb_nes;
+      video_rgb_reg <= video_rgb_pocket;
     end else if (de_prev && ~de) begin
       video_rgb_reg <= video_slot_rgb;
     end
@@ -970,6 +1169,7 @@ module core_top (
   wire clk_ppu_21_47;
   wire clk_video_5_37;
   wire clk_video_5_37_90deg;
+  wire clk_analogizer; //42_954_496
 
   // wire [63:0] reconfig_to_pll;
   // wire [63:0] reconfig_from_pll;
@@ -987,6 +1187,7 @@ module core_top (
       .outclk_1(clk_ppu_21_47),
       .outclk_2(clk_video_5_37),
       .outclk_3(clk_video_5_37_90deg),
+      .outclk_4(clk_analogizer), //42.954496MHz
 
       // .reconfig_to_pll  (reconfig_to_pll),
       // .reconfig_from_pll(reconfig_from_pll),

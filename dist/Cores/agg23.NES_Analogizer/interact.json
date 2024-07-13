@@ -1,0 +1,337 @@
+{
+  "interact": {
+    "magic": "APF_VER_1",
+    "variables": [
+    {
+      "name": "Reset core",
+      "id": 9,
+      "type": "action",
+      "enabled": true,
+      "address": "0x50",
+      "value": 1
+    },
+    {
+      "name": "SNAC Adapter",
+      "id": 10,
+      "type": "list",
+      "enabled": true,
+      "persist": true,
+      "address": "0xF7000000",
+      "defaultval": "0x00",
+      "mask": "0xFFFFFFE0",
+      "options": [
+        {
+        "value": "0x00",
+        "name": "None"
+        },
+        {
+        "value": "0x01",
+        "name": "DB15 Normal"
+        },
+        {
+        "value": "0x02",
+        "name": "NES"
+        },
+        {
+        "value": "0x03",
+        "name": "SNES"
+        },
+        {
+        "value": "0x04",
+        "name": "PCE 2BTN"
+        },
+        {
+        "value": "0x05",
+        "name": "PCE 6BTN"
+        },
+        {
+        "value": "0x06",
+        "name": "PCE Multitap"
+        },
+        {
+          "value": "0x09",
+          "name": "DB15 Fast"
+        },
+        {
+          "value": "0x0B",
+          "name": "SNES A,B<->X,Y"
+        }
+      ]
+    },
+    {
+      "name": "SNAC Controller Assignment",
+      "id": 11,
+      "type": "list",
+      "enabled": true,
+      "persist": true,
+      "address": "0xF7000000",
+      "defaultval": "0x00",
+      "mask": "0xFFFFFC3F",
+      "options": [
+        {
+          "value": "0x0",
+          "name": "SNAC -> P1"
+        },
+        {
+          "value": "0x40",
+          "name": "SNAC -> P2"
+        },
+        {
+          "value": "0x80",
+          "name": "SNAC P1,P2->P1,P2"
+        },
+        {
+          "value": "0xC0",
+          "name": "SNAC P1,P2->P2,P1"
+        }
+      ]
+    },
+    {
+      "name": "Analogizer Video Out",
+      "id": 12,
+      "type": "list",
+      "enabled": true,
+      "persist": true,
+      "address": "0xF7000000",
+      "defaultval": "0x0",
+      "mask": "0xFFFFC3FF",
+      "options": [
+        {
+          "value": "0x0",
+          "name": "RGBS"
+        },
+        {
+          "value": "0x0400",
+          "name": "RGsB"
+        },
+        {
+          "value": "0x0800",
+          "name": "YPbPr"
+        },
+        {
+          "value": "0x0C00",
+          "name": "Y/C NTSC"
+        },
+        {
+            "value": "0x1000",
+            "name": "Y/C PAL"
+        },
+        {
+          "value": "0x1400",
+          "name": "Scandoubler RGBHV"
+        },
+        {
+          "value": "0x2000",
+          "name": "RGBS,Pocket OFF"
+        },
+        {
+          "value": "0x2400",
+          "name": "RGsB,Pocket OFF"
+        },
+        {
+          "value": "0x2800",
+          "name": "YPbPr,Pocket OFF"
+        },            {
+          "value": "0x2C00",
+          "name": "Y/C NTSC,Pocket OFF"
+        },
+        {
+            "value": "0x3000",
+            "name": "Y/C PAL,Pocket OFF"
+        },
+        {
+          "value": "0x3400",
+          "name": "Scandoubler,Pocket OFF"
+        }
+      ]
+    },
+    {
+      "name": "Scandoubler Mode",
+      "id": 14,
+      "type": "list",
+      "enabled": true,
+      "persist": true,
+      "address": "0xF7000000",
+      "defaultval": "0x0",
+      "mask": "0xFFF0FFFF",
+      "options": [
+        {
+          "value": "0x0",
+          "name": "No Scanlines"
+        },
+        {
+          "value": "0x10000",
+          "name": "25% Scanlines"
+        },
+        {
+          "value": "0x20000",
+          "name": "50% Scanlines"
+        },
+        {
+          "value": "0x30000",
+          "name": "75% Scanlines"
+        },
+        {
+          "value": "0x40000",
+          "name": "HQ2x"
+        }
+      ]
+    },
+	  {
+        "name": "Use Multitap",
+        "id": 20,
+        "type": "check",
+        "enabled": true,
+        "address": "0x300",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
+        "name": "Hide Overscan",
+        "id": 40,
+        "type": "check",
+        "enabled": true,
+        "address": "0x200",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 1,
+        "value": 1
+      },
+      {
+        "name": "Edge Masking",
+        "id": 41,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x204",
+        "defaultval": 3,
+        "options": [
+          {
+            "value": 0,
+            "name": "No Masking"
+          },
+          {
+            "value": 1,
+            "name": "Mask Left"
+          },
+          {
+            "value": 2,
+            "name": "Mask Both"
+          },
+          {
+            "value": 3,
+            "name": "Auto Masking"
+          }
+        ]
+      },
+      {
+        "name": "Palette",
+        "id": 60,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x20C",
+        "defaultval": 1,
+        "options": [
+          {
+            "value": 0,
+            "name": "Kitrinx 34"
+          },
+          {
+            "value": 1,
+            "name": "Smooth"
+          },
+          {
+            "value": 2,
+            "name": "Wavebeam"
+          },
+          {
+            "value": 3,
+            "name": "Sony CXA"
+          },
+          {
+            "value": 4,
+            "name": "PC-10 Better"
+          },
+          {
+            "value": 5,
+            "name": "Custom"
+          }
+        ]
+      },
+      {
+        "name": "Controller Options",
+        "id": 90,
+        "type": "action",
+        "enabled": false
+      },
+      {
+        "name": "Turbo Speed",
+        "id": 91,
+        "type": "slider_u32",
+        "enabled": true,
+        "address": "0x310",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "graphical": {
+          "signed": false,
+          "min": 0,
+          "max": 6,
+          "adjust_small": 1,
+          "adjust_large": 1
+        }
+      },
+      {
+        "name": "Swap P1 & P2",
+        "id": 83,
+        "type": "check",
+        "enabled": true,
+        "address": "0x30C",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
+        "name": "Lightgun Options",
+        "id": 80,
+        "type": "action",
+        "enabled": false
+      },
+      {
+        "name": "Use Zapper",
+        "id": 81,
+        "type": "check",
+        "enabled": true,
+        "address": "0x304",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
+        "name": "D-Pad Aim Speed",
+        "id": 82,
+        "type": "slider_u32",
+        "enabled": true,
+        "address": "0x308",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 3,
+        "graphical": {
+          "signed": false,
+          "min": 1,
+          "max": 10,
+          "adjust_small": 1,
+          "adjust_large": 4
+        }
+      }
+    ],
+    "messages": []
+  }
+}
