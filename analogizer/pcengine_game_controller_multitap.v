@@ -87,7 +87,7 @@ module pcengine_game_controller_multitap #(parameter MASTER_CLK_FREQ=50_000_000)
 (
     input wire i_clk,
 	input wire i_rst,
-    input wire [4:0] game_controller_type, //4 2btn, 5 6btn, 6 multitap
+    input wire [3:0] game_controller_type, //0x4 2btn, 0x5 6btn, 0x6 multitap
 	input wire i_stb,
     output reg [15:0] player1_btn_state,
     output reg [15:0] player2_btn_state,
@@ -108,7 +108,7 @@ module pcengine_game_controller_multitap #(parameter MASTER_CLK_FREQ=50_000_000)
     parameter DATA    = 3'b100;
 
     //store module settings
-    reg [4:0] game_controller_type_r;
+    reg [3:0] game_controller_type_r;
 
     reg [6:0] state /* synthesis preserve */;
 
@@ -228,6 +228,6 @@ module pcengine_game_controller_multitap #(parameter MASTER_CLK_FREQ=50_000_000)
         end
     end
 
-    assign o_clr = (game_controller_type_r == 5'd6) ? clr_internal : 1'b0;
-    assign o_sel = (game_controller_type_r == 5'd6) ? sel_internal : 1'b0;
+    assign o_clr = (game_controller_type_r == 4'h6) ? clr_internal : 1'b0;
+    assign o_sel = (game_controller_type_r == 4'h6) ? sel_internal : 1'b0;
 endmodule

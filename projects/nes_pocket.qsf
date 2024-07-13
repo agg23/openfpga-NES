@@ -10,7 +10,7 @@
 # Project-Wide Assignments
 # ==============================================================================
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 18.1.1
-set_global_assignment -name LAST_QUARTUS_VERSION "18.0.0 Lite Edition"
+set_global_assignment -name LAST_QUARTUS_VERSION "18.1.0 Standard Edition"
 set_global_assignment -name TOP_LEVEL_ENTITY apf_top
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
@@ -61,7 +61,7 @@ source ../platform/pocket/pocket.tcl
 
 
 set_global_assignment -name FITTER_AGGRESSIVE_ROUTABILITY_OPTIMIZATION ALWAYS
-set_global_assignment -name ALM_REGISTER_PACKING_EFFORT LOW
+set_global_assignment -name ALM_REGISTER_PACKING_EFFORT HIGH
 set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
 set_global_assignment -name QIP_FILE ../analogizer/analogizer.qip
 set_global_assignment -name QIP_FILE ../platform/pocket/apf.qip

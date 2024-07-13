@@ -74,9 +74,11 @@ module openFPGA_Pocket_Analogizer_SNAC #(parameter MASTER_CLK_FREQ=50_000_000)
     input wire i_rst, //Core general reset
     input wire conf_AB, //0 conf. A(default), 1 conf. B (see graph above)
     input wire [4:0] game_cont_type, //0-15 Conf. A, 16-31 Conf. B
-    input wire [2:0] game_cont_sample_rate, //0 compatibility mode (slowest), 1 normal mode, 2 fast mode, 3 superfast mode
+    //input wire [2:0] game_cont_sample_rate, //0 compatibility mode (slowest), 1 normal mode, 2 fast mode, 3 superfast mode
     output reg [15:0] p1_btn_state,
     output reg [15:0] p2_btn_state,
+    output reg [15:0] p3_btn_state,
+    output reg [15:0] p4_btn_state,
     output reg busy,    
     //SNAC Pocket cartridge port interface (see graph above)   
     output reg [7:4] CART_BK0_OUT,
@@ -106,57 +108,68 @@ module openFPGA_Pocket_Analogizer_SNAC #(parameter MASTER_CLK_FREQ=50_000_000)
     reg SNAC_IN7 /* synthesis preserve */;   //cart_tran_bank0[5]                                          TX+
     
     //calculate step sizes for fract clock enables
-    localparam pce_compat_polling_freq    =  20_000; //  20_000 / 5 =   4K samples/sec PCE
+    // localparam pce_compat_polling_freq    =  20_000; //  20_000 / 5 =   4K samples/sec PCE
     localparam pce_normal_polling_freq    =  40_000; //  40_000 / 5 =   8K samples/sec PCE
     localparam pce_fast_polling_freq      =  80_000; //  80_000 / 5 =  16K samples/sec PCE
-    localparam pce_very_fast_polling_freq = 100_000; // 100_000 / 5 =  20K samples/sec PCE
+    // localparam pce_very_fast_polling_freq = 100_000; // 100_000 / 5 =  20K samples/sec PCE
 
-    localparam Compat_60Hz_polling_freq        =   1_080; //  
-    localparam Compat_120Hz_polling_freq        =  2_160; //  
-    localparam snes_compat_polling_freq        =   20_000; //                                           20_000 / 18 =  1.11K samples/sec NES/SNES
-    localparam serlatch_compat_polling_freq    =   100_000; //  100_000 / 25 =  4K samples/sec DB15    100_000 / 18 =  5.55K samples/sec NES/SNES
+    // localparam Compat_60Hz_polling_freq        =   1_080; //  
+    // localparam Compat_120Hz_polling_freq        =  2_160; //  
+    localparam snes_compat_polling_freq        =   50_000; //                                           
+    // localparam serlatch_compat_polling_freq    =   100_000; //  100_000 / 25 =  4K samples/sec DB15    100_000 / 18 =  5.55K samples/sec NES/SNES
     localparam serlatch_normal_polling_freq    =   200_000; //  200_000 / 25 =  8K samples/sec DB15    200_000 / 18 = 11.11K samples/sec NES/SNES
     localparam serlatch_fast_polling_freq      =   400_000; //  400_000 / 25 = 16K samples/sec DB15    400_000 / 18 = 22.22K samples/sec NES/SNES
-    localparam serlatch_very_fast_polling_freq = 1_000_000; //1_000_000 / 25 = 32K samples/sec DB15  1_000_000 / 18 = 55.55K samples/sec NES/SNES
+    // localparam serlatch_very_fast_polling_freq = 1_000_000; //1_000_000 / 25 = 32K samples/sec DB15  1_000_000 / 18 = 55.55K samples/sec NES/SNES
+
+    localparam psx_normal_polling_freq = 125_000;
+    localparam psx_fast_polling_freq = 250_000;
 
 
     //the FSM is clocked 2x the polling freq.
     localparam [32:0] MAX_INT = 33'h0ffffffff;
-    localparam [64:0] pce_compat_pstep_ = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * pce_compat_polling_freq * 2) / 1000;
-    localparam [32:0] pce_compat_pstep  = pce_compat_pstep_[32:0];
+    // localparam [64:0] pce_compat_pstep_ = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * pce_compat_polling_freq * 2) / 1000;
+    // localparam [32:0] pce_compat_pstep  = pce_compat_pstep_[32:0];
     localparam [64:0] pce_normal_pstep_ = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * pce_normal_polling_freq * 2) / 1000;
     localparam [32:0] pce_normal_pstep  = pce_normal_pstep_[32:0];
-    localparam [64:0] pce_fast_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) *pce_fast_polling_freq * 2) / 1000;
+    localparam [64:0] pce_fast_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * pce_fast_polling_freq * 2) / 1000;
     localparam [32:0] pce_fast_pstep    = pce_fast_pstep_[32:0];
-    localparam [64:0] pce_very_fast_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) *pce_very_fast_polling_freq * 2) / 1000;
-    localparam [32:0] pce_very_fast_pstep    = pce_very_fast_pstep_[32:0];
 
-    localparam [64:0] serlatch_compat_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * serlatch_compat_polling_freq * 2) / 1000;
-    localparam [32:0] serlatch_compat_pstep    = serlatch_compat_pstep_[32:0];
+    localparam [64:0] psx_fast_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * psx_fast_polling_freq * 2) / 1000;
+    localparam [32:0] psx_fast_pstep    = psx_fast_pstep_[32:0];
+    localparam [64:0] psx_normal_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * psx_normal_polling_freq * 2) / 1000;
+    localparam [32:0] psx_normal_pstep    = psx_normal_pstep_[32:0];
+    // localparam [64:0] pce_very_fast_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) *pce_very_fast_polling_freq * 2) / 1000;
+    // localparam [32:0] pce_very_fast_pstep    = pce_very_fast_pstep_[32:0];
+
+    // localparam [64:0] serlatch_compat_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * serlatch_compat_polling_freq * 2) / 1000;
+    // localparam [32:0] serlatch_compat_pstep    = serlatch_compat_pstep_[32:0];
     localparam [64:0] serlatch_normal_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * serlatch_normal_polling_freq * 2) / 1000;
     localparam [32:0] serlatch_normal_pstep    = serlatch_normal_pstep_[32:0];
     localparam [64:0] serlatch_fast_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * serlatch_fast_polling_freq * 2) / 1000;
     localparam [32:0] serlatch_fast_pstep    = serlatch_fast_pstep_[32:0];
-    localparam [64:0] serlatch_very_fast_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * serlatch_very_fast_polling_freq * 2) / 1000;
-    localparam [32:0] serlatch_very_fast_pstep    = serlatch_very_fast_pstep_[32:0];
+    // localparam [64:0] serlatch_very_fast_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * serlatch_very_fast_polling_freq * 2) / 1000;
+    // localparam [32:0] serlatch_very_fast_pstep    = serlatch_very_fast_pstep_[32:0];
     
     localparam [64:0] snes_compat_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * snes_compat_polling_freq  * 2) / 1000;
     localparam [32:0] snes_compat_pstep    = snes_compat_pstep_[32:0];
 
-    localparam [64:0] Compat_60Hz_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * Compat_60Hz_polling_freq  * 2) / 1000;
-    localparam [32:0] Compat_60Hz_pstep    = Compat_60Hz_pstep_[32:0];
-    localparam [64:0] Compat_120Hz_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * Compat_120Hz_polling_freq  * 2) / 1000;
-    localparam [32:0] Compat_120Hz_pstep    = Compat_120Hz_pstep_[32:0];
+    // localparam [64:0] Compat_60Hz_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * Compat_60Hz_polling_freq  * 2) / 1000;
+    // localparam [32:0] Compat_60Hz_pstep    = Compat_60Hz_pstep_[32:0];
+    // localparam [64:0] Compat_120Hz_pstep_   = ((MAX_INT / (MASTER_CLK_FREQ / 1000)) * Compat_120Hz_polling_freq  * 2) / 1000;
+    // localparam [32:0] Compat_120Hz_pstep    = Compat_120Hz_pstep_[32:0];
     
     //Supported game controller types
-    localparam GC_DISABLED = 5'd0;
-    localparam GC_DB15 = 5'd1;
-    localparam GC_NES = 5'd2;
-    localparam GC_SNES = 5'd3;
-    localparam GC_PCE_2BTN = 5'd4;
-    localparam GC_PCE_6BTN = 5'd5;
-    localparam GC_PCE_MULTITAP = 5'd6;
-    //parameter GC_PSX= 5'd16;
+    localparam GC_DISABLED     = 5'h0;
+    localparam GC_DB15         = 5'h1;
+    localparam GC_NES          = 5'h2;
+    localparam GC_SNES         = 5'h3;
+    localparam GC_PCE_2BTN     = 5'h4;
+    localparam GC_PCE_6BTN     = 5'h5;
+    localparam GC_PCE_MULTITAP = 5'h6;
+    localparam GC_DB15_FAST    = 5'h9;
+    localparam GC_SNES_SWAP    = 5'hB;
+    localparam GC_PSX          = 5'h10; //16 PSX 125KHz
+    localparam GC_PSX_FAST     = 5'h11; //17 PSX 250KHz
 
     //Configuration:
     localparam CONF_A = 1'b0;
@@ -164,7 +177,7 @@ module openFPGA_Pocket_Analogizer_SNAC #(parameter MASTER_CLK_FREQ=50_000_000)
 
     reg conf_AB_r;
     reg [4:0] game_cont_type_r;
-    reg [2:0] game_cont_sample_rate_r;
+    // reg [2:0] game_cont_sample_rate_r;
     reg [32:0] strobe_step_size;
     reg reset_on_change;
 
@@ -172,51 +185,88 @@ module openFPGA_Pocket_Analogizer_SNAC #(parameter MASTER_CLK_FREQ=50_000_000)
         //register SNAC settings
         conf_AB_r <= conf_AB;
         game_cont_type_r <= game_cont_type;
-        game_cont_sample_rate_r <= game_cont_sample_rate;
+        //game_cont_sample_rate_r <= game_cont_sample_rate;
 
         //detect change of SNAC settings and reset clock divider and set new settings
         reset_on_change <= 1'b0;
-        if(i_rst || (game_cont_type_r != game_cont_type) || (game_cont_sample_rate_r != game_cont_sample_rate)) begin
+        //if(i_rst || (game_cont_type_r != game_cont_type) || (game_cont_sample_rate_r != game_cont_sample_rate)) begin
+        if(i_rst || (game_cont_type_r != game_cont_type)) begin
             reset_on_change <= 1'b1;
         end
     end
 
     reg serlat_ena;
     reg pce_ena;
+    reg psx_ena;
+
     always @(posedge i_clk) begin
         serlat_ena <= 1'b0;
         pce_ena    <= 1'b0;
+        psx_ena    <= 1'b0;
 
         case (game_cont_type)
-            GC_DB15, GC_NES, GC_SNES: begin 
+            GC_PSX: begin
+                psx_ena    <= 1'b1;
+                strobe_step_size <= psx_normal_pstep;   
+            end
+            GC_PSX_FAST: begin
+                psx_ena    <= 1'b1;
+                strobe_step_size <= psx_fast_pstep;   
+            end
+            GC_DB15: begin 
                 serlat_ena <= 1'b1;
-                case (game_cont_sample_rate)
-                    0: begin strobe_step_size <= serlatch_compat_pstep ;   end
-                    1: begin strobe_step_size <= serlatch_normal_pstep;    end
-                    2: begin strobe_step_size <= serlatch_fast_pstep;      end
-                    3: begin strobe_step_size <= serlatch_very_fast_pstep; end 
-                    4: begin strobe_step_size <= snes_compat_pstep;        end 
-                    5: begin strobe_step_size <= Compat_60Hz_pstep;        end
-                    6: begin strobe_step_size <= Compat_120Hz_pstep;       end
-                    default: begin strobe_step_size <= serlatch_compat_pstep ;  end
-                endcase
+                strobe_step_size <= serlatch_normal_pstep;    
+                // case (game_cont_sample_rate)
+                //     0: begin strobe_step_size <= serlatch_compat_pstep;    end
+                //     1: begin strobe_step_size <= serlatch_normal_pstep;    end
+                //     2: begin strobe_step_size <= serlatch_fast_pstep;      end
+                //     // 3: begin strobe_step_size <= serlatch_very_fast_pstep; end 
+                //     // 4: begin strobe_step_size <= snes_compat_pstep;        end 
+                //     // 5: begin strobe_step_size <= Compat_60Hz_pstep;        end
+                //     // 6: begin strobe_step_size <= Compat_120Hz_pstep;       end
+                //     default: begin strobe_step_size <= serlatch_compat_pstep ;  end
+                // endcase
             end
-            GC_PCE_2BTN, GC_PCE_6BTN, GC_PCE_MULTITAP: begin
+            GC_DB15_FAST: begin 
+                serlat_ena <= 1'b1;
+                strobe_step_size <= serlatch_fast_pstep;    
+            end
+            GC_NES, GC_SNES, GC_SNES_SWAP: begin 
+                serlat_ena <= 1'b1;
+                strobe_step_size <= snes_compat_pstep;
+                // case (game_cont_sample_rate)
+                //     0: begin strobe_step_size <= serlatch_compat_pstep ;   end
+                //     1: begin strobe_step_size <= serlatch_normal_pstep;    end
+                //     2: begin strobe_step_size <= serlatch_fast_pstep;      end
+                //     // 3: begin strobe_step_size <= serlatch_very_fast_pstep; end 
+                //     // 4: begin strobe_step_size <= snes_compat_pstep;        end 
+                //     // 5: begin strobe_step_size <= Compat_60Hz_pstep;        end
+                //     // 6: begin strobe_step_size <= Compat_120Hz_pstep;       end
+                //     default: begin strobe_step_size <= serlatch_compat_pstep ;  end
+                // endcase
+            end
+            GC_PCE_2BTN, GC_PCE_6BTN: begin
                 pce_ena    <= 1'b1;
-                case (game_cont_sample_rate)
-                    0: begin strobe_step_size <= pce_compat_pstep;    end
-                    1: begin strobe_step_size <= pce_normal_pstep;    end
-                    2: begin strobe_step_size <= pce_fast_pstep;      end
-                    3: begin strobe_step_size <= pce_very_fast_pstep; end 
-                    default: begin strobe_step_size <= pce_compat_pstep;    end
-                endcase 
+                strobe_step_size <= pce_normal_pstep;
+                // case (game_cont_sample_rate)
+                //     0: begin strobe_step_size <= pce_compat_pstep;    end
+                //     1: begin strobe_step_size <= pce_normal_pstep;    end
+                //     2: begin strobe_step_size <= pce_fast_pstep;      end
+                //     3: begin strobe_step_size <= pce_very_fast_pstep; end 
+                //     default: begin strobe_step_size <= pce_compat_pstep;    end
+                // endcase 
             end
+            GC_PCE_MULTITAP: begin
+                pce_ena    <= 1'b1;
+                strobe_step_size <= pce_fast_pstep;
+            end
+            
             default: //disabled
-                strobe_step_size <= 33'd0;
+                strobe_step_size <= 33'h0;
         endcase
     end
 
-    always @(*) begin
+    always @(posedge i_clk) begin
         case (conf_AB)         
             CONF_A: begin
                 CART_BK0_DIR                   <= 1'b0;                                           //INPUT
@@ -260,6 +310,8 @@ module openFPGA_Pocket_Analogizer_SNAC #(parameter MASTER_CLK_FREQ=50_000_000)
 
     assign o_stb = stb_clk;
 
+    //PSX game controller for 2 players
+
     //DB15/NES/SNES game controller
     wire [15:0] sl_p1 /* synthesis keep */;
     wire [15:0] sl_p2 /* synthesis keep */;
@@ -270,7 +322,7 @@ module openFPGA_Pocket_Analogizer_SNAC #(parameter MASTER_CLK_FREQ=50_000_000)
     (
         .i_clk(i_clk),
         .i_rst(reset_on_change),
-        .game_controller_type(game_cont_type[2:0]), //1 DB15, 2 NES, 3 SNES
+        .game_controller_type(game_cont_type[3:0]), //0x1 DB15, 0x2 NES, 0x3 SNES, 0x9 DB15 FAST, 0XB SNES SWAP A,B<->X,Y
         .i_stb(stb_clk),
         .p1_btn_state(sl_p1),
         .p2_btn_state(sl_p2),
@@ -292,7 +344,7 @@ module openFPGA_Pocket_Analogizer_SNAC #(parameter MASTER_CLK_FREQ=50_000_000)
     (
         .i_clk(i_clk),
         .i_rst(reset_on_change),
-        .game_controller_type(game_cont_type), //4 2btn, 5 6btn
+        .game_controller_type(game_cont_type[3:0]), //0X4 2btn, 0X5 6btn
         .i_stb(stb_clk),
         .player_btn_state(pce_p1),
         .busy(),
@@ -302,19 +354,19 @@ module openFPGA_Pocket_Analogizer_SNAC #(parameter MASTER_CLK_FREQ=50_000_000)
         .i_dat({SNAC_IN7,SNAC_IO3_A,SNAC_IO6_A,SNAC_IN4}) //data from controller
     );
 
-wire [15:0] pce_multitap_p1, pce_multitap_p2;
+wire [15:0] pce_multitap_p1, pce_multitap_p2, pce_multitap_p3, pce_multitap_p4;
 wire PCE_MULTITAP_SNAC_OUT1, PCE_MULTITAP_SNAC_OUT2;
 
-pcengine_game_controller_multitap #(.MASTER_CLK_FREQ(MASTER_CLK_FREQ)) pcegmultitap
+pcengine_game_controller_multitap #(.MASTER_CLK_FREQ(MASTER_CLK_FREQ)) pcegmutitap
 (
         .i_clk(i_clk),
         .i_rst(reset_on_change),
-        .game_controller_type(game_cont_type), //6 multitap
+        .game_controller_type(game_cont_type[3:0]), //0x6 multitap
         .i_stb(stb_clk),
         .player1_btn_state(pce_multitap_p1),
         .player2_btn_state(pce_multitap_p2),
-        .player3_btn_state(),
-        .player4_btn_state(),
+        .player3_btn_state(pce_multitap_p3),
+        .player4_btn_state(pce_multitap_p4),
         .player5_btn_state(),
         .busy(),
     //SNAC Game controller interface
@@ -328,33 +380,43 @@ pcengine_game_controller_multitap #(.MASTER_CLK_FREQ(MASTER_CLK_FREQ)) pcegmulti
         GC_DISABLED: begin
             SNAC_OUT1 = 1'b0;
             SNAC_OUT2 = 1'b0;
-            p1_btn_state = 16'd0; 
-            p2_btn_state = 16'd0;
+            p1_btn_state = 16'h0; 
+            p2_btn_state = 16'h0;
+            p3_btn_state = 16'h0; 
+            p4_btn_state = 16'h0;
         end
-        GC_DB15, GC_NES, GC_SNES: begin
+        GC_DB15, GC_DB15_FAST, GC_NES, GC_SNES, GC_SNES_SWAP: begin
             SNAC_OUT1 = SERLAT_SNAC_OUT1;
             SNAC_OUT2 = SERLAT_SNAC_OUT2;            
             p1_btn_state = sl_p1;
             p2_btn_state = sl_p2;
+            p3_btn_state = 16'h0; 
+            p4_btn_state = 16'h0;
 
         end
         GC_PCE_2BTN, GC_PCE_6BTN: begin
             SNAC_OUT1 = PCE_SNAC_OUT1;
             SNAC_OUT2 = PCE_SNAC_OUT2;
             p1_btn_state = pce_p1; 
-            p2_btn_state = 16'd0;
+            p2_btn_state = 16'h0;
+            p3_btn_state = 16'h0; 
+            p4_btn_state = 16'h0;
         end
         GC_PCE_MULTITAP: begin
             SNAC_OUT1 = PCE_MULTITAP_SNAC_OUT1;
             SNAC_OUT2 = PCE_MULTITAP_SNAC_OUT2;
             p1_btn_state = pce_multitap_p1; 
             p2_btn_state = pce_multitap_p2;
+            p3_btn_state = pce_multitap_p3; 
+            p4_btn_state = pce_multitap_p4;
         end
         default: begin
             SNAC_OUT1 = 1'b0;
             SNAC_OUT2 = 1'b0;
-            p1_btn_state = 16'd0; 
-            p2_btn_state = 16'd0;
+            p1_btn_state = 16'h0; 
+            p2_btn_state = 16'h0;
+            p3_btn_state = 16'h0; 
+            p4_btn_state = 16'h0;
         end
         endcase
     end

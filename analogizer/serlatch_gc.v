@@ -146,7 +146,7 @@ module serlatch_game_controller #(parameter MASTER_CLK_FREQ=53_600_000)
 (
     input wire i_clk,
 	input wire i_rst,
-    input wire [2:0] game_controller_type, //0 DISABLED, 1 DB15, 2 NES, 3 SNES
+    input wire [3:0] game_controller_type, //0x0 DISABLED, 0x1 DB15, 0x2 NES, 0x3 SNES, 0x9 DB15 Fast, 0xB SNES SWAP A,B<->X,Y
     input wire i_stb,
     output reg [15:0] p1_btn_state,
     output reg [15:0] p2_btn_state,
@@ -165,7 +165,7 @@ module serlatch_game_controller #(parameter MASTER_CLK_FREQ=53_600_000)
     parameter DATA  = 3'b100;
 
     //store module settings
-    reg [2:0] game_controller_type_r;
+    reg [3:0] game_controller_type_r;
     reg [2:0] state = IDLE;
 
     reg [5:0] counter;
@@ -204,11 +204,11 @@ module serlatch_game_controller #(parameter MASTER_CLK_FREQ=53_600_000)
                     //fetch data from last read
                     //set button status output
                         case(game_controller_type_r)
-							3'd0: begin //DISABLED
+							4'h0: begin //DISABLED
                                 p1_btn_state = 16'd0;
                                 p2_btn_state = 16'd0;
 							end
-                            3'd1: begin //DB15
+                            4'h1,4'h9: begin //DB15, DB15 FAST
                                 // Pocket logic button order:
                                 // [0]     dpad_up
                                 // [1]     dpad_down
@@ -237,7 +237,7 @@ module serlatch_game_controller #(parameter MASTER_CLK_FREQ=53_600_000)
                                 //PLAYER2         START        SELECT       R3 L3 R2 L2     R1           L1           Y            X            B            A            RIGH        LEFT        DOWN         UP
                                 p2_btn_state <= ~{bstat_r[19], bstat_r[18], 4'b1111,        bstat_r[16], bstat_r[17], bstat_r[20], bstat_r[21], bstat_r[22], bstat_r[23], bstat_r[8], bstat_r[9], bstat_r[10], bstat_r[11]};
                             end
-                            3'd2: begin //NES
+                            4'h2: begin //NES
                                 //SNAC NES adapter button order from first to last
                                 //  0   1   2   3   4   5   6   7   8   9  10  11  12 13 14 15
                                 //  A   B SEL  ST  UP  DW  LF  RG   H   H   H   H   H  H  H  H
@@ -247,7 +247,7 @@ module serlatch_game_controller #(parameter MASTER_CLK_FREQ=53_600_000)
                                 p1_btn_state <= ~{p1b_r[3],p1b_r[2],     1'b1,     1'b1,  1'b1,  1'b1,  1'b1,  1'b1, 1'b1,     1'b1,     p1b_r[1], p1b_r[0],p1b_r[7],p1b_r[6],p1b_r[5],p1b_r[4]};
                                 p2_btn_state <= ~{p2b_r[3],p2b_r[2],     1'b1,     1'b1,  1'b1,  1'b1,  1'b1,  1'b1, 1'b1,     1'b1,     p2b_r[1], p2b_r[0],p2b_r[7],p2b_r[6],p2b_r[5],p2b_r[4]};
                             end
-                            3'd3: begin //SNES
+                            4'h3: begin //SNES
                                 //SNAC SNES adapter button order from first to last
                                 //  0   1   2   3   4   5   6   7   8   9  10  11  12 13 14 15
                                 //  B   Y SEL  ST  UP  DW  LF  RG   A   X  LT  LR   H  H  H  H
@@ -256,6 +256,17 @@ module serlatch_game_controller #(parameter MASTER_CLK_FREQ=53_600_000)
                                 //                START    SELECT   R3     L3     R2     L2    R1         L1         Y         X         B         A        RIGHT    LEFT     DOWN      UP
                                 p1_btn_state <= ~{p1b_r[3],p1b_r[2],1'b1,  1'b1,  1'b1,  1'b1, p1b_r[11], p1b_r[10], p1b_r[1], p1b_r[9], p1b_r[0], p1b_r[8],p1b_r[7],p1b_r[6], p1b_r[5],p1b_r[4]};
                                 p2_btn_state <= ~{p2b_r[3],p2b_r[2],1'b1,  1'b1,  1'b1,  1'b1, p2b_r[11], p2b_r[10], p2b_r[1], p2b_r[9], p2b_r[0], p2b_r[8],p2b_r[7],p2b_r[6], p2b_r[5],p2b_r[4]};
+
+                            end
+                            4'hB: begin //SNES SWAP A,B <-> X,Y
+                                //SNAC SNES adapter button order from first to last
+                                //  0   1   2   3   4   5   6   7   8   9  10  11  12 13 14 15
+                                //  B   Y SEL  ST  UP  DW  LF  RG   A   X  LT  LR   H  H  H  H
+
+                                //follow Pocket game controls order:
+                                //                START    SELECT   R3     L3     R2     L2    R1         L1         Y         X         B         A        RIGHT    LEFT     DOWN      UP
+                                p1_btn_state <= ~{p1b_r[3],p1b_r[2],1'b1,  1'b1,  1'b1,  1'b1, p1b_r[11], p1b_r[10], p1b_r[0], p1b_r[8], p1b_r[1], p1b_r[9],p1b_r[7],p1b_r[6], p1b_r[5],p1b_r[4]};
+                                p2_btn_state <= ~{p2b_r[3],p2b_r[2],1'b1,  1'b1,  1'b1,  1'b1, p2b_r[11], p2b_r[10], p2b_r[0], p2b_r[8], p2b_r[1], p2b_r[9],p2b_r[7],p2b_r[6], p2b_r[5],p2b_r[4]};
 
                             end
                             default:
@@ -269,8 +280,8 @@ module serlatch_game_controller #(parameter MASTER_CLK_FREQ=53_600_000)
                     counter <= 6'd0;
 
 					counter_top_value <= 6'd0;
-					if      (game_controller_type_r == 3'd1)                                      counter_top_value <= 6'd48;
-					else if((game_controller_type_r == 3'd2) || (game_controller_type_r == 3'd3)) counter_top_value <= 6'd34;
+					if     ((game_controller_type_r == 4'h1) || (game_controller_type_r == 4'h9))                                     counter_top_value <= 6'd48;
+					else if((game_controller_type_r == 4'h2) || (game_controller_type_r == 4'h3) || (game_controller_type_r == 4'hB)) counter_top_value <= 6'd34;
 
                     latch_internal <= latch_level;
                     clk_internal <= disable_clock_on_latch ? 1'b0 : 1'b1; 
@@ -288,7 +299,7 @@ module serlatch_game_controller #(parameter MASTER_CLK_FREQ=53_600_000)
                     
                     //first sample of data is available in LATCH phase.
                     if(sample_data) begin//read button state
-                        if(game_controller_type_r == 3'd1) begin //if is selected DB15, all button state is store in one 24bit register
+                        if((game_controller_type_r == 4'h1) || (game_controller_type_r == 4'h9))  begin //if is selected DB15,DB15 FAST all button state is store in one 24bit register
                             bstat_r[0] <= i_dat1; //3->0, 5->1, 7->2, 9->3, ...
                             // $display("DB15 [LATCH] BTN_CNT:%d  i_dat1:%d", btn_cnt, i_dat1);
                         end
@@ -309,11 +320,11 @@ module serlatch_game_controller #(parameter MASTER_CLK_FREQ=53_600_000)
                     clk_internal <= ~clk_internal; 
                     //following data samples are get in DATA phase.
                     if(sample_data) begin//read button state
-                        if(game_controller_type_r == 3'd1) begin //if is selected DB15, all button state is store in one 24bit register
+                        if((game_controller_type_r == 4'h1) || (game_controller_type_r == 4'h9) ) begin //if is selected DB15,DB15 FAST all button state is store in one 24bit register
                             bstat_r[((counter>>1)-1)] <= i_dat1; //3->0, 5->1, 7->2, 9->3, ...
                             //$display("DB15 [DATA] BTN_CNT:%d  i_dat1:%d r_dat[%d]:%d", btn_cnt, i_dat1, btn_cnt,bstat_r[btn_cnt]);
                         end
-                        else if((game_controller_type_r == 3'd2 || (game_controller_type_r == 3'd3))) begin
+                        else if((game_controller_type_r == 4'h2) || (game_controller_type_r == 4'h3)  || (game_controller_type_r == 4'hB)) begin
                             p1b_r[((counter>>1)-1)] <= i_dat1;
                             p2b_r[((counter>>1)-1)] <= i_dat2;
                         end
@@ -336,7 +347,7 @@ module serlatch_game_controller #(parameter MASTER_CLK_FREQ=53_600_000)
     //                     ___  
     //NES,SNES LATCH _____|   |_____  ...
 
-    assign latch_level = (game_controller_type_r == 3'd1) ? 1'b1 : 1'b0;
+    assign latch_level = ((game_controller_type_r == 4'h1) || (game_controller_type_r == 4'h9))  ? 1'b1 : 1'b0; //DB15, DB15 FAST
 
     //the NES,SNES SNAC interfaces disable clock signal while are in LATCH phase
     //but internally the falling edge CLK is used for sample the button state
@@ -347,14 +358,10 @@ module serlatch_game_controller #(parameter MASTER_CLK_FREQ=53_600_000)
     //       _   _   _   _   _ 
     //CLK   | |_|X|_|X|_| |_| |_ ...
     //       ... 1 2 3 4 5 6 7 8 ...
-    assign disable_clock_on_latch = (game_controller_type_r != 3'd1) ? 1'b1 : 1'b0; //en caso de que sea controlador NES,SNES
+    assign disable_clock_on_latch = ((game_controller_type_r != 4'h1) && (game_controller_type_r != 4'h9)) ? 1'b1 : 1'b0; //en caso de que sea controlador NES,SNES
 
     //counter values: 36 for NES,SNES, 50 for DB15
-    assign o_clk = (game_controller_type_r == 3'd0) ? 1'b0 : clk_internal;
-    assign o_clk2 = (game_controller_type_r == 3'd0) ? 1'b0 : clk_internal;
-    assign o_lat = (game_controller_type_r == 3'd0) ? 1'b0 : latch_internal;
-
-
-
-
+    assign o_clk  = (game_controller_type_r == 4'h0) ? 1'b0 : clk_internal;
+    assign o_clk2 = (game_controller_type_r == 4'h0) ? 1'b0 : clk_internal;
+    assign o_lat  = (game_controller_type_r == 4'h0) ? 1'b0 : latch_internal;
 endmodule
