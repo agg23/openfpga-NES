@@ -63,7 +63,8 @@ reg [21:0] chr_aout;
 wire prg_allow;
 wire chr_allow;
 wire vram_a10;
-reg [7:0] chr_dout, prg_dout;
+wire [7:0] chr_dout;
+reg [7:0] chr_data, prg_dout;
 wire vram_ce;
 wire [15:0] flags_out = {12'h0, 1'b1, 1'b0, prg_bus_write, has_chr_dout};
 wire irq;
@@ -106,7 +107,6 @@ reg in_split_area;
 
 reg rendering_en;
 reg ppu_sprite16_r;
-wire sprite8x16_mode = ppu_sprite16_r & rendering_en;
 
 reg ppu_in_frame, last_ppu_in_frame;
 reg [7:0] ppu_scanline;
@@ -121,9 +121,6 @@ reg is_sprite_fetch;
 // That is too late for the first extra sprite so also use chr_ex here.
 wire is_bg_fetch = ~(is_sprite_fetch | chr_ex);
 
-// On an original NES these PPU addresses should be latched because the lower 8 bits
-// are overwritten with the read data on the 2nd cycle when PPU_/RD goes low.
-// In the core the address is not changed so latching is not needed.
 wire ppu_is_tile_addr = (~chr_ain[13]);
 wire ppu_is_at_addr = (chr_ain[13:12] == 2'b10) & (&chr_ain[9:6]);
 wire ppu_is_nt_addr = (chr_ain[13:12] == 2'b10) & (~&chr_ain[9:6]);
@@ -137,7 +134,6 @@ wire [9:0] ram_addrB = Savestate_MAPRAMactive ? Savestate_MAPRAMAddr      : exra
 wire       ram_wrenB = Savestate_MAPRAMactive ? Savestate_MAPRAMWrEn      : 1'b0;
 wire [7:0] ram_dataB = Savestate_MAPRAMactive ? Savestate_MAPRAMWriteData : 8'b0;
 wire [7:0] last_read_ram;
-
 
 dpram #(.widthad_a(10)) expansion_ram
 (
@@ -154,7 +150,6 @@ dpram #(.widthad_a(10)) expansion_ram
 	.data_b    (ram_dataB),
 	.q_b       (last_read_ram)
 );
-
 
 // Handle IO register writes
 always @(posedge clk) begin
@@ -200,17 +195,20 @@ always @(posedge clk) begin
 		endcase
 
 		// Remember which set of CHR was written to last.
-		// chr_last is set to 0 when changing bank with sprites set to 8x8
 		if (prg_ain[9:4] == 6'b010010) //(prg_ain[9:0] >= 10'h120 && prg_ain[9:0] < 10'h130)
-			chr_last <= prg_ain[3] & ppu_sprite16_r;
+			chr_last <= prg_ain[3];
 
 	end
 
+		// chr_last is set to 0 when sprite size is 8x8
+		if (~ppu_sprite16_r) begin
+			chr_last <= 0;
+		end
+
 		if (prg_write && prg_ain == 16'h2000) begin // $2000
 			ppu_sprite16_r <= prg_din[5];
-			if (~prg_din[5]) // chr_last is set to 0 when changing sprite size to 8x8
-				chr_last <= 0;
 		end
+
 		if (prg_write && prg_ain == 16'h2001) begin // $2001
 			rendering_en <= |prg_din[4:3];
 		end
@@ -410,19 +408,18 @@ always @(posedge clk) begin
 				end
 
 				if (~last_chr_a13 & chr_ain_o[13]) begin
-					if (ppu_tile_cnt == 34)
+					if (ppu_tile_cnt == 34) begin
 						is_sprite_fetch <= 1;
-
-					if (ppu_tile_cnt == 0)
-						is_sprite_fetch <= 0;
-
-					if (ppu_tile_cnt == 0)
-						in_split_area <= !vsplit_side;
-					else if (ppu_tile_cnt == {1'b0, vsplit_startstop})
-						in_split_area <= vsplit_side;
-					else if (ppu_tile_cnt == 34)
 						in_split_area <= 0;
+					end
 
+					if (ppu_tile_cnt == 0) begin
+						is_sprite_fetch <= 0;
+					end
+
+					if (ppu_tile_cnt == {1'b0, vsplit_startstop}) begin
+						in_split_area <= 1;
+					end
 				end
 			end
 		end
@@ -497,35 +494,35 @@ wire [1:0] split_attr = (!loopy[1] && !loopy[6]) ? last_read_ram[1:0] :
 						(!loopy[1] &&  loopy[6]) ? last_read_ram[5:4] :
 													last_read_ram[7:6];
 // If splitting is active or not
-wire insplit = in_split_area && vsplit_enable && ~chr_ex;
+wire insplit = vsplit_enable & (in_split_area ^ ~vsplit_side) & ~chr_ex & ~extended_ram_mode[1] & ppu_in_frame & rendering_en;
 
 // Currently reading the attribute byte?
-wire exattr_read = (extended_ram_mode == 1) && ppu_is_at_addr && ppu_in_frame;
+wire exattr_read = (extended_ram_mode == 1) && ppu_is_at_addr && ppu_in_frame && rendering_en;
 
 // If the current chr read should be redirected from |chr_dout| instead.
 assign has_chr_dout = chr_ain[13] && (mirrbits[1] || insplit || exattr_read);
-wire [1:0] override_attr = insplit ? split_attr : (extended_ram_mode == 1) ? last_read_exattr[7:6] : fill_attr;
+
+wire [1:0] override_attr = insplit ? split_attr : exattr_read ? last_read_exattr[7:6] : fill_attr;
+
 always @* begin
-	if (ppu_in_frame) begin
-		if (ppu_is_nt_addr) begin
-			// Name table fetch
-			if (insplit || mirrbits[0] == 0)
-				chr_dout = (extended_ram_mode[1] ? 8'b0 : last_read_ram);
-			else begin
-				// Inserting Filltile
-				chr_dout = fill_tile;
-			end
-		end else begin
-			// Attribute table fetch
-			if (!insplit && !exattr_read && mirrbits[0] == 0)
-				chr_dout = (extended_ram_mode[1] ? 8'b0 : last_read_ram);
-			else
-				chr_dout = {override_attr, override_attr, override_attr, override_attr};
+	if (ppu_is_nt_addr) begin
+		// Name table fetch
+		if (insplit || mirrbits[0] == 0)
+			chr_data = (extended_ram_mode[1] ? 8'b0 : last_read_ram);
+		else begin
+			// Inserting Filltile
+			chr_data = fill_tile;
 		end
 	end else begin
-		chr_dout = last_read_vram;
+		// Attribute table fetch
+		if (!insplit && !exattr_read && mirrbits[0] == 0)
+			chr_data = (extended_ram_mode[1] ? 8'b0 : last_read_ram);
+		else
+			chr_data = {override_attr, override_attr, override_attr, override_attr};
 	end
 end
+
+assign chr_dout = last_read_vram;
 
 // Handle reading from the expansion ram.
 // 0 - Use as extra nametable (possibly for split mode)
@@ -543,8 +540,8 @@ always @(posedge clk) begin
 
 		last_chr_read <= chr_read;
 
-		if (~last_chr_read & chr_read) begin
-			last_read_vram <= extended_ram_mode[1] ? 8'b0 : last_read_ram;
+		if (chr_read) begin
+			last_read_vram <= chr_data;
 
 			if (ppu_is_nt_addr & ppu_in_frame) begin
 				last_read_exattr <= last_read_ram;
@@ -603,11 +600,13 @@ end
 
 assign prg_aout = {prgsel[7] ? {2'b00, prgsel[6:0]} : {6'b11_1100, prgsel[2:0]}, prg_ain[12:0]};    // 8kB banks
 
-// Registers $5120-$5127 apply to sprite graphics and $5128-$512B for background graphics, but ONLY when 8x16 sprites are enabled.
-// Otherwise, the last set of registers written to (either $5120-$5127 or $5128-$512B) will be used for all graphics.
+// Registers $5120-$5127 apply to sprite graphics and $5128-$512B for background graphics but ONLY when 8x16 sprites are enabled.
+// If not rendering, the last set of registers written to (either $5120-$5127 or $5128-$512B) will be used.
 // 0 if using $5120-$5127, 1 if using $5128-$512F
+// Only registers $5120-$5127 are used when 8x8 sprites are enabled.
 
-wire chrset = (~sprite8x16_mode) ? 1'd0 : (ppu_in_frame) ? is_bg_fetch : chr_last;
+wire chrset = (ppu_in_frame & rendering_en) ? (is_bg_fetch & ppu_sprite16_r) : chr_last;
+
 reg [9:0] chrsel;
 
 always @* begin
@@ -643,11 +642,11 @@ always @* begin
 	chr_aout = {2'b10, chrsel, chr_ain[9:0]};    // 1kB banks
 
 	// Override |chr_aout| if we're in a vertical split.
-	if (ppu_in_frame && insplit) begin
+	if (ppu_in_frame & rendering_en & insplit) begin
 		//$write("In vertical split!\n");
 //		chr_aout = {2'b10, vsplit_bank, chr_ain[11:3], vscroll[2:0]}; // SL
 		chr_aout = {2'b10, vsplit_bank, chr_ain[11:3], chr_ain[2:0]}; // CL
-	end else if (ppu_in_frame && extended_ram_mode == 1 && is_bg_fetch && ppu_is_tile_addr) begin
+	end else if (ppu_in_frame && rendering_en && extended_ram_mode == 1 && is_bg_fetch && ppu_is_tile_addr) begin
 		//$write("In exram thingy!\n");
 		// Extended attribute mode. Replace the page with the page from exram.
 		chr_aout = {2'b10, upper_chr_bank_bits, last_read_exattr[5:0], chr_ain[11:0]};
