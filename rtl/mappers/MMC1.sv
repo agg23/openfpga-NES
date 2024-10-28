@@ -302,17 +302,23 @@ assign irq = (counter[29:25] == 5'b10100);
 
 always begin
 	if (!prg_ain[15]) begin
-		// WRAM is always routed as usual.
-		prg_aout = mmc1_aout;
-	end else if (!unlocked) begin
-		// Not initialized yet, mapper switch disabled.
-		prg_aout = {7'b00_0000_0, prg_ain[14:0]};
-	end else if (mmc1_chr[2] == 0) begin
-		// O=0: Use first PRG chip (first 128k), use 'A' PRG Reg, 32k swap
-		prg_aout = {5'b00_000, mmc1_chr[1:0], prg_ain[14:0]};
+		// WRAM is always routed as usual (8KB).
+		prg_aout = { mmc1_aout[21:15], 2'b00, prg_ain[12:0] };
 	end else begin
-		// O=1: Use second PRG chip (second 128k), use 'B' PRG Reg, MMC1 style swap
-		prg_aout = mmc1_aout;
+		prg_aout[21:18] = 4'd0;
+		if (!unlocked) begin
+			// Not initialized yet, mapper switch disabled.
+			prg_aout[17:15] = 3'd0;
+		end else if (~mmc1_chr_addr[15]) begin
+			// O=0: Use first PRG chip (first 128k), use 'A' PRG Reg, 32k swap
+			prg_aout[17:15] = { 1'b0, mmc1_chr_addr[14:13] };
+		end else begin
+			// O=1: Use second PRG chip (second 128k), use 'B' PRG Reg, MMC1 style swap
+			prg_aout[17:15] = { 1'b1, mmc1_aout[16:15] };
+		end
+		// "MMC1 PRG A14 is connected to both PRG ROMs"
+		prg_aout[14] = mmc1_aout[14];
+		prg_aout[13:0] = prg_ain[13:0];
 	end
 end
 
