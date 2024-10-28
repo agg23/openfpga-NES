@@ -4,7 +4,7 @@ module N163(
 	input        clk,         // System clock
 	input        ce,          // M2 ~cpu_clk
 	input        enable,      // Mapper enabled
-	input [31:0] flags,       // Cart flags
+	input [63:0] flags,       // Cart flags
 	input [15:0] prg_ain,     // prg address
 	inout [21:0] prg_aout_b,  // prg address out
 	input        prg_read,    // prg read
@@ -69,6 +69,12 @@ reg [7:0] m2;
 wire m2_n = 1;//~ce;  //m2_n not used as clk.  Invert m2 (ce).
 wire [18:10] chr_aoutm;
 
+wire [3:0] prg_ram_size = flags[29:26];
+wire [3:0] prg_nvram_size = flags[34:31];
+wire has_prg_ram = |{prg_ram_size, prg_nvram_size};
+// 2KB PRG RAM for mapper 210
+wire ram_2k = (prg_ram_size == 4'h5 || prg_nvram_size == 4'h5);
+
 always @(posedge clk) begin
 	if (SaveStateBus_load) begin
 		m2 <= 8'd0;
@@ -99,11 +105,14 @@ assign chr_aout[21:18] = {4'b1000};
 assign chr_aout[17:10] = chr_aoutm[17:10];
 assign chr_aout[9:0] = chr_ain[9:0];
 assign vram_a10 = chr_aout[10];
+
 wire [21:13] prg_aout_tmp = {3'b00_0, ramprgaout};
 wire [21:13] prg_ram = {9'b11_1100_000};
-wire prg_is_ram = prg_ain >= 'h6000 && prg_ain < 'h8000;
+wire prg_is_ram = (prg_ain[15:13] == 3'b011) & has_prg_ram;
+
 assign prg_aout[21:13] = prg_is_ram ? prg_ram : prg_aout_tmp;
-assign prg_aout[12:0] = prg_ain[12:0];
+assign prg_aout[12:11] = (prg_is_ram & ram_2k) ? 2'b00 : prg_ain[12:11];
+assign prg_aout[10:0] = prg_ain[10:0];
 assign prg_allow = (prg_ain[15] && !prg_write) || prg_is_ram;
 
 endmodule
@@ -218,7 +227,7 @@ reg [15:0] count;
 wire [15:0] count_next=count+1'd1;
 wire countup=count[15] & ~&count[14:0];
 reg timeout;
-assign irq=timeout;
+assign irq = timeout & ~mapper210;
 always@(posedge clk20) begin
 if (SaveStateBus_load) begin
 	count   <= SS_MAP3[23: 8];
@@ -336,7 +345,8 @@ wire config_rd = 0;
 //gamegenie gg(m2, reset, nesprg_we, prgain, nesprgdin, ramprgdin, gg_out, config_rd);
 
 //PRG data out
-wire mapper_oe = m2_n & ~nesprg_we & ((prgain[15:12]=='b0101) || (prgain[15:11]=='b01001));
+// No readable registers on mapper 210
+wire mapper_oe = ~mapper210 & m2_n & ~nesprg_we & ((prgain[15:12]=='b0101) || (prgain[15:11]=='b01001));
 always @* begin
 	case(prgain[15:11])
 		5'b01001: nesprgdout=audio_dout;
