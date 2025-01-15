@@ -71,7 +71,9 @@ wire [18:10] chr_aoutm;
 
 wire [3:0] prg_ram_size = flags[29:26];
 wire [3:0] prg_nvram_size = flags[34:31];
-wire has_prg_ram = |{prg_ram_size, prg_nvram_size};
+wire is_nes20 = flags[35];
+// Default to having PRG RAM if no NES2.0 header
+wire has_prg_ram = |{~is_nes20, prg_ram_size, prg_nvram_size};
 // 2KB PRG RAM for mapper 210
 wire ram_2k = (prg_ram_size == 4'h5 || prg_nvram_size == 4'h5);
 
