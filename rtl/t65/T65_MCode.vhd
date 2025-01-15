@@ -589,6 +589,7 @@ begin
               Jump <= "01";
             else
               -- KIL !!!
+              lCycle <= Cycle_sync; -- Prevents end-of-instruction signal, halting CPU
             end if;
           when others =>
         end case;

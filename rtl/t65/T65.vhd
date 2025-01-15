@@ -774,7 +774,7 @@ begin
             elsif IRQ_n_o = '0' and P(Flag_I) = '0' then
               IRQCycle <= '1';
             end if;
-          else
+          elsif MCycle/="111" then -- increment machine cycle but do not overflow
             MCycle <= std_logic_vector(unsigned(MCycle) + 1);
           end if;
         end if;
