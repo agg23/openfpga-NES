@@ -29,7 +29,8 @@ module MapperFDS(
 	input [1:0] max_diskside,
 	input       fds_busy,
 	input       fds_eject_btn,
-	input       fds_auto_eject_en
+	input       fds_auto_eject_en,
+	input       fds_fast
 );
 
 assign prg_aout_b      = enable ? prg_aout : 22'hZ;
@@ -79,7 +80,7 @@ reg byte_transfer;
 reg got_start_byte, got_start_byte_d;
 reg after_pre_gap;
 reg read_4030;
-reg [15:0] transfer_cnt;
+reg [19:0] transfer_cnt;
 reg [15:0] byte_cnt;
 reg [15:0] file_size;
 reg [2:0] block_type;
@@ -96,8 +97,10 @@ reg [22:0] cpu_clk_cnt;
 reg old_eject_btn;
 
 reg read_disk_d, write_disk_d;
-wire read_disk = (prg_read & prg_ain == 16'h4031);
-wire write_disk = (prg_write & prg_ain == 16'h4024 & write_en & byte_transfer & got_start_byte_d & motor_on & ~diskreset & ~block_end);
+wire prg_disk_rd_reg = (prg_ain == 16'h4031);
+wire prg_disk_wr_reg = (prg_ain == 16'h4024);
+wire read_disk = (~prg_write & prg_disk_rd_reg);
+wire write_disk = (prg_write & prg_disk_wr_reg & write_en & byte_transfer & got_start_byte_d & motor_on & ~diskreset & ~block_end);
 wire disk_ready = (~disk_eject & ~diskreset & motor_on & ~diskend);
 wire [7:0] disk_data = write_disk ? prg_din : prg_dbus;
 wire disk_irq = (byte_transfer_flag & disk_irq_en);
@@ -106,9 +109,14 @@ wire disk_irq = (byte_transfer_flag & disk_irq_en);
 // The gap at the start of the disk is typically 28300 bits long and gaps between blocks 976 bits.
 // A byte takes 82.99 microseconds which is around 149 CPU cycles.
 // We can use shorter delays here.
-localparam PRE_GAP_DELAY = 16'd65535; // 525420
-localparam BYTE_DELAY    = 16'd99;  // 149
-localparam EJECT_DELAY   = 80 * 23'd22335;
+localparam PRE_GAP_DELAY_FAST = 20'd65535;
+localparam PRE_GAP_DELAY_ORIG = 20'd525420;
+localparam BYTE_DELAY_FAST    = 20'd99;
+localparam BYTE_DELAY_ORIG    = 20'd149;
+localparam EJECT_DELAY        = 100 * 23'd29780;
+
+wire [19:0] pre_gap_delay = fds_fast ? PRE_GAP_DELAY_FAST : PRE_GAP_DELAY_ORIG;
+wire [19:0] byte_delay = fds_fast ? BYTE_DELAY_FAST : BYTE_DELAY_ORIG;
 
 always@(posedge clk) begin
 	if(~enable) begin
@@ -218,7 +226,7 @@ always@(posedge clk) begin
 
 			if (~fds_auto_eject_en) begin
 				old_eject_btn <= fds_eject_btn;
-				if (~old_eject_btn & fds_eject_btn & ~write_en) begin
+				if (~old_eject_btn & fds_eject_btn & ~write_en & ~fds_busy) begin
 					diskside <= (max_diskside == diskside) ? 2'd0 : (diskside + 1'b1);
 					disk_eject_auto <= 1; // Minimum eject time
 					cpu_clk_cnt <= 0;
@@ -226,13 +234,14 @@ always@(posedge clk) begin
 			end
 
 			if (fds_auto_eject_en) begin
-				if (diskreset) begin // Diskreset is usually on when the game is waiting for disk swap
+				if (diskreset & ~fds_busy) begin // Diskreset is usually on when the game is waiting for disk swap
 					if (~disk_eject_auto) begin
 						if (prg_read & prg_ain == 16'h4032 & ~disk_eject_wait) begin
 							read_4032_cnt <= read_4032_cnt + 1'b1;
 						end
 
 						if (read_4032_cnt == 5'd20) begin
+							read_4032_cnt <= 0;
 							disk_eject_auto <= 1;
 							disk_eject_wait <= 1;
 							cpu_clk_cnt <= 0;
@@ -247,7 +256,6 @@ always@(posedge clk) begin
 			end
 
 			if (cpu_clk_cnt == EJECT_DELAY) begin // Eject for a certain amount of frames
-				read_4032_cnt <= 0;
 				cpu_clk_cnt <= 0;
 				if (disk_eject_auto) begin
 					disk_eject_auto <= 0;
@@ -316,11 +324,11 @@ always@(posedge clk) begin
 				after_pre_gap <= 0;
 			end else begin
 				if (~after_pre_gap) begin
-					if (transfer_cnt == PRE_GAP_DELAY) begin // Beginning of disk
+					if (transfer_cnt == pre_gap_delay) begin // Beginning of disk
 						after_pre_gap <= 1;
 						transfer_cnt <= 0;
 					end
-				end else if (transfer_cnt == BYTE_DELAY) begin
+				end else if (transfer_cnt == byte_delay) begin
 					transfer_cnt <= 0;
 					if (byte_transfer & ~fds_busy) begin
 						byte_transfer_flag <= 1;
@@ -350,7 +358,7 @@ assign romoffset=diskpos + sideoffset;
 
 
 // BIOS patches
-localparam BIOS_PATCHES_CNT = 51;
+localparam BIOS_PATCHES_CNT = 33;
 wire [23:0] BIOS_PATCHES[BIOS_PATCHES_CNT] = '{
 	// Wait for button press before loading disk
 	'hEEE2_09,                       // Don't branch here otherwise no music
@@ -372,8 +380,11 @@ wire [23:0] BIOS_PATCHES[BIOS_PATCHES_CNT] = '{
 	'hF4D8_B1, 'hF4D9_00,            // LDA ($00),Y
 	'hF4DA_30, 'hF4DB_03,            // BMI $F4DF
 	'hF4DC_8D, 'hF4DD_27, 'hF4DE_40, // STA $4027
-	'hF4DF_4C, 'hF4E0_E3, 'hF4E1_E6, // JMP $E6E3 (StartXfer)
+	'hF4DF_4C, 'hF4E0_E3, 'hF4E1_E6  // JMP $E6E3 (StartXfer)
+};
 
+localparam BIOS_PATCHES2_CNT = 18;
+wire [23:0] BIOS_PATCHES2[BIOS_PATCHES2_CNT] = '{
 	// Remove some delays
 	//'hE652_EA, 'hE653_EA, 'hE654_EA, // NOP <- This delay is needed for SMB2J Level 4-4 end
 	'hE655_EA, 'hE656_EA, 'hE657_EA,
@@ -384,20 +395,32 @@ wire [23:0] BIOS_PATCHES[BIOS_PATCHES_CNT] = '{
 	'hE6ED_EA, 'hE6EE_EA, 'hE6EF_EA
 };
 
-
 reg [7:0] patch_data;
-reg patch_found;
+reg bios_patch1_found, bios_patch2_found;
 integer i;
 always @* begin
-	patch_found = 0;
+	bios_patch1_found = 0;
+	bios_patch2_found = 0;
 	patch_data = 0;
 	for (i = 0; i < BIOS_PATCHES_CNT; i=i+1) begin
 		if (BIOS_PATCHES[i][23:8] == prg_ain) begin
 			patch_data = BIOS_PATCHES[i][7:0];
-			patch_found = 1;
+			bios_patch1_found = 1;
 		end
 	end
+
+	// These are only enabled when fds_fast = 1
+	for (i = 0; i < BIOS_PATCHES2_CNT; i=i+1) begin
+		if (BIOS_PATCHES2[i][23:8] == prg_ain) begin
+			patch_data = BIOS_PATCHES2[i][7:0];
+			bios_patch2_found = 1;
+		end
+	end
+
+	if (~fds_fast) bios_patch2_found = 0;
 end
+
+wire bios_patch_found = bios_patch1_found | bios_patch2_found;
 
 //NES data out
 reg [7:0] prg_dout_r;
@@ -405,14 +428,14 @@ always @* begin
 	fds_prg_bus_write = 1'b1;
 
 	if (prg_ain == 16'h4030) begin //IRQ status
-		prg_dout_r = {1'b0, diskend, 4'd0 ,byte_transfer_flag, timer_irq};
+		prg_dout_r = {byte_transfer_flag, diskend, 4'd0, 1'b0, timer_irq};
 	end else if (prg_ain == 16'h4032) begin //drive status
 		prg_dout_r = {4'h4, 1'b0, disk_eject, ~disk_ready, disk_eject};
 	end else if (prg_ain == 16'h4033) begin //power / exp
 		prg_dout_r = 8'b10000000;
 	end else if (fds_audio_prg_bus_write) begin
 		prg_dout_r = audio_dout;
-	end else if (patch_found) begin
+	end else if (bios_patch_found) begin
 		prg_dout_r = patch_data;
 	end else begin
 		prg_dout_r = 8'd0;
@@ -435,8 +458,8 @@ wire [5:0] prgbank = prg_is_ram ? { 4'b0001,prg_ain[14:13] } : 6'd0;
 //PRG 00000-01FFF = bios
 //PRG 08000-0FFFF = wram
 //PRG 40000-7FFFF = disk image
-assign prg_aout = (read_disk | write_disk) ? { 4'b111_1,romoffset } : { 3'b000,prgbank,prg_ain[12:0] };
-assign prg_allow = (prg_read & prg_ain[15] & ~fds_prg_bus_write) | (prg_is_ram | read_disk | write_disk);
+assign prg_aout = (prg_disk_rd_reg | prg_disk_wr_reg) ? { 4'b111_1,romoffset } : { 3'b000,prgbank,prg_ain[12:0] };
+assign prg_allow = ((prg_ain[15] | prg_disk_rd_reg) & ~prg_write & ~bios_patch_found) | (prg_is_ram | write_disk);
 
 assign chr_allow = 1;
 assign chr_aout = { 9'b10_0000_000, chr_ain[12:0] };
