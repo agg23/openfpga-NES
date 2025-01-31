@@ -388,7 +388,7 @@ wire MMC6 = ((flags[7:0] == 4) && (flags[24:21] == 1)); // mapper 4, submapper 1
 wire acclaim = ((flags[7:0] == 4) && (flags[24:21] == 3)); // Acclaim mapper
 wire mapper268 = ({flags[20:17],flags[7:0]} == 268); // Coolboy/Mindkids; Note: if mapper 268-256=12 was in this driver, it would need to check upper mapper bits
 wire mapper268_5k = (flags[24:21] == 1);
-wire oversized = mapper268;
+wire oversized = mapper268 || (flags[10:9] == 3); // If prg size in header is >= 1MB (prg_size==6 or 7) must be some way to access it. Allow oversize mmc3
 wire gnrom;
 wire lockout;
 wire gnrom_lock;
