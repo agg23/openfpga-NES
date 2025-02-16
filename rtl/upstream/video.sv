@@ -10,7 +10,7 @@ module video
 	input  [8:0] count_h,
 	input  [8:0] count_v,
 	input        hide_overscan,
-	input  [2:0] palette,
+	input  [3:0] palette,
 	input  [2:0] emphasis,
 	input  [1:0] reticle,
 	input        pal_video,
@@ -103,7 +103,7 @@ wire [23:0] pal_sonycxa_lut[64] = '{
 
 wire [23:0] mem_data;
 
-spram #(.addr_width(6), .data_width(24), .mem_name("pal")) pal_ram
+spram #(.addr_width(6), .data_width(24), .mem_name("pal"), .mem_init_file("rtl/tao.mif")) pal_ram
 (
 	.clock(clk),
 	.address(load_color ? load_color_index : color_ef),

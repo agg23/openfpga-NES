@@ -306,6 +306,7 @@ always begin
 		prg_aout = { mmc1_aout[21:15], 2'b00, prg_ain[12:0] };
 	end else begin
 		prg_aout[21:18] = 4'd0;
+
 		if (!unlocked) begin
 			// Not initialized yet, mapper switch disabled.
 			prg_aout[17:15] = 3'd0;
@@ -316,6 +317,7 @@ always begin
 			// O=1: Use second PRG chip (second 128k), use 'B' PRG Reg, MMC1 style swap
 			prg_aout[17:15] = { 1'b1, mmc1_aout[16:15] };
 		end
+
 		// "MMC1 PRG A14 is connected to both PRG ROMs"
 		prg_aout[14] = mmc1_aout[14];
 		prg_aout[13:0] = prg_ain[13:0];

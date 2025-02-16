@@ -58,8 +58,9 @@ module cart_top (
 	output reg  [1:0] diskside,
 	input             fds_busy,       // FDS Disk Swap Busy
 	input             fds_eject,      // FDS Disk Swap Pause
-	input             fds_auto_eject,
-	input       [1:0] max_diskside,
+	input             fds_auto_eject, // FDS Auto Swap Enabled
+	input       [1:0] max_diskside,   // FDS disk side count
+	input             fds_fast,       // FDS disk access speed
 	// savestates              
 	input       [63:0]  SaveStateBus_Din,
 	input       [ 9:0]  SaveStateBus_Adr,
@@ -312,14 +313,14 @@ MMC2 mmc2(
 //*****************************************************************************//
 // Name   : MMC3                                                               //
 // Mappers: 4, 33, 37, 47, 48, 74, 76, 80, 82, 88, 95, 112, 118, 119, 154, 189,//
-//          191, 192, 194, 195, 196, 206, 207, 268                             //
+//          191, 192, 194, 195, 196, 205, 206, 207, 208, 268                   //
 // Status : Working -- Blaarg IRQ timing test fails, but may be submapper      //
 // Notes  : While currently working well, this mapper could use a full review. //
 // Games  : Crystalis, Battletoads                                             //
 //*****************************************************************************//
 wire mmc3_en = me[118] | me[119] | me[47] | me[206] | me[112] | me[88] | me[154] | me[95]
 	| me[76] | me[80] | me[82] | me[207] | me[48] | me[33] | me[37] | me[74] | me[191]
-	| me[192] | me[194] | me[195] | me[196] | me[4] | me[189] | me[268];
+	| me[192] | me[194] | me[195] | me[196] | me[4] | me[189] | me[268] | me[205] | me[208];
 
 MMC3 mmc3 (
 	.clk        (clk),
@@ -1853,6 +1854,45 @@ Mapper164 map164(
 );
 
 //*****************************************************************************//
+// Name   : DIS23C01 DAOU ROM CONTROLLER, Korea                                //
+// Mappers: 156                                                                //
+// Status : Working                                                            //
+// Notes  :                                                                    //
+// Games  : Metal Force (K), Buzz and Waldog (K), General's Son (K),           //
+//          Koko Adventure (K)                                                 //
+//*****************************************************************************//
+Mapper156 daou(
+	.clk        (clk),
+	.ce         (ce),
+	.enable     (me[156]),
+	.flags      (flags),
+	.prg_ain    (prg_ain),
+	.prg_aout_b (prg_addr_b),
+	.prg_read   (prg_read),
+	.prg_write  (prg_write),
+	.prg_din    (prg_din),
+	.prg_dout_b (prg_dout_b),
+	.prg_allow_b(prg_allow_b),
+	.chr_ain    (chr_ain),
+	.chr_aout_b (chr_addr_b),
+	.chr_read   (chr_read),
+	.chr_allow_b(chr_allow_b),
+	.vram_a10_b (vram_a10_b),
+	.vram_ce_b  (vram_ce_b),
+	.irq_b      (irq_b),
+	.flags_out_b(flags_out_b),
+	.audio_in   (audio_in),
+	.audio_b    (audio_out_b),
+	// savestates
+	.SaveStateBus_Din  (SaveStateBus_Din ), 
+	.SaveStateBus_Adr  (SaveStateBus_Adr ),
+	.SaveStateBus_wren (SaveStateBus_wren),
+	.SaveStateBus_rst  (SaveStateBus_rst ),
+	.SaveStateBus_load (SaveStateBus_load ),
+	.SaveStateBus_Dout (SaveStateBus_wired_or[37])
+);
+
+//*****************************************************************************//
 // Name   : Sachen 8259                                                        //
 // Mappers: 137, 138, 139, 141, 150, 243                                       //
 // Status : Working                                                            //
@@ -2116,37 +2156,45 @@ Mapper413 map413 (
 // Games  : Bio Miracle for audio, Various unlicensed games for compatibility. //
 //*****************************************************************************//
 tri0 [1:0] fds_diskside;
-// MapperFDS mapfds(
-// 	.clk        (clk),
-// 	.ce         (ce),
-// 	.enable     (me[20]),
-// 	.flags      (flags),
-// 	.prg_ain    (prg_ain),
-// 	.prg_aout_b (prg_addr_b),
-// 	.prg_read   (prg_read),
-// 	.prg_write  (prg_write),
-// 	.prg_din    (prg_din),
-// 	.prg_dout_b (prg_dout_b),
-// 	.prg_allow_b(prg_allow_b),
-// 	.chr_ain    (chr_ain),
-// 	.chr_aout_b (chr_addr_b),
-// 	.chr_read   (chr_read),
-// 	.chr_allow_b(chr_allow_b),
-// 	.vram_a10_b (vram_a10_b),
-// 	.vram_ce_b  (vram_ce_b),
-// 	.irq_b      (irq_b),
-// 	.flags_out_b(flags_out_b),
-// 	.audio_in   (fds_audio),
-// 	.audio_b    (audio_out_b),
-// 	// Special ports
-// 	.prg_dbus   (prg_from_ram),
-// 	.audio_dout	(fds_data),
-// 	.diskside_b (fds_diskside),
-// 	.max_diskside (max_diskside),
-// 	.fds_busy   (fds_busy),
-// 	.fds_eject_btn (fds_eject),
-// 	.fds_auto_eject_en (fds_auto_eject)
-// );
+MapperFDS mapfds(
+	.clk        (clk),
+	.ce         (ce),
+	.enable     (me[20]),
+	.flags      (flags),
+	.prg_ain    (prg_ain),
+	.prg_aout_b (prg_addr_b),
+	.prg_read   (prg_read),
+	.prg_write  (prg_write),
+	.prg_din    (prg_din),
+	.prg_dout_b (prg_dout_b),
+	.prg_allow_b(prg_allow_b),
+	.chr_ain    (chr_ain),
+	.chr_aout_b (chr_addr_b),
+	.chr_read   (chr_read),
+	.chr_allow_b(chr_allow_b),
+	.vram_a10_b (vram_a10_b),
+	.vram_ce_b  (vram_ce_b),
+	.irq_b      (irq_b),
+	.flags_out_b(flags_out_b),
+	.audio_in   (fds_audio),
+	.audio_b    (audio_out_b),
+	// Special ports
+	.prg_dbus   (prg_from_ram),
+	.audio_dout	(fds_data),
+	.diskside_b (fds_diskside),
+	.max_diskside (max_diskside),
+	.fds_busy   (fds_busy),
+	.fds_eject_btn (fds_eject),
+	.fds_auto_eject_en (fds_auto_eject),
+	.fds_fast   (fds_fast),
+	// savestates
+	.SaveStateBus_Din  (SaveStateBus_Din ),
+	.SaveStateBus_Adr  (SaveStateBus_Adr ),
+	.SaveStateBus_wren (SaveStateBus_wren),
+	.SaveStateBus_rst  (SaveStateBus_rst ),
+	.SaveStateBus_load (SaveStateBus_load ),
+	.SaveStateBus_Dout (SaveStateBus_wired_or[38])
+);
 
 //*****************************************************************************//
 // Name   : Mapper 31                                                          //
@@ -2156,38 +2204,38 @@ tri0 [1:0] fds_diskside;
 // Games  : Famicompo Pico 2014, NSF 1.0                                       //
 //*****************************************************************************//
 wire [5:0] exp_audioe;
-// NSF nsfplayer(
-// 	.clk        (clk),
-// 	.ce         (ce),
-// 	.enable     (me[31]),
-// 	.flags      (flags),
-// 	.prg_ain    (prg_ain),
-// 	.prg_aout_b (prg_addr_b),
-// 	.prg_read   (prg_read),
-// 	.prg_write  (prg_write),
-// 	.prg_din    (prg_din),
-// 	.prg_dout_b (prg_dout_b),
-// 	.prg_allow_b(prg_allow_b),
-// 	.chr_ain    (chr_ain),
-// 	.chr_aout_b (chr_addr_b),
-// 	.chr_read   (chr_read),
-// 	.chr_dout_b (chr_dout_b), // Special port
-// 	.chr_allow_b(chr_allow_b),
-// 	.vram_a10_b (vram_a10_b),
-// 	.vram_ce_b  (vram_ce_b),
-// 	.irq_b      (irq_b),
-// 	.flags_out_b(flags_out_b),
-// 	.audio_in   (exp_audioe[5] ? ss5b_audio :
-// 	             exp_audioe[4] ? n163_audio :
-// 	             exp_audioe[3] ? mmc5_audio :
-// 	             exp_audioe[2] ? fds_audio  :
-// 	             exp_audioe[1] ? vrc7_audio :
-// 	             exp_audioe[0] ? vrc6_audio :
-// 					 audio_in),
-// 	.exp_audioe (exp_audioe),  // Expansion Enabled (0x0=None, 0x1=VRC6, 0x2=VRC7, 0x4=FDS, 0x8=MMC5, 0x10=N163, 0x20=SS5B
-// 	.audio_b    (audio_out_b),
-// 	.fds_din    (fds_data)
-// );
+NSF nsfplayer(
+	.clk        (clk),
+	.ce         (ce),
+	.enable     (me[31]),
+	.flags      (flags),
+	.prg_ain    (prg_ain),
+	.prg_aout_b (prg_addr_b),
+	.prg_read   (prg_read),
+	.prg_write  (prg_write),
+	.prg_din    (prg_din),
+	.prg_dout_b (prg_dout_b),
+	.prg_allow_b(prg_allow_b),
+	.chr_ain    (chr_ain),
+	.chr_aout_b (chr_addr_b),
+	.chr_read   (chr_read),
+	.chr_dout_b (chr_dout_b), // Special port
+	.chr_allow_b(chr_allow_b),
+	.vram_a10_b (vram_a10_b),
+	.vram_ce_b  (vram_ce_b),
+	.irq_b      (irq_b),
+	.flags_out_b(flags_out_b),
+	.audio_in   (exp_audioe[5] ? ss5b_audio :
+	             exp_audioe[4] ? n163_audio :
+	             exp_audioe[3] ? mmc5_audio :
+	             exp_audioe[2] ? fds_audio  :
+	             exp_audioe[1] ? vrc7_audio :
+	             exp_audioe[0] ? vrc6_audio :
+					 audio_in),
+	.exp_audioe (exp_audioe),  // Expansion Enabled (0x0=None, 0x1=VRC6, 0x2=VRC7, 0x4=FDS, 0x8=MMC5, 0x10=N163, 0x20=SS5B
+	.audio_b    (audio_out_b),
+	.fds_din    (fds_data)
+);
 
 wire [15:0] ss5b_audio;
 SS5b_mixed snd_5bm (
@@ -2261,29 +2309,36 @@ mmc5_mixed snd_mmc5 (
 
 wire [15:0] fds_audio;
 wire [7:0] fds_data;
-// fds_mixed snd_fds (
-// 	.clk(clk),
-// 	.ce(ce),
-// 	.enable(me[20] | (me[31] && exp_audioe[2])),
-// 	.wren(prg_write),
-// 	.addr_in(prg_ain),
-// 	.data_in(prg_din),
-// 	.data_out(fds_data),
-// 	.audio_in(audio_in),
-// 	.audio_out(fds_audio)
-// );
+fds_mixed snd_fds (
+	.clk(clk),
+	.ce(ce),
+	.enable(me[20] | (me[31] && exp_audioe[2])),
+	.wren(prg_write),
+	.addr_in(prg_ain),
+	.data_in(prg_din),
+	.data_out(fds_data),
+	.audio_in(audio_in),
+	.audio_out(fds_audio),
+	// savestates
+	.Savestate_MAPRAMactive   (Savestate_MAPRAMactive),
+	.Savestate_MAPRAMAddr     (Savestate_MAPRAMAddr[7:0]),
+	.Savestate_MAPRAMRdEn     (Savestate_MAPRAMRdEn),
+	.Savestate_MAPRAMWrEn     (Savestate_MAPRAMWrEn),
+	.Savestate_MAPRAMWriteData(Savestate_MAPRAMWriteData),
+	.Savestate_MAPRAMReadData (SaveStateRAM_wired_or[3])
+);
 
 wire [15:0] vrc7_audio;
-// vrc7_mixed snd_vrc7 (
-// 	.clk(clk),
-// 	.ce(ce),
-// 	.enable(me[85] | (me[31] && exp_audioe[1])),
-// 	.wren(prg_write),
-// 	.addr_in(prg_ain),
-// 	.data_in(prg_din),
-// 	.audio_in(audio_in),
-// 	.audio_out(vrc7_audio)
-// );
+vrc7_mixed snd_vrc7 (
+	.clk(clk),
+	.ce(ce),
+	.enable(me[85] | (me[31] && exp_audioe[1])),
+	.wren(prg_write),
+	.addr_in(prg_ain),
+	.data_in(prg_din),
+	.audio_in(audio_in),
+	.audio_out(vrc7_audio)
+);
 
 wire [15:0] vrc6_audio;
 vrc6_mixed snd_vrc6 (
@@ -2343,7 +2398,7 @@ always @* begin
 end
 
 // savestates
-localparam SAVESTATE_MODULES    = 37;
+localparam SAVESTATE_MODULES    = 39;
 wire [63:0] SaveStateBus_wired_or[0:SAVESTATE_MODULES-1];
 
 assign SaveStateBus_Dout  = SaveStateBus_wired_or[ 0] | SaveStateBus_wired_or[ 1] | SaveStateBus_wired_or[ 2] | SaveStateBus_wired_or[ 3] | SaveStateBus_wired_or[ 4] | 
@@ -2353,10 +2408,10 @@ assign SaveStateBus_Dout  = SaveStateBus_wired_or[ 0] | SaveStateBus_wired_or[ 1
 									 SaveStateBus_wired_or[20] | SaveStateBus_wired_or[21] | SaveStateBus_wired_or[22] | SaveStateBus_wired_or[23] | SaveStateBus_wired_or[24] |
 									 SaveStateBus_wired_or[25] | SaveStateBus_wired_or[26] | SaveStateBus_wired_or[27] | SaveStateBus_wired_or[28] | SaveStateBus_wired_or[29] |
 									 SaveStateBus_wired_or[30] | SaveStateBus_wired_or[31] | SaveStateBus_wired_or[32] | SaveStateBus_wired_or[33] | SaveStateBus_wired_or[34] |
-									 SaveStateBus_wired_or[35] | SaveStateBus_wired_or[36];
+									 SaveStateBus_wired_or[35] | SaveStateBus_wired_or[36] | SaveStateBus_wired_or[37] | SaveStateBus_wired_or[38];
 
-localparam SAVESTATERAM_MODULES    = 3;
-wire [7:0] SaveStateRAM_wired_or[0:SAVESTATE_MODULES-1];
-assign Savestate_MAPRAMReadData = SaveStateRAM_wired_or[0] | SaveStateRAM_wired_or[1] | SaveStateRAM_wired_or[2];
+localparam SAVESTATERAM_MODULES    = 4;
+wire [7:0] SaveStateRAM_wired_or[0:SAVESTATERAM_MODULES-1];
+assign Savestate_MAPRAMReadData = SaveStateRAM_wired_or[0] | SaveStateRAM_wired_or[1] | SaveStateRAM_wired_or[2] | SaveStateRAM_wired_or[3];
 
 endmodule

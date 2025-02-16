@@ -333,13 +333,14 @@ assign flags_out_b  = enable ? flags_out : 16'hZ;
 assign audio_b      = enable ? {1'b0, audio_in[15:1]} : 16'hZ;
 
 wire [21:0] prg_aout, chr_aout;
-wire [7:0] prg_dout = 0;
+reg [7:0] prg_dout;
 wire prg_allow;
 wire chr_allow;
 wire vram_a10;
 wire vram_ce;
 wire irq;
-reg [15:0] flags_out = {12'h0, 1'b1, 3'b0};
+wire [15:0] flags_out = {12'h0, 1'b1, 1'b0, prg_bus_write, 1'b0};
+reg prg_bus_write;
 
 reg [2:0] bank_select;             // Register to write to next
 reg prg_rom_bank_mode;             // Mode for PRG banking
@@ -383,7 +384,9 @@ wire mapper192 = (flags[7:0] == 192);   // Has 4KB CHR RAM
 wire mapper194 = (flags[7:0] == 194);   // Has 2KB CHR RAM
 wire mapper195 = (flags[7:0] == 195);   // Has 4KB CHR RAM
 wire mapper196 = (flags[7:0] == 196);   // PRG A0 line switcheroo
-wire mapper189 = (flags[7:0] == 189);
+wire mapper189 = (flags[7:0] == 189);		// Mapper 189 is a multicart
+wire mapper205 = (flags[7:0] == 205);		// Mapper 47 is a multicart similar to mapper 37
+wire mapper208 = (flags[7:0] == 208);		// Mapper 208 is a multicart similar to mapper 189 with copy protection. It has no RAM.
 wire MMC6 = ((flags[7:0] == 4) && (flags[24:21] == 1)); // mapper 4, submapper 1 = MMC6
 wire acclaim = ((flags[7:0] == 4) && (flags[24:21] == 3)); // Acclaim mapper
 wire mapper268 = ({flags[20:17],flags[7:0]} == 268); // Coolboy/Mindkids; Note: if mapper 268-256=12 was in this driver, it would need to check upper mapper bits
@@ -408,6 +411,8 @@ wire chr_invert_support = (irq_support && !mapper48) || mapper82;
 wire regs_7e = mapper80 || mapper82 || mapper207;
 wire internal_128 = mapper80 || mapper207;
 wire prg_reg_odd = (~mapper196) ? prg_ain[0] : ( |prg_ain[3:2] | (prg_ain[1] & ~prg_ain[14]) );
+wire [3:0] prota = (m268_reg[4][6] ^ m268_reg[4][3]) ? {m268_reg[4][1:0],m268_reg[4][4],m268_reg[4][7]} : 4'hF; // m208 4'hF = 0x59
+wire [3:0] prot = (m268_reg[4][3]) ? ~prota : prota;
 
 always @(posedge clk)
 if (~enable) begin
@@ -427,6 +432,7 @@ if (~enable) begin
 	a12_ctr <= 0;
 	last_a12 <= 0;
 	mapper37_multicart <= 3'b000;
+	mapper189_prgsel <= 4'b1011; // mapper 208 requires 0xX011
 	{m268_reg[0],m268_reg[1],m268_reg[2],m268_reg[3],m268_reg[4],m268_reg[5]} <= 0;
 end else if (SaveStateBus_load) begin
 	irq_reg            <= SS_MAP1[ 6: 0];
@@ -486,7 +492,7 @@ end else begin
 							7: prg_bank_1 <= prg_din;       // Select 8 KB PRG ROM bank at $A000-$BFFF
 						endcase
 					end
-					3'b01_0: mirroring <= !prg_din[0];                   // Mirroring ($A000-$BFFE, even)
+					3'b01_0: if (!mapper208) mirroring <= !prg_din[0];  // Mirroring ($A000-$BFFE, even)
 					3'b01_1: {ram_enable, ram_protect, ram6_enable, ram6_protect} <= {{4{prg_din[7]}},{4{prg_din[6]}}, prg_din[5:4]}; // PRG RAM protect ($A001-$BFFF, odd)
 					3'b10_0: irq_latch <= prg_din;                      // IRQ latch ($C000-$DFFE, even)
 					3'b10_1: irq_reload <= 1;                           // IRQ reload ($C001-$DFFF, odd)
@@ -576,15 +582,30 @@ end else begin
 		if (prg_write && prg_is_ram)
 			mapper47_multicart <= prg_din[0];
 	
-		// For Mapper 37
+		// For Mapper 37 and 205
 		// $6000-7FFF:  [.... .QBB]  Block select
 		if (prg_write && prg_is_ram)
 			mapper37_multicart <= prg_din[2:0];
 	
 		// Mapper 189
 		// $4120-7FFF:  [AAAA BBBB] A,B:  PRG Reg
-		if (prg_write && prg_ain[15:14] == 2'b01 && prg_ain[8])
+		if (prg_write && prg_ain[15:14] == 2'b01 && prg_ain[8] && mapper189)
 			mapper189_prgsel <= (prg_din[7:4] | prg_din[3:0]); // Select 32 KB PRG ROM bank at $8000-$FFFF
+	
+		// Mapper 208
+		// $4800-4FFF or 6800-6FFF:  [..mP ...P] :  mirror PRG Reg
+		if (prg_write && prg_ain[15:14] == 2'b01 && !prg_ain[12] && prg_ain[11] && mapper208)
+			{mirroring, mapper189_prgsel[1:0]} <= {!prg_din[5], prg_din[4], prg_din[0]}; // Select 32 KB PRG ROM bank at $8000-$FFFF
+	
+		// Mapper 208
+		// $5000-57FF: Prot index
+		if (prg_write && prg_ain[15:11] == 5'b01010 && mapper208)
+			m268_reg[4] <= prg_din;
+	
+		// Mapper 208
+		// $5800-5FFF: Prot index
+		if (prg_write && prg_ain[15:11] == 5'b01011 && mapper208)
+			m268_reg[{1'b0,prg_ain[1:0]}] <= prg_din ^ {1'b0,prot[3],1'b0,prot[2:1],2'b00,prot[0]};
 	end
 
 	if (m2_inv) begin // Inverted M2
@@ -692,8 +713,9 @@ always @* begin
 		else if (mapper37_multicart[2] == 1'b0)
 			prgsel[3] = 1'b0;
 	end
+	if (mapper205) prgsel[7:4] = {2'b00, mapper37_multicart[1], mapper37_multicart[0] | (prgsel[4] & !mapper37_multicart[1])};
 
-	if (mapper189) prgsel = {2'b00,mapper189_prgsel,prg_ain[14:13]};
+	if (mapper189 || mapper208) prgsel = {2'b00,mapper189_prgsel,prg_ain[14:13]};
 	if (!oversized) prgsel[7:6] = 2'b00;
 end
 
@@ -713,6 +735,7 @@ always @* begin
 		// mapper47 is limited to 128k CHR, the top bit is controlled by mapper47_multicart instead.
 		if (mapper47) chrsel[7] = mapper47_multicart;
 		if (mapper37) chrsel[7] = mapper37_multicart[2];
+		if (mapper205) chrsel[8:7] = {mapper37_multicart[1], mapper37_multicart[0] | (chrsel[7] & !mapper37_multicart[1])};
 		if ((mapper88) || (mapper154)) chrsel[6] = chr_ain[12];
 	end else begin
 		case(chr_ain[12:11])
@@ -721,6 +744,17 @@ always @* begin
 			2'b10: chrsel = {chr_bank_4, chr_ain[10]};
 			2'b11: chrsel = {chr_bank_5, chr_ain[10]};
 		endcase
+	end
+end
+
+// Read from mapper
+always @* begin
+	prg_bus_write = 1'b1;
+	if (!prg_write && mapper208 && prg_ain[15:11] == 5'b01011) begin // 5800
+		prg_dout = m268_reg[{1'b0,prg_ain[1:0]}];
+	end else begin
+		prg_dout = 8'hFF; // By default open bus.
+		prg_bus_write = 0;
 	end
 end
 
@@ -782,9 +816,9 @@ assign chr_aout =
 wire ram_a13 = mapper268 && m268_reg[3][5] && (prg_ain[15:12] == 4'h5);
 assign prg_is_ram = (ram_a13 || (prg_ain[15:13] == 3'b011) && ((prg_ain[12:8] == 5'b1_1111) | ~internal_128)) //(>= 'h6000 && < 'h8000) && (==7Fxx or external_ram)
 					&& ram_enable_a && !(ram_protect_a && prg_write);
-assign prg_allow = prg_ain[15] && !prg_write || prg_is_ram && !mapper47;
+assign prg_allow = prg_ain[15] && !prg_write || (prg_is_ram && !mapper47 && !mapper208);
 wire [21:0] prg_ram = {8'b11_1100_00, ram_a13, internal_128 ? 6'b000000 : MMC6 ? {3'b000, prg_ain[9:7]} : prg_ain[12:7], prg_ain[6:0]};
-assign prg_aout = prg_is_ram  && !mapper47 && !DxROM && !mapper95 && !mapper88 ? prg_ram : prg_aout_tmp;
+assign prg_aout = prg_is_ram  && !mapper47 && !mapper208 && !DxROM && !mapper95 && !mapper88 ? prg_ram : prg_aout_tmp;
 assign vram_a10 = TxSROM ? chrsel[7] :              // TxSROM do not support mirroring
 					mapper95 ? chrsel[5] :          // mapper95 does not support mirroring
 					mapper154 ? mirroring :         // mapper154 does not support mirroring
