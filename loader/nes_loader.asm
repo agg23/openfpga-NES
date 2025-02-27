@@ -175,7 +175,7 @@ calculate_code3:
 
 	log_string("Calculate code for ines2.0 header...")
 	//shift left 8 bits
-	//and r5,#3
+	and r5,#3
 	asl r5,#8
 	or r6,r5 //combine with already stored value
 
