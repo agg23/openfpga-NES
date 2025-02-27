@@ -32,7 +32,7 @@
 
 `default_nettype none
 
-module iir_filter
+module  iir_filter
     #(
          parameter use_params = 1,                     // set to 1 to use following parameters, 0 for input port variables.
          parameter stereo     = 1,                     // 0 for mono (input_l)

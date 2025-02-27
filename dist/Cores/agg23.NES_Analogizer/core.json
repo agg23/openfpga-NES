@@ -1,0 +1,43 @@
+{
+  "core": {
+    "magic": "APF_VER_1",
+    "metadata": {
+      "platform_ids": [
+        "nes",
+        "analogizer"
+      ],
+      "shortname": "NES_Analogizer",
+      "description": "[Analogizer] Nintendo Entertainment System and Famicom. Nintendo's first home console",
+      "author": "agg23",
+      "url": "https://github.com/RndMnkIII/openfpga-NES-Analogizer",
+      "version": "1.0.3",
+      "date_release": "2025-02-27"
+    },
+    "framework": {
+      "target_product": "Analogue Pocket",
+      "version_required": "1.1",
+      "sleep_supported": true,
+      "dock": {
+        "supported": true,
+        "analog_output": false
+      },
+      "hardware": {
+        "link_port": false,
+        "cartridge_adapter": 0
+      },
+      "chip32_vm": "nes_loader.bin"
+    },
+    "cores": [
+      {
+        "name": "set1_no",
+        "id": 0,
+        "filename": "nes_set1.rev"
+      },
+      {
+        "name": "set2_au",
+        "id": 1,
+        "filename": "nes_set2.rev"
+      }
+    ]
+  }
+}

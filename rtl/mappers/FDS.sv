@@ -514,7 +514,24 @@ end
 
 wire [15:0] audio_exp_f;
 
-IIR_filter #(
+//IIR_filter #(
+//	.coeff_x   (2.15/1.140404269e+03),
+//	.coeff_x0  (1),
+//	.coeff_x1  (0),
+//	.coeff_x2  (0),
+//	.coeff_y0  (-0.9982462360),
+//	.coeff_y1  (0),
+//	.coeff_y2  (0),
+//	.stereo    (0)
+//) fds_filter (
+//	.clk       (clk),
+//	.ce        (fds_filter_ce),
+//	.sample_ce (1),
+//	.input_l   ({audio_exp[11:0], 4'b0000}),
+//	.output_l  (audio_exp_f)
+//);
+
+iir_filter #(
 	.coeff_x   (2.15/1.140404269e+03),
 	.coeff_x0  (1),
 	.coeff_x1  (0),

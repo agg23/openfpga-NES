@@ -1,0 +1,25 @@
+{
+  "data": {
+    "magic": "APF_VER_1",
+    "data_slots": [
+      {
+        "name": "Cartridge",
+        "id": 0,
+        "filename": "NHK Gakuen - Space School - Sansu 6 Nen (Ge) (Japan).nes",
+        "required": true,
+        "parameters": "0x109",
+        "extensions": ["nes"],
+        "address": "0x10000000"
+      },
+      {
+        "name": "Cartridge",
+        "id": 1,
+        "filename": "Super Mario Bros. 3 (USA).nes",
+        "required": true,
+        "parameters": "0x109",
+        "extensions": ["nes"],
+        "address": "0x10000000"
+      }
+    ]
+  }
+}

@@ -2,15 +2,15 @@
   "interact": {
     "magic": "APF_VER_1",
     "variables": [
-      {
-        "name": "Reset core",
-        "id": 10,
-        "type": "action",
-        "enabled": true,
-        "address": "0x50",
-        "value": 1
-      },
-      {
+    {
+      "name": "Reset core",
+      "id": 9,
+      "type": "action",
+      "enabled": true,
+      "address": "0x50",
+      "value": 1
+    },
+	  {
         "name": "Use Multitap",
         "id": 20,
         "type": "check",
@@ -164,16 +164,30 @@
         "type": "action",
         "enabled": false
       },
+
       {
         "name": "Use Zapper",
         "id": 81,
-        "type": "check",
+        "type": "list",
         "enabled": true,
-        "address": "0x304",
         "persist": true,
         "writeonly": true,
+        "address": "0x304",
         "defaultval": 0,
-        "value": 1
+        "options": [
+          {
+            "value": 0,
+            "name": "Off"
+          },
+          {
+            "value": 1,
+            "name": "Emulated Zapper (Stick)"
+          },
+          {
+            "value": 2,
+            "name": "SNAC Zapper"
+          }
+        ]
       },
       {
         "name": "D-Pad Aim Speed",

@@ -393,8 +393,7 @@ wire [4:0] bits_orig =
 	bits4[1:0]  != 0 ? bits4 :
 	bits5[1:0]  != 0 ? bits5 :
 	bits6[1:0]  != 0 ? bits6 :
-	bits7[1:0]  != 0 || ~extra_sprites ? bits7 :
-	bits_ex;
+	bits7[1:0]  != 0 || ~extra_sprites ? bits7 : bits_ex;
 
 wire [4:0] bits_ex =
 	bits8[1:0]  != 0 ? bits8 :
@@ -527,7 +526,7 @@ if (Savestate_OAMRdEn) Savestate_OAMReadData  <= oam[Savestate_OAMAddr];
 if (Savestate_OAMWrEn) oam[Savestate_OAMAddr] <= Savestate_OAMWriteData;
 
 if (reset) begin
-	oam_temp <= '{64{8'hFF}};
+	oam_temp <= '{64{8'hFF}}; //{64{8'hFF}};
 	
 	oam_data         <= SS_OAMEVAL[ 7: 0]; //oam_temp[0] == 8'hFF
 	oam_temp_wren    <= SS_OAMEVAL[    8]; //1;

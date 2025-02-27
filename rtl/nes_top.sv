@@ -57,6 +57,10 @@ module nes_top (
     input wire p4_dpad_left,
     input wire p4_dpad_right,
 
+    //Analogizer SNAC Zapper (always on P2 port)
+    input wire SNAC_Zapper_Trigger,
+    input wire SNAC_Zapper_Light,
+
     // Settings
     input wire hide_overscan,
     input wire [1:0] mask_vid_edges,
@@ -64,7 +68,7 @@ module nes_top (
     input wire [2:0] selected_palette,
 
     input wire multitap_enabled,
-    input wire lightgun_enabled,
+    input wire [1:0] lightgun_enabled, //added bit one to check for Analogizer SNAC Zapper
     input wire [7:0] lightgun_dpad_aim_speed,
 
     input wire [2:0] turbo_speed,
@@ -213,7 +217,8 @@ module nes_top (
       .int_audio     (int_audio),
       .ext_audio     (ext_audio),
       // Video
-      .ex_sprites    (allow_extra_sprites),
+      //.ex_sprites    (allow_extra_sprites),
+      .ex_sprites    (1'b0),
       .color         (color),
       .emphasis      (emphasis),
       .cycle         (cycle),
@@ -366,7 +371,7 @@ module nes_top (
   wire paddle_btn = 0;
   wire [4:0] joypad1_data = {2'b0, mic, paddle_en & paddle_btn, joypad_bits[0]};
   // Upper 4 bits are other peripherals
-  wire [4:0] joypad2_data = {trigger, light, 2'b0, joypad_bits2[0]};
+  wire [4:0] joypad2_data = {(lightgun_enabled[1] ? SNAC_Zapper_Trigger : trigger),  (lightgun_enabled[1] ? SNAC_Zapper_Light : light), 2'b0, joypad_bits2[0]}; //Added check for Analogizer SNAC Zapper
 
   wire [7:0] nes_joy_A = {
     p1_dpad_right,
@@ -418,7 +423,7 @@ module nes_top (
 
   zapper zap (
       .clk(clk_ppu_21_47),
-      .reset(reset_nes | ~lightgun_enabled),
+      .reset(reset_nes | ~lightgun_enabled[0]),
       .dpad_up(p1_dpad_up),
       .dpad_down(p1_dpad_down),
       .dpad_left(p1_dpad_left),
@@ -852,7 +857,7 @@ module nes_top (
       .load_color_index(pal_index),
       .emphasis(emphasis),
       // Zapper
-      .reticle(lightgun_enabled ? reticle : 2'b00),
+      .reticle(lightgun_enabled[0] ? reticle : 2'b00),
       .pal_video(pal_video),
 
       // .ce_pix(ce_pix),

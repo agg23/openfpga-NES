@@ -1,0 +1,212 @@
+{
+  "interact": {
+    "magic": "APF_VER_1",
+    "variables": [
+    {
+      "name": "Reset core",
+      "id": 9,
+      "type": "action",
+      "enabled": true,
+      "address": "0x50",
+      "value": 1
+    },
+	  {
+        "name": "Use Multitap",
+        "id": 20,
+        "type": "check",
+        "enabled": true,
+        "address": "0x300",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
+        "name": "Video Options",
+        "id": 39,
+        "type": "action",
+        "enabled": false
+      },
+      {
+        "name": "Hide Overscan",
+        "id": 40,
+        "type": "check",
+        "enabled": true,
+        "address": "0x200",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 1,
+        "value": 1
+      },
+      {
+        "name": "Edge Masking",
+        "id": 41,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x204",
+        "defaultval": 3,
+        "options": [
+          {
+            "value": 0,
+            "name": "No Masking"
+          },
+          {
+            "value": 1,
+            "name": "Mask Left"
+          },
+          {
+            "value": 2,
+            "name": "Mask Both"
+          },
+          {
+            "value": 3,
+            "name": "Auto Masking"
+          }
+        ]
+      },
+      {
+        "name": "Square Pixels",
+        "id": 42,
+        "type": "check",
+        "enabled": true,
+        "address": "0x210",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
+        "name": "Extra Sprites",
+        "id": 48,
+        "type": "check",
+        "enabled": true,
+        "address": "0x208",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
+        "name": "Palette",
+        "id": 60,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x20C",
+        "defaultval": 1,
+        "options": [
+          {
+            "value": 0,
+            "name": "Kitrinx 34"
+          },
+          {
+            "value": 1,
+            "name": "Smooth"
+          },
+          {
+            "value": 2,
+            "name": "Wavebeam"
+          },
+          {
+            "value": 3,
+            "name": "Sony CXA"
+          },
+          {
+            "value": 4,
+            "name": "PC-10 Better"
+          },
+          {
+            "value": 5,
+            "name": "Custom"
+          }
+        ]
+      },
+      {
+        "name": "Controller Options",
+        "id": 90,
+        "type": "action",
+        "enabled": false
+      },
+      {
+        "name": "Turbo Speed",
+        "id": 91,
+        "type": "slider_u32",
+        "enabled": true,
+        "address": "0x310",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "graphical": {
+          "signed": false,
+          "min": 0,
+          "max": 6,
+          "adjust_small": 1,
+          "adjust_large": 1
+        }
+      },
+      {
+        "name": "Swap P1 & P2",
+        "id": 83,
+        "type": "check",
+        "enabled": true,
+        "address": "0x30C",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
+        "name": "Lightgun Options",
+        "id": 80,
+        "type": "action",
+        "enabled": false
+      },
+
+      {
+        "name": "Use Zapper",
+        "id": 81,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x304",
+        "defaultval": 0,
+        "options": [
+          {
+            "value": 0,
+            "name": "Off"
+          },
+          {
+            "value": 1,
+            "name": "Emulated Zapper (Stick)"
+          },
+          {
+            "value": 2,
+            "name": "SNAC Zapper"
+          }
+        ]
+      },
+      {
+        "name": "D-Pad Aim Speed",
+        "id": 82,
+        "type": "slider_u32",
+        "enabled": true,
+        "address": "0x308",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 3,
+        "graphical": {
+          "signed": false,
+          "min": 1,
+          "max": 10,
+          "adjust_small": 1,
+          "adjust_large": 4
+        }
+      }
+    ],
+    "messages": []
+  }
+}

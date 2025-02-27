@@ -1154,4 +1154,3 @@ assign vram_a10 = flags[14] ? chr_ain[10] : chr_ain[11];
 assign vram_ce = chr_ain[13];
 
 endmodule
-

@@ -14,9 +14,8 @@
 // CHR-VRAM  = 1100
 // CPU-RAM   = 1110
 // CARTRAM   = 1111
-// RndMnkIII 23/02/2025: added parameters to divide the mappers into two blocks
-// to make easier to generate two bitstream files. This should be fit into the Pocket FPGA.
-//SET1 mapper codes: remaining
+//SET1 mapper codes:
+//
 //SET2 mapper codes:5,69,24,26,85,210,19,20,31,69
 module cart_top
 #(
