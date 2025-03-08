@@ -5,8 +5,10 @@
 //
 
 `default_nettype none
+`define USE_OLD_STYLE_SCANDOUBLER  1'b1
 
-module core_top (
+module core_top 
+#(parameter reg USE_PAL_PLL = 1'b0) (
 
     //
     // physical connections
@@ -234,19 +236,19 @@ module core_top (
 
   // cart is unused, so set all level translators accordingly
   // directions are 0:IN, 1:OUT
-  assign cart_tran_bank3         = 8'hzz;
-  assign cart_tran_bank3_dir     = 1'b0;
-  assign cart_tran_bank2         = 8'hzz;
-  assign cart_tran_bank2_dir     = 1'b0;
-  assign cart_tran_bank1         = 8'hzz;
-  assign cart_tran_bank1_dir     = 1'b0;
-  assign cart_tran_bank0         = 4'hf;
-  assign cart_tran_bank0_dir     = 1'b1;
-  assign cart_tran_pin30         = 1'b0;  // reset or cs2, we let the hw control it by itself
-  assign cart_tran_pin30_dir     = 1'bz;
-  assign cart_pin30_pwroff_reset = 1'b0;  // hardware can control this
-  assign cart_tran_pin31         = 1'bz;  // input
-  assign cart_tran_pin31_dir     = 1'b0;  // input
+//  assign cart_tran_bank3         = 8'hzz;
+//  assign cart_tran_bank3_dir     = 1'b0;
+//  assign cart_tran_bank2         = 8'hzz;
+//  assign cart_tran_bank2_dir     = 1'b0;
+//  assign cart_tran_bank1         = 8'hzz;
+//  assign cart_tran_bank1_dir     = 1'b0;
+//  assign cart_tran_bank0         = 4'hf;
+//  assign cart_tran_bank0_dir     = 1'b1;
+//  assign cart_tran_pin30         = 1'b0;  // reset or cs2, we let the hw control it by itself
+//  assign cart_tran_pin30_dir     = 1'bz;
+//  assign cart_pin30_pwroff_reset = 1'b0;  // hardware can control this
+//  assign cart_tran_pin31         = 1'bz;  // input
+//  assign cart_tran_pin31_dir     = 1'b0;  // input
 
   // link port is input only
   assign port_tran_so            = 1'bz;
@@ -295,25 +297,26 @@ module core_top (
   assign aux_scl                 = 1'bZ;
   assign vpll_feed               = 1'bZ;
 
+
+  localparam [7:0] ADDRESS_ANALOGIZER_CONFIG = 8'hF7;
   // for bridge write data, we just broadcast it to all bus devices
   // for bridge read data, we have to mux it
   // add your own devices here
-  always @(*) begin
-    casex (bridge_addr)
-      default: begin
-        bridge_rd_data <= 0;
-      end
-      32'hF8xxxxxx: begin
-        bridge_rd_data <= cmd_bridge_rd_data;
-      end
-    endcase
+  wire [31:0] analogizer_bridge_rd_data;
 
-    if (bridge_addr[31:28] == 4'h2) begin
-      bridge_rd_data <= sd_read_data;
-    end else if (bridge_addr[31:28] == 4'h4) begin
-      bridge_rd_data <= save_state_bridge_read_data;
+  always @(*) begin
+      casex (bridge_addr[31:24])
+        default:                   begin bridge_rd_data <= 0;                         end
+        ADDRESS_ANALOGIZER_CONFIG: begin bridge_rd_data <= analogizer_bridge_rd_data; end
+        8'hF8:                     begin bridge_rd_data <= cmd_bridge_rd_data;        end
+      endcase
+
+      if (bridge_addr[31:28] == 4'h2) begin
+        bridge_rd_data <= sd_read_data;
+      end else if (bridge_addr[31:28] == 4'h4) begin
+        bridge_rd_data <= save_state_bridge_read_data;
+      end
     end
-  end
 
   always @(posedge clk_74a) begin
     if (reset_delay > 0) begin
@@ -325,9 +328,12 @@ module core_top (
         32'h050: begin
           reset_delay <= 32'h100000;
         end
-        // 32'h054: begin
-        //   region <= bridge_wr_data[1:0];
-        // end
+       32'h330: begin
+         region <= bridge_wr_data[1:0]; //When Chip32 loader writes the region to the Core
+       end
+        32'h32C: begin
+          video_dejitter <= bridge_wr_data[0];
+        end
         32'h200: begin
           hide_overscan <= bridge_wr_data[0];
         end
@@ -347,7 +353,7 @@ module core_top (
           multitap_enabled <= bridge_wr_data[0];
         end
         32'h304: begin
-          lightgun_enabled <= bridge_wr_data[0];
+          lightgun_enabled <= bridge_wr_data[1:0]; //Modified to add support for Analogizer SNAC Zapper lightgun
         end
         32'h308: begin
           lightgun_dpad_aim_speed <= bridge_wr_data[7:0];
@@ -361,7 +367,7 @@ module core_top (
       endcase
     end
   end
-
+  
   //
   // host/target command handler
   //
@@ -627,7 +633,7 @@ module core_top (
   wire [31:0] cont1_joy_s;
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont1_s (
       cont1_key,
       cont1_key_s,
@@ -635,7 +641,7 @@ module core_top (
   );
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont2_s (
       cont2_key,
       cont2_key_s,
@@ -643,7 +649,7 @@ module core_top (
   );
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont3_s (
       cont3_key,
       cont3_key_s,
@@ -651,7 +657,7 @@ module core_top (
   );
 
   synch_3 #(
-      .WIDTH(32)
+      .WIDTH(16)
   ) cont4_s (
       cont4_key,
       cont4_key_s,
@@ -667,23 +673,26 @@ module core_top (
   );
 
   // Settings
+  //reg [2:0] system_type = 0;
   reg [1:0] region = 0;
+  reg video_dejitter = 0;
 
   reg hide_overscan = 0;
   reg [1:0] mask_vid_edges = 0;
   reg square_pixels = 0;
-  reg allow_extra_sprites = 0;
-  reg [2:0] selected_palette = 0;
-  wire external_reset = reset_delay > 0;
+   reg allow_extra_sprites = 0;
+   reg [2:0] selected_palette = 0;
+   wire external_reset = reset_delay > 0;
 
-  reg multitap_enabled = 0;
-  reg lightgun_enabled = 0;
-  reg [7:0] lightgun_dpad_aim_speed = 0;
+   reg multitap_enabled = 0;
+   reg [1:0] lightgun_enabled = 0;
+   reg [7:0] lightgun_dpad_aim_speed = 0;
 
-  reg [2:0] turbo_speed = 0;
-  reg swap_controllers = 0;
+   reg [2:0] turbo_speed = 0;
+   reg swap_controllers = 0;
 
   wire [1:0] region_s;
+  wire video_dejitter_s;
 
   wire hide_overscan_s;
   wire [1:0] mask_vid_edges_s;
@@ -693,31 +702,33 @@ module core_top (
   wire external_reset_s;
 
   wire multitap_enabled_s;
-  wire lightgun_enabled_s;
+  wire [1:0] lightgun_enabled_s;
   wire [7:0] lightgun_dpad_aim_speed_s;
 
   wire [2:0] turbo_speed_s;
   wire swap_controllers_s;
 
   synch_3 #(
-      .WIDTH(24)
+      .WIDTH(27)
   ) settings_s (
       {
-        region,
-        hide_overscan,
-        mask_vid_edges,
-        square_pixels,
-        allow_extra_sprites,
-        selected_palette,
-        external_reset,
-        multitap_enabled,
-        lightgun_enabled,
-        lightgun_dpad_aim_speed,
-        turbo_speed,
-        swap_controllers
+        region,                      // 2
+        video_dejitter,              // 1 
+        hide_overscan,               // 1
+        mask_vid_edges,              // 2
+        square_pixels,               // 1
+        allow_extra_sprites,         // 1
+        selected_palette,            // 3  
+        external_reset,              // 1
+        multitap_enabled,            // 1 
+        lightgun_enabled,            // 2
+        lightgun_dpad_aim_speed,     // 8
+        turbo_speed,                 // 3
+        swap_controllers             // 1
       },
       {
         region_s,
+        video_dejitter_s,
         hide_overscan_s,
         mask_vid_edges_s,
         square_pixels_s,
@@ -743,75 +754,356 @@ module core_top (
 
   wire hide_overscan_with_region = hide_overscan_s && region_s == 2'b0;
 
+/*[ANALOGIZER_HOOK_BEGIN]*/
+//reg analogizer_ena;
+wire [3:0] analogizer_video_type;
+wire [4:0] snac_game_cont_type;
+wire [3:0] snac_cont_assignment;
+wire [2:0] SC_fx;
+wire       pocket_blank_screen;
+//reg       analogizer_osd_out;
+
+wire  ANALOGIZER_DE = ~(h_blank || v_blank);
+  //create aditional switch to blank Pocket screen.
+  wire [23:0] video_rgb_pocket;
+  assign video_rgb_pocket = (pocket_blank_screen) ? 24'h000000: video_rgb_nes;
+
+//switch between Analogizer SNAC and Pocket Controls for P1-P4 (P3,P4 when uses PCEngine Multitap)
+  wire [15:0] p1_btn, p2_btn, p3_btn, p4_btn;
+  wire [31:0] p1_joy, p2_joy;
+  reg [31:0] p1_joystick, p2_joystick;
+  reg  [15:0] p1_controls, p2_controls, p3_controls, p4_controls;
+
+wire snac_is_analog = (snac_game_cont_type == 5'h12) || (snac_game_cont_type == 5'h13);
+wire [31:0] neutral_joystick = 32'h80808080;
+
+always @(posedge clk_ppu_21_47) begin
+	reg [31:0] p1_pocket_btn, p1_pocket_joy;
+	reg [31:0] p2_pocket_btn, p2_pocket_joy;
+  reg [31:0] p3_pocket_btn;
+  reg [31:0] p4_pocket_btn;
+
+    if(snac_game_cont_type == 5'h0) begin //SNAC is disabled
+          p1_controls <= cont1_key_s;
+				  p1_joystick <= cont1_joy_s;
+          p2_controls <= cont2_key_s;
+          p3_controls <= cont3_key_s;
+          p4_controls <= cont4_key_s;
+    end
+    else begin
+	  p1_pocket_btn <= snac_is_analog ? {{4'h3},{12'h0},p1_btn} : {{4'h2},{12'h0},p1_btn};
+	  p1_pocket_joy <= snac_is_analog ? p1_joy : neutral_joystick; 
+	  p2_pocket_btn <= snac_is_analog ? {{4'h3},{12'h0},p2_btn} : {{4'h2},{12'h0},p2_btn};
+     p2_pocket_joy <= snac_is_analog ? p2_joy : neutral_joystick; 
+     p3_pocket_btn <= snac_is_analog ? {{4'h3},{12'h0},p3_btn} : {{4'h2},{12'h0},p3_btn};
+	  p4_pocket_btn <= snac_is_analog ? {{4'h3},{12'h0},p4_btn} : {{4'h2},{12'h0},p4_btn};
+
+      case(snac_cont_assignment[1:0])
+      2'h0:    begin  //SNAC P1 -> Pocket P1
+	  			//0x13 PSX SNAC Analog -> 0x3 See: https://www.analogue.co/developer/docs/bus-communication#PAD
+				//0xXX another SANC	-> 0x2
+          p1_controls <= p1_pocket_btn;
+          p1_joystick <= p1_pocket_joy; //check for PSX Analog SNAC or return neutral position data
+          p2_controls <= cont2_key_s;
+          p3_controls <= cont3_key_s;
+          p4_controls <= cont4_key_s;
+
+        end
+      2'h1: begin  //SNAC P1 -> Pocket P2
+          p1_controls <= cont1_key_s;
+          p1_joystick <= cont1_joy_s;
+          p2_controls <= p1_pocket_btn;
+          p3_controls <= cont3_key_s;
+          p4_controls <= cont4_key_s;
+        end
+      2'h2: begin //SNAC P1 -> Pocket P1, SNAC P2 -> Pocket P2
+          p1_controls <= p1_pocket_btn;
+          p1_joystick <= p1_pocket_joy; //check for PSX Analog SNAC or return neutral position data
+          p2_controls <= p2_pocket_btn;
+          p3_controls <= cont3_key_s;
+          p4_controls <= cont4_key_s;
+        end
+      2'h3: begin //SNAC P1 -> Pocket P2, SNAC P2 -> Pocket P1
+          p1_controls <= p2_pocket_btn;
+          p1_joystick <= p2_pocket_joy; //check for PSX Analog SNAC or return neutral position data
+          p2_controls <= p1_pocket_btn;
+          p3_controls <= cont3_key_s;
+          p4_controls <= cont4_key_s;
+        end
+	    4'h4: begin //SNAC P1-P2 -> Pocket P3-P4
+          p1_controls <= cont1_key_s;
+          p1_joystick <= cont1_joy_s;
+          p2_controls <= cont2_key_s;
+          p3_controls <= p1_pocket_btn;
+          p4_controls <= p2_pocket_btn;
+        end
+	    4'h5: begin //SNAC P1-P4 -> Pocket P1-P4
+          p1_controls <= p1_pocket_btn;
+          p1_joystick <= p1_pocket_joy; //check for PSX Analog SNAC or return neutral position data
+          p2_controls <= p2_pocket_btn;
+          p3_controls <= p3_pocket_btn;
+          p4_controls <= p4_pocket_btn;
+        end
+      default: begin 
+          p1_controls <= cont1_key_s;
+          p1_joystick <= cont1_joy_s;
+          p2_controls <= cont2_key_s;
+          p3_controls <= cont3_key_s;
+          p4_controls <= cont4_key_s;
+        end
+      endcase
+    end
+  end
+
+wire clk_vid = video_rgb_clock; //video_rgb_clock; //Fixed one bit shift error on RGB channels.
+
+wire SYNC = ~^{video_hs_nes, video_vs_nes};
+
+//*** Analogizer Interface V1.0 ***
+//reg analogizer_ena;
+reg [3:0] analog_video_type;
+reg [4:0] game_cont_type /* synthesis keep */;
+
+// Video Y/C Encoder settings
+// Follows the Mike Simone Y/C encoder settings:
+// https://github.com/MikeS11/MiSTerFPGA_YC_Encoder
+// SET PAL and NTSC TIMING and pass through status bits. ** YC must be enabled in the qsf file **
+// wire [39:0] CHROMA_PHASE_INC;
+// wire PALFLAG;
+
+parameter NTSC_REF = 3.579545;   
+parameter PAL_REF = 4.43361875;
+
+// Parameters to be modifed
+parameter CLK_VIDEO_NTSC = 42.954496; // Must be filled E.g XX.X Hz - CLK_VIDEO
+parameter CLK_VIDEO_PAL  = 42.562736; // Must be filled E.g XX.X Hz - CLK_VIDEO
+
+//PAL CLOCK FREQUENCY SHOULD BE 42.56274
+localparam [39:0] NTSC_PHASE_INC = 40'd91626062837; //d91_625_958_315; //d91_625_968_981; // ((NTSC_REF**2^40) / CLK_VIDEO_NTSC) - SNES Example;
+localparam [39:0] PAL_PHASE_INC =  40'd114532461227; //PAL
+// assign CHROMA_PHASE_INC = PALFLAG ? PAL_PHASE_INC : NTSC_PHASE_INC; 
+// assign PALFLAG = (analogizer_video_type == 4'h4); 
+
+//42_954_496 NTSC
+//42_562_736 PAL
+
+generate
+    if (USE_PAL_PLL  == 1'b0) begin
+      openFPGA_Pocket_Analogizer #(.MASTER_CLK_FREQ(42_954_496), .LINE_LENGTH(260), 
+                                  .ADDRESS_ANALOGIZER_CONFIG(ADDRESS_ANALOGIZER_CONFIG),
+                                  .USE_OLD_STYLE_SVGA_SCANDOUBLER(`USE_OLD_STYLE_SCANDOUBLER)) 
+                                analogizer (
+        .clk_74a(clk_74a),
+        .i_clk(clk_analogizer),
+        .i_rst(external_reset_s), //i_rst is active high
+        .i_ena(1'b1),
+
+        //Video interface
+        .video_clk(clk_analogizer),
+        .R(video_rgb_nes[23:16]),
+        .G(video_rgb_nes[15:8]),
+        .B(video_rgb_nes[7:0]),
+        .Hblank(h_blank),
+        .Vblank(v_blank),
+        .BLANKn(de),
+        .Hsync(video_hs_nes), //composite SYNC on HSync.
+        .Vsync(video_vs_nes),
+        .Csync(SYNC),
+
+        //openFPGA Bridge interface
+        .bridge_endian_little(bridge_endian_little),
+        .bridge_addr(bridge_addr),
+        .bridge_rd(bridge_rd),
+        .analogizer_bridge_rd_data(analogizer_bridge_rd_data),
+        .bridge_wr(bridge_wr),
+        .bridge_wr_data(bridge_wr_data),
+
+        //Analogizer settings
+        .snac_game_cont_type_out(snac_game_cont_type),
+        .snac_cont_assignment_out(snac_cont_assignment),
+        .analogizer_video_type_out(analogizer_video_type),
+        .SC_fx_out(SC_fx),
+        .pocket_blank_screen_out(pocket_blank_screen),
+        .analogizer_osd_out(),
+
+        //Video Y/C Encoder interface
+        .CHROMA_PHASE_INC(NTSC_PHASE_INC),
+        .PALFLAG(1'b0),
+        //Video SVGA Scandoubler interface
+        .ce_pix(clk_video_5_37),
+        .scandoubler(1'b1), //logic for disable/enable the scandoubler
+        //SNAC interface
+        .p1_btn_state(p1_btn),
+        .p1_joy_state(p1_joy),
+        .p2_btn_state(p2_btn),  
+        .p2_joy_state(p2_joy),
+        .p3_btn_state(p3_btn),
+        .p4_btn_state(p4_btn),      
+        //Pocket Analogizer IO interface to the Pocket cartridge port
+        .cart_tran_bank2(cart_tran_bank2),
+        .cart_tran_bank2_dir(cart_tran_bank2_dir),
+        .cart_tran_bank3(cart_tran_bank3),
+        .cart_tran_bank3_dir(cart_tran_bank3_dir),
+        .cart_tran_bank1(cart_tran_bank1),
+        .cart_tran_bank1_dir(cart_tran_bank1_dir),
+        .cart_tran_bank0(cart_tran_bank0),
+        .cart_tran_bank0_dir(cart_tran_bank0_dir),
+        .cart_tran_pin30(cart_tran_pin30),
+        .cart_tran_pin30_dir(cart_tran_pin30_dir),
+        .cart_pin30_pwroff_reset(cart_pin30_pwroff_reset),
+        .cart_tran_pin31(cart_tran_pin31),
+        .cart_tran_pin31_dir(cart_tran_pin31_dir),
+        //debug
+        .o_stb()
+      );
+    end
+  else begin
+          openFPGA_Pocket_Analogizer #(.MASTER_CLK_FREQ(42_562_736), .LINE_LENGTH(260), 
+                                  .ADDRESS_ANALOGIZER_CONFIG(ADDRESS_ANALOGIZER_CONFIG),
+                                  .USE_OLD_STYLE_SVGA_SCANDOUBLER(`USE_OLD_STYLE_SCANDOUBLER)) 
+                                analogizer (
+        .clk_74a(clk_74a),
+        .i_clk(clk_analogizer),
+        .i_rst(external_reset_s), //i_rst is active high
+        .i_ena(1'b1),
+
+        //Video interface
+        .video_clk(clk_analogizer),
+        .R(video_rgb_nes[23:16]),
+        .G(video_rgb_nes[15:8]),
+        .B(video_rgb_nes[7:0]),
+        .Hblank(h_blank),
+        .Vblank(v_blank),
+        .BLANKn(de),
+        .Hsync(video_hs_nes), //composite SYNC on HSync.
+        .Vsync(video_vs_nes),
+        .Csync(SYNC),
+
+        //openFPGA Bridge interface
+        .bridge_endian_little(bridge_endian_little),
+        .bridge_addr(bridge_addr),
+        .bridge_rd(bridge_rd),
+        .analogizer_bridge_rd_data(analogizer_bridge_rd_data),
+        .bridge_wr(bridge_wr),
+        .bridge_wr_data(bridge_wr_data),
+
+        //Analogizer settings
+        .snac_game_cont_type_out(snac_game_cont_type),
+        .snac_cont_assignment_out(snac_cont_assignment),
+        .analogizer_video_type_out(analogizer_video_type),
+        .SC_fx_out(SC_fx),
+        .pocket_blank_screen_out(pocket_blank_screen),
+        .analogizer_osd_out(),
+
+        //Video Y/C Encoder interface
+        .CHROMA_PHASE_INC(PAL_PHASE_INC),
+        .PALFLAG(1'b1),
+        //Video SVGA Scandoubler interface
+        .ce_pix(clk_video_5_37),
+        .scandoubler(1'b1), //logic for disable/enable the scandoubler
+        //SNAC interface
+        .p1_btn_state(p1_btn),
+        .p1_joy_state(p1_joy),
+        .p2_btn_state(p2_btn),  
+        .p2_joy_state(p2_joy),
+        .p3_btn_state(p3_btn),
+        .p4_btn_state(p4_btn),      
+        //Pocket Analogizer IO interface to the Pocket cartridge port
+        .cart_tran_bank2(cart_tran_bank2),
+        .cart_tran_bank2_dir(cart_tran_bank2_dir),
+        .cart_tran_bank3(cart_tran_bank3),
+        .cart_tran_bank3_dir(cart_tran_bank3_dir),
+        .cart_tran_bank1(cart_tran_bank1),
+        .cart_tran_bank1_dir(cart_tran_bank1_dir),
+        .cart_tran_bank0(cart_tran_bank0),
+        .cart_tran_bank0_dir(cart_tran_bank0_dir),
+        .cart_tran_pin30(cart_tran_pin30),
+        .cart_tran_pin30_dir(cart_tran_pin30_dir),
+        .cart_pin30_pwroff_reset(cart_pin30_pwroff_reset),
+        .cart_tran_pin31(cart_tran_pin31),
+        .cart_tran_pin31_dir(cart_tran_pin31_dir),
+        //debug
+        .o_stb()
+      );
+  end
+endgenerate
+
+/*[ANALOGIZER_HOOK_END]*/
+
   nes_top nes (
       .clk_74a(clk_74a),
       .clk_ppu_21_47(clk_ppu_21_47),
       .clk_85_9(clk_85_9),
       .clock_locked(pll_core_locked),
 
-      .sys_type(region_s),
+    .sys_type(region_s),
 
       // Control
       // Region changed, reset
       .external_reset(external_reset_s || prev_region != region_s || pll_reset),
 
       // Input
-      .p1_button_a(cont1_key_s[4]),
-      .p1_button_b(cont1_key_s[5]),
-      .p1_button_a_turbo(cont1_key_s[6]),
-      .p1_button_b_turbo(cont1_key_s[7]),
-      .p1_button_start(cont1_key_s[15]),
-      .p1_button_select(cont1_key_s[14]),
-      .p1_dpad_up(cont1_key_s[0]),
-      .p1_dpad_down(cont1_key_s[1]),
-      .p1_dpad_left(cont1_key_s[2]),
-      .p1_dpad_right(cont1_key_s[3]),
+      .p1_button_a(p1_controls[4]),
+      .p1_button_b(p1_controls[5]),
+      .p1_button_a_turbo(p1_controls[6]),
+      .p1_button_b_turbo(p1_controls[7]),
+      .p1_button_start(p1_controls[15]),
+      .p1_button_select(p1_controls[14]),
+      .p1_dpad_up(p1_controls[0]),
+      .p1_dpad_down(p1_controls[1]),
+      .p1_dpad_left(p1_controls[2]),
+      .p1_dpad_right(p1_controls[3]),
 
-      .p1_lstick_x(cont1_joy_s[7:0]),
-      .p1_lstick_y(cont1_joy_s[15:8]),
+      .p1_lstick_x(p1_joystick[7:0]),
+      .p1_lstick_y(p1_joystick[15:8]),
 
-      .p2_button_a(cont2_key_s[4]),
-      .p2_button_b(cont2_key_s[5]),
-      .p2_button_a_turbo(cont2_key_s[6]),
-      .p2_button_b_turbo(cont2_key_s[7]),
-      .p2_button_start(cont2_key_s[15]),
-      .p2_button_select(cont2_key_s[14]),
-      .p2_dpad_up(cont2_key_s[0]),
-      .p2_dpad_down(cont2_key_s[1]),
-      .p2_dpad_left(cont2_key_s[2]),
-      .p2_dpad_right(cont2_key_s[3]),
+      .p2_button_a(p2_controls[4]),
+      .p2_button_b(p2_controls[5]),
+      .p2_button_a_turbo(p2_controls[6]),
+      .p2_button_b_turbo(p2_controls[7]),
+      .p2_button_start(p2_controls[15]),
+      .p2_button_select(p2_controls[14]),
+      .p2_dpad_up(p2_controls[0]),
+      .p2_dpad_down(p2_controls[1]),
+      .p2_dpad_left(p2_controls[2]),
+      .p2_dpad_right(p2_controls[3]),
 
-      .p3_button_a(cont3_key_s[4]),
-      .p3_button_b(cont3_key_s[5]),
-      .p3_button_a_turbo(cont3_key_s[6]),
-      .p3_button_b_turbo(cont3_key_s[7]),
-      .p3_button_start(cont3_key_s[15]),
-      .p3_button_select(cont3_key_s[14]),
-      .p3_dpad_up(cont3_key_s[0]),
-      .p3_dpad_down(cont3_key_s[1]),
-      .p3_dpad_left(cont3_key_s[2]),
-      .p3_dpad_right(cont3_key_s[3]),
+      .p3_button_a(p3_controls[4]),
+      .p3_button_b(p3_controls[5]),
+      .p3_button_a_turbo(p3_controls[6]),
+      .p3_button_b_turbo(p3_controls[7]),
+      .p3_button_start(p3_controls[15]),
+      .p3_button_select(p3_controls[14]),
+      .p3_dpad_up(p3_controls[0]),
+      .p3_dpad_down(p3_controls[1]),
+      .p3_dpad_left(p3_controls[2]),
+      .p3_dpad_right(p3_controls[3]),
 
-      .p4_button_a(cont4_key_s[4]),
-      .p4_button_b(cont4_key_s[5]),
-      .p4_button_a_turbo(cont4_key_s[6]),
-      .p4_button_b_turbo(cont4_key_s[7]),
-      .p4_button_start(cont4_key_s[15]),
-      .p4_button_select(cont4_key_s[14]),
-      .p4_dpad_up(cont4_key_s[0]),
-      .p4_dpad_down(cont4_key_s[1]),
-      .p4_dpad_left(cont4_key_s[2]),
-      .p4_dpad_right(cont4_key_s[3]),
+      .p4_button_a(p4_controls[4]),
+      .p4_button_b(p4_controls[5]),
+      .p4_button_a_turbo(p4_controls[6]),
+      .p4_button_b_turbo(p4_controls[7]),
+      .p4_button_start(p4_controls[15]),
+      .p4_button_select(p4_controls[14]),
+      .p4_dpad_up(p4_controls[0]),
+      .p4_dpad_down(p4_controls[1]),
+      .p4_dpad_left(p4_controls[2]),
+      .p4_dpad_right(p4_controls[3]),
 
       // Settings
-      .hide_overscan(hide_overscan_with_region),
+      .hide_overscan(hide_overscan_s), //Don't Hide overscan wire hide_overscan = status[4] && ~pal_video;
       .mask_vid_edges(mask_vid_edges_s),
       .allow_extra_sprites(allow_extra_sprites_s),
       .selected_palette(selected_palette_s),
+      .dejitter_timing(video_dejitter_s),
 
       .multitap_enabled(multitap_enabled_s),
       .lightgun_enabled(lightgun_enabled_s),
       .lightgun_dpad_aim_speed(lightgun_dpad_aim_speed_s),
+
+      //SNAC Zapper inputs from P2 port
+      .SNAC_Zapper_Trigger(p2_controls[7]), //added zapper trigger to Y
+      .SNAC_Zapper_Light(p2_controls[6]), //added zapper light to X
 
       .turbo_speed(turbo_speed_s),
       .swap_controllers(swap_controllers_s),
@@ -860,6 +1152,8 @@ module core_top (
       .dram_we_n(dram_we_n),
 
       // Video
+      .ce_pix(),
+      .ce_pix90(),
       .HBlank (h_blank),
       .VBlank (v_blank),
       .HSync  (video_hs_nes),
@@ -872,7 +1166,8 @@ module core_top (
   );
 
   // Video
-
+  // wire ce_pix;
+  // wire ce_pix90;
   wire h_blank;
   wire v_blank;
   wire video_hs_nes;
@@ -904,38 +1199,36 @@ module core_top (
     video_de_reg  <= 0;
     video_rgb_reg <= 24'h0;
 
-    if (de) begin
-      video_de_reg  <= 1;
+      if (de) begin
+        video_de_reg  <= 1;
+        //video_rgb_reg <= video_rgb_nes;
+        video_rgb_reg <= video_rgb_pocket;
+      end else if (de_prev && ~de) begin
+        video_rgb_reg <= video_slot_rgb;
+      end
 
-      video_rgb_reg <= video_rgb_nes;
-    end else if (de_prev && ~de) begin
-      video_rgb_reg <= video_slot_rgb;
-    end
+      if (hs_delay > 0) begin
+        hs_delay <= hs_delay - 1;
+      end
 
-    if (hs_delay > 0) begin
-      hs_delay <= hs_delay - 1;
-    end
+      if (hs_delay == 1) begin
+        video_hs_reg <= 1;
+      end
 
-    if (hs_delay == 1) begin
-      video_hs_reg <= 1;
-    end
+      if (~hs_prev && video_hs_nes) begin
+        // HSync went high. Delay by 3 cycles to prevent overlapping with VSync
+        hs_delay <= 7;
+      end
 
-    if (~hs_prev && video_hs_nes) begin
-      // HSync went high. Delay by 3 cycles to prevent overlapping with VSync
-      hs_delay <= 7;
-    end
-
-    // Set VSync to be high for a single cycle on the rising edge of the VSync coming out of the core
-    video_vs_reg <= ~vs_prev && video_vs_nes;
-    hs_prev <= video_hs_nes;
-    vs_prev <= video_vs_nes;
-    de_prev <= de;
+      // Set VSync to be high for a single cycle on the rising edge of the VSync coming out of the core
+      video_vs_reg <= ~vs_prev && video_vs_nes;
+      hs_prev <= video_hs_nes;
+      vs_prev <= video_vs_nes;
+      de_prev <= de;
   end
 
   // Sound
-
   wire [15:0] audio;
-
   reg  [15:0] audio_buffer = 0;
 
   // Buffer audio to have better fitting on audio route
@@ -967,148 +1260,47 @@ module core_top (
   ///////////////////////////////////////////////
 
   wire clk_85_9;
-  wire clk_ppu_21_47;
-  wire clk_video_5_37;
+  wire clk_ppu_21_47; //26.60 for PAL
+  wire clk_video_5_37; //5.32 fof PAL
   wire clk_video_5_37_90deg;
+  wire clk_analogizer; //42_954_496 //
 
-  // wire [63:0] reconfig_to_pll;
-  // wire [63:0] reconfig_from_pll;
+// wire [63:0] reconfig_to_pll;
+// wire [63:0] reconfig_from_pll;
 
   wire pll_core_locked;
 
   reg  pll_reset = 0;
+generate
+    if (USE_PAL_PLL  == 1'b0) begin
+      mf_pllbase mp1 (
+          .refclk(clk_74a),
+          .rst   (pll_reset),
+          // .rst(0),
 
-  mf_pllbase mp1 (
-      .refclk(clk_74a),
-      .rst   (pll_reset),
-      // .rst(0),
+          .outclk_0(clk_85_9),
+          .outclk_1(clk_ppu_21_47),
+          .outclk_2(clk_video_5_37),
+          .outclk_3(clk_video_5_37_90deg),
+          .outclk_4(clk_analogizer), //42.954496MHz
+          .locked(pll_core_locked)
+      );
+    end else begin
+        mf_pllbase_pal mp1 (
+          .refclk(clk_74a),
+          .rst   (pll_reset),
+          // .rst(0),
 
-      .outclk_0(clk_85_9),
-      .outclk_1(clk_ppu_21_47),
-      .outclk_2(clk_video_5_37),
-      .outclk_3(clk_video_5_37_90deg),
-
-      // .reconfig_to_pll  (reconfig_to_pll),
-      // .reconfig_from_pll(reconfig_from_pll),
-
-      .locked(pll_core_locked)
-  );
+          .outclk_0(clk_85_9),
+          .outclk_1(clk_ppu_21_47),
+          .outclk_2(clk_video_5_37),
+          .outclk_3(clk_video_5_37_90deg),
+          .outclk_4(clk_analogizer), //42.562736
+          .locked(pll_core_locked)
+        );
+    end
+endgenerate
 
   // See https://github.com/agg23/openfpga-NES/issues/26
-
-  // wire        cfg_waitrequest;
-  // reg         cfg_write;
-  // reg  [ 5:0] cfg_address;
-  // reg  [31:0] cfg_data;
-
-  // pll_reconfig pll_reconfig (
-  //     .mgmt_clk(clk_74a),
-  //     .mgmt_reset(0),
-  //     .mgmt_waitrequest(cfg_waitrequest),
-  //     .mgmt_read(0),
-  //     .mgmt_readdata(),
-  //     .mgmt_write(cfg_write),
-  //     .mgmt_address(cfg_address),
-  //     .mgmt_writedata(cfg_data),
-  //     .reconfig_to_pll(reconfig_to_pll),
-  //     .reconfig_from_pll(reconfig_from_pll)
-  // );
-
-  // wire pal = region != 0;
-
-  // reg prev_pal = 0;
-  // reg write_pal = 0;
-
-  // reg [3:0] state = 0;
-
-  // reg prev_pll_core_locked = 0;
-  // reg [19:0] pll_reset_delay = 0;
-
-  // always @(posedge clk_74a) begin
-  //   prev_pal <= pal;
-  //   prev_pll_core_locked <= pll_core_locked;
-
-  //   cfg_write <= 0;
-  //   if (prev_pal != pal) begin
-  //     state <= 1;
-  //     write_pal <= pal;
-  //   end
-
-  //   if (~pll_core_locked && prev_pll_core_locked) begin
-  //     pll_reset_delay <= 20'hF_FFFF;
-  //   end
-
-  //   if (pll_reset_delay == 20'hFFFF) begin
-  //     pll_reset <= 1;
-  //   end else if (pll_reset_delay == 20'h0) begin
-  //     pll_reset <= 0;
-  //   end
-
-  //   if (pll_reset_delay > 20'h0) begin
-  //     pll_reset_delay <= pll_reset_delay - 20'h1;
-  //   end
-
-  //   if (!cfg_waitrequest) begin
-  //     if (state) state <= state + 1'd1;
-  //     case (state)
-  //       1: begin
-  //         cfg_address <= 0;
-  //         cfg_data <= 0;
-  //         cfg_write <= 1;
-  //       end
-  //       3: begin
-  //         // Set fractional division
-  //         // Config addresses come from https://www.intel.com/content/www/us/en/docs/programmable/683640/current/fractional-pll-dynamic-reconfiguration.html
-  //         cfg_address <= 7;
-  //         // NTSC: 425907062
-  //         //   Mem: 85.908992 MHz
-  //         //   Main: 21.477248 MHz
-  //         //   Vid: 5.369312 MHz
-  //         // PAL: 737738000
-  //         //   Mem: 85.125472 MHz
-  //         //   Main: 21.281368 MHz
-  //         //   Vid: 5.320342 MHz
-  //         cfg_data <= write_pal ? 737738000 : 425907062;
-  //         cfg_write <= 1;
-  //       end
-  //       5: begin
-  //         // Set counter C0
-  //         cfg_address <= 'h5;
-  //         cfg_data <= write_pal ? 32'h000404 : 32'h020403;
-  //         cfg_write <= 1;
-  //       end
-  //       7: begin
-  //         // Set counter C1
-  //         cfg_address <= 'h5;
-  //         cfg_data <= write_pal ? 32'h041010 : 32'h040E0E;
-  //         cfg_write <= 1;
-  //       end
-  //       9: begin
-  //         // Set counter C2
-  //         cfg_address <= 'h5;
-  //         cfg_data <= write_pal ? 32'h084040 : 32'h083838;
-  //         cfg_write <= 1;
-  //       end
-  //       11: begin
-  //         // Set counter C3
-  //         cfg_address <= 'h5;
-  //         cfg_data <= write_pal ? 32'h0C4040 : 32'h0C3838;
-  //         cfg_write <= 1;
-  //       end
-  //       13: begin
-  //         // Set counter M
-  //         cfg_address <= 'h4;
-  //         cfg_data <= write_pal ? 32'h20504 : 32'h00404;
-  //         cfg_write <= 1;
-  //       end
-  //       15: begin
-  //         // Begin fractional PLL reconfig
-  //         cfg_address <= 2;
-  //         cfg_data <= 0;
-  //         cfg_write <= 1;
-  //       end
-  //     endcase
-  //   end
-  // end
 
 endmodule
