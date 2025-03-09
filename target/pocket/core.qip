@@ -10,6 +10,4 @@ set_global_assignment -name SYSTEMVERILOG_FILE    [file join $::quartus(qip_path
 set_global_assignment -name SIGNALTAP_FILE [file join $::quartus(qip_path) "stp1.stp"]
 
 set_global_assignment -name QIP_FILE       [file join $::quartus(qip_path) "mf_audio_pll.qip"]
-set_global_assignment -name QIP_FILE       [file join $::quartus(qip_path) "mf_pllbase.qip"]
-set_global_assignment -name QIP_FILE       [file join $::quartus(qip_path) "mf_pllbase_pal.qip"]
-set_global_assignment -name QIP_FILE       [file join $::quartus(qip_path) "pll_reconfig.qip"]
+set_global_assignment -name QIP_FILE       [file join $::quartus(qip_path) "nes_pll.qip"]

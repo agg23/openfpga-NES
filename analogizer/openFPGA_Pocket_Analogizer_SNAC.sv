@@ -110,7 +110,7 @@ module openFPGA_Pocket_Analogizer_SNAC #(parameter MASTER_CLK_FREQ=50_000_000)
     logic SNAC_IO3_B ;//Conf.B: cart_tran_bank0[4] (in),  Conf.B: pin30(out)         RX-
     logic SNAC_IN4 ;  //cart_tran_bank0[7]                                           RX+
     logic SNAC_IO5_A ;//Conf.A: pin30(out),               Conf.B: cart_tran_bank1[6] GND_D
-	 logic SNAC_IO5_B ;//Conf.A: pin30(out),               Conf.B: cart_tran_bank1[6] GND_D
+	logic SNAC_IO5_B ;//Conf.A: pin30(out),               Conf.B: cart_tran_bank1[6] GND_D
     logic SNAC_IO6_A ;//Conf.A: pin31(in),                Conf.B: pin31(out)         TX-
     logic SNAC_IO6_B ;//Conf.A: pin31(in),                Conf.B: pin31(out)         TX-
     logic SNAC_IN7 ;   //cart_tran_bank0[5]                                          TX+
@@ -318,16 +318,16 @@ module openFPGA_Pocket_Analogizer_SNAC #(parameter MASTER_CLK_FREQ=50_000_000)
     .o_stb (stb_clk)
     );
 
-	 wire dbg_clk_w;
-	 reg dbg_clk /* synthesis noprune */;
-    clock_divider_fract dbgckdiv(
-    .i_clk (i_clk),
-    .i_rst(reset_on_change), //reset on polling freq change
-    .i_step(uart_dbg_pstep[31:0]),
-    .o_stb (dbg_clk_w)
-    );
+	//  wire dbg_clk_w;
+	//  reg dbg_clk /* synthesis noprune */;
+    // clock_divider_fract dbgckdiv(
+    // .i_clk (i_clk),
+    // .i_rst(reset_on_change), //reset on polling freq change
+    // .i_step(uart_dbg_pstep[31:0]),
+    // .o_stb (dbg_clk_w)
+    // );
 	 
-	 always @(posedge i_clk) dbg_clk <= dbg_clk_w;
+	//  always @(posedge i_clk) dbg_clk <= dbg_clk_w;
 
     assign o_stb = stb_clk;
 
@@ -434,14 +434,14 @@ pcengine_game_controller_multitap #(.MASTER_CLK_FREQ(MASTER_CLK_FREQ)) pcegmutit
         p2_joy_state = 32'h80808080; //analog stick neutral position value
 
         case(game_cont_type)
-        GC_DISABLED: begin
-            SNAC_OUT1 = 1'b0;
-            SNAC_OUT2 = 1'b0;
-            p1_btn_state = 16'h0; 
-            p2_btn_state = 16'h0;
-            p3_btn_state = 16'h0; 
-            p4_btn_state = 16'h0;
-        end
+        // GC_DISABLED: begin
+        //     SNAC_OUT1 = 1'b0;
+        //     SNAC_OUT2 = 1'b0;
+        //     p1_btn_state = 16'h0; 
+        //     p2_btn_state = 16'h0;
+        //     p3_btn_state = 16'h0; 
+        //     p4_btn_state = 16'h0;
+        // end
         GC_DB15, GC_DB15_FAST, GC_SNES, GC_SNES_SWAP: begin
             SNAC_OUT1 = SERLAT_SNAC_OUT1;
             SNAC_OUT2 = SERLAT_SNAC_OUT2;            
