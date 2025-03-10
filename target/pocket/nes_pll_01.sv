@@ -1,5 +1,5 @@
 `timescale 1ns/10ps
-module nes_pll_01 #(parameter reg USE_PAL_PLL = 1'b1)
+module nes_pll_01
 (
 	// interface 'refclk'
 	input wire refclk,
@@ -26,8 +26,15 @@ module nes_pll_01 #(parameter reg USE_PAL_PLL = 1'b1)
 	output wire locked
 );
 
+parameter USE_PAL_PLL = 1'b0;
+initial begin
+$info("*** nes_pll_01 ***");
+$info("USE_PAL_PLL %d", USE_PAL_PLL);
+end
+
+//NTSC
  generate
-    if (USE_PAL_PLL  == 1'b1) begin
+    if (USE_PAL_PLL  == 1'b0) begin
 	altera_pll #(
 		.fractional_vco_multiplier("true"),
 		.reference_clock_frequency("74.25 MHz"),
@@ -97,6 +104,8 @@ module nes_pll_01 #(parameter reg USE_PAL_PLL = 1'b1)
 		.fbclk	(1'b0),
 		.refclk	(refclk)
 	);
+
+	//PAL
 end else begin
 		altera_pll #(
 		.fractional_vco_multiplier("true"),

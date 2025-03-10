@@ -8,8 +8,8 @@ module vga_out
 	input wire        csync,
 	input wire        de,
 
-	input  wire [23:0] din,
-	output wire [23:0] dout,
+	input  wire [17:0] din,
+	output wire [17:0] dout,
 
 	output reg    hsync_o,
 	output reg    vsync_o,
@@ -17,9 +17,9 @@ module vga_out
 	output reg    de_o
 );
 
-wire [7:0] red   = din[23:16];
-wire [7:0] green = din[15:8];
-wire [7:0] blue  = din[7:0];
+wire [7:0] red   = {din[17:12],2'b00};
+wire [7:0] green = {din[11:6],2'b00};
+wire [7:0] blue  = {din[5:0],2'b00};
 
 // http://marsee101.blog19.fc2.com/blog-entry-2311.html
 
@@ -29,13 +29,13 @@ wire [7:0] blue  = din[7:0];
 // Pr = 128 + 0.500*R - 0.418*G - 0.082*B (Pr =  0.500*R - 0.419*G - 0.081*B)
 
 reg  [7:0] y, pb, pr;
-reg [23:0] rgb;
+reg [17:0] rgb;
 always @(posedge clk) begin
 	reg [18:0] y_1r, pb_1r, pr_1r;
 	reg [18:0] y_1g, pb_1g, pr_1g;
 	reg [18:0] y_1b, pb_1b, pr_1b;
 	reg [18:0] y_2, pb_2, pr_2;
-	reg [23:0] din1, din2;
+	reg [17:0] din1, din2;
 	reg hsync2, vsync2, csync2, de2;
 	reg hsync1, vsync1, csync1, de1;
 
@@ -67,6 +67,6 @@ always @(posedge clk) begin
 	rgb <= din2; din2 <= din1; din1 <= din;
 end
 
-assign dout = ypbpr_en ? {pr, y, pb} : rgb;
+assign dout = ypbpr_en ? {pr[7:2], y[7:2], pb[7:2]} : rgb; //reduced to 6bits per component
 
 endmodule

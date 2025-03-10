@@ -1,10 +1,10 @@
-# NES for Analogue Pocket
+# NES for Analogue Pocket with Analogizer Support
 
 Ported from the core originally developed by [Ludvig Strigeus](https://github.com/strigeus/fpganes) and heavily developed by [@sorgelig](https://github.com/sorgelig), [@greyrogue](https://github.com/greyrogue), [@Kitrinx](https://github.com/Kitrinx), [@paulb-nl](https://github.com/paulb-nl), and many more. Core icon by [spiritualized1997](https://github.com/spiritualized1997). Latest upstream available at https://github.com/MiSTer-devel/NES_MiSTer
 
 Please report any issues encountered to this repo. Most likely any problems are a result of my port, not the original core. Issues will be upstreamed as necessary.
 
-## Installation
+## Installation (see also Analogizer settings section)
 
 ### Easy mode
 
@@ -24,7 +24,7 @@ booted as NTSC.
 
 ### Dock Support
 
-Core supports four players/controllers via the Analogue Dock. To enable four player mode, turn on `Use Multitap` setting.
+Core supports four players/controllers via the Analogue Dock. To enable four player mode, turn on `Use Multitap` setting. This is also required to enable to use the Analogizer SNAC PCEngine Multitap.
 
 ### Mappers
 
@@ -84,7 +84,7 @@ Core supports virtual lightguns by enabling the `Use Zapper > Emulated Zapper (S
 
 **NOTE:** Joystick support for aiming only appears to work when a controller is paired over Bluetooth and not connected to the Analogue Dock directly by USB.
 
-### Analogizer
+### Analogizer settings
 
 This Analogizer core use a configuration file to select Analogizer adapter options, not based on the Pocket's menu system. It is necessary to use [Pupdate](https://github.com/mattpannella/pupdate) release >= 4.3.1 or run an external [utility](https://github.com/RndMnkIII/AnalogizerConfigurator) to generate such a file. Once generated, you must copy the `analogizer.bin` file to the `/Assets/analogizer/common` folder on the Pocket SD card. If this folder does not exist, you must create it or if you have already extracted the Amiga core distribution file it will be created. Pupdate does all actions automatically after running this tool. Inside Pupdate navigate to: `Pocket Setup>Analogizer Config>Standard Analogizer Config`, choose Analogizer settings and exit to save to file.
 
@@ -181,5 +181,23 @@ You will need to connect an active VGA to Y/C adapter to the VGA port (the 5V po
 * [Active VGA->Composite/S-Video adapter](https://antoniovillena.com/product/mikes1-vga-composite-adapter/)
 
 Using another type of Y/C adapter not tested to be used with Analogizer will not receive official support.
+
+### Build & Install instructions (Windows):
+ 
+1) Install Quartus 21.1 (x64)
+2) Add to the system or user Path: <Quartus 21.1 Install Path>\quartus\bin64
+   clone the project files: git clone <repository-URL>
+3) Open a PowerShell terminal to project folder openfpga-NES
+
+4) Generate the four bitstreams files running the scripts: 
+   .\build.ps1 NTSC_SET1
+   .\build.ps1 NTSC_SET2
+   .\build.ps1 PAL_SET1
+   .\build.ps1 PAL_SET2
+
+   The generated *.rev bitstream files are stored in the 'core_bitstreams' folder
+6) Copy the contents from 'pkg\pocket' folder to the root of Pocket SD Card.
+5) Copy the bitstream files from 'core_bitstreams' to the Core folder 'Cores\agg23.NES' in the Pocket SD Card.
+
 
 

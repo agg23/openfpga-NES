@@ -1,7 +1,7 @@
 //Famicom Disk System
 
 module MapperFDS(
-	input        clk,         // System clock  
+	input        clk,         // System clock
 	input        ce,          // M2 ~cpu_clk
 	input        enable,      // Mapper enabled
 	input [31:0] flags,       // Cart flags
@@ -604,46 +604,43 @@ wire [11:0] mul_out = wave_latch * (vol_pwm_lat[5] ? 6'd32 : vol_pwm_lat);
 wire [15:0] level_out;
 assign audio_out = level_out[11:0];
 
-wire [7:0] low_addr_in = (addr_in[15:8] == 8'h40) ? addr_in[7:0] : 8'h0;
-
 always_comb begin
 	case (master_vol)
-		2'b00: level_out   = mul_out;
-		2'b01: level_out   = {mul_out, 1'b0} / 16'd3;
-		2'b10: level_out   = mul_out[11:1];
-		2'b11: level_out   = {mul_out, 1'b0} / 16'd5;
+		2'b00: level_out = mul_out;
+		2'b01: level_out = {mul_out, 1'b0} / 16'd3;
+		2'b10: level_out = mul_out[11:1];
+		2'b11: level_out = {mul_out, 1'b0} / 16'd5;
 		default: level_out = mul_out;
 	endcase
 
-	if (low_addr_in >= 'h40 && low_addr_in < 'h80) begin
+	if (addr_in >= 'h4040 && addr_in < 'h4080) begin
 		if (wave_wren)
 			data_out = wave_table[addr_in[5:0]];
 		else
 			data_out = wave_table[wave_accum[23:18]];
 	end else begin
-		case (low_addr_in)
-			'h90: data_out    = {2'b01, vol_gain};
-			'h91: data_out    = wave_accum[19:12];
-			'h92: data_out    = {2'b01, sweep_gain};
-			'h93: data_out    = {1'b0, mod_accum[11:5]};
-			'h94: data_out    = wave_pitch[11:4];
-			'h95: data_out    = {cycles, mod_incr[3:0]};
-			'h96: data_out    = {2'b01, wave_table[wave_accum[23:18]]};
-			'h97: data_out    = {1'b0, mod_bias};
+		case (addr_in)
+			'h4090: data_out = {2'b01, vol_gain};
+			'h4091: data_out = wave_accum[19:12];
+			'h4092: data_out = {2'b01, sweep_gain};
+			'h4093: data_out = {1'b0, mod_accum[11:5]};
+			'h4094: data_out = wave_pitch[11:4];
+			'h4095: data_out = {cycles, mod_incr[3:0]};
+			'h4096: data_out = {2'b01, wave_table[wave_accum[23:18]]};
+			'h4097: data_out = {1'b0, mod_bias};
 			default: data_out = 8'b0100_0000;
 		endcase
 	end
 
-
 	case (mod_table[mod_accum[17:13]])
-		3'h0: mod_incr    = 0;
-		3'h1: mod_incr    = 7'sd1;
-		3'h2: mod_incr    = 7'sd2;
-		3'h3: mod_incr    = 7'sd4;
-		3'h4: mod_incr    = -7'sd4;
-		3'h5: mod_incr    = -7'sd4;
-		3'h6: mod_incr    = -7'sd2;
-		3'h7: mod_incr    = -7'sd1;
+		3'h0: mod_incr = 0;
+		3'h1: mod_incr = 7'sd1;
+		3'h2: mod_incr = 7'sd2;
+		3'h3: mod_incr = 7'sd4;
+		3'h4: mod_incr = -7'sd4;
+		3'h5: mod_incr = -7'sd4;
+		3'h6: mod_incr = -7'sd2;
+		3'h7: mod_incr = -7'sd1;
 		default: mod_incr = 0;
 	endcase
 end
@@ -724,78 +721,78 @@ end else if (~old_m2 & m2) begin
 
 	//**** Registers ****//
 	if (wr) begin
-		if (low_addr_in >= 'h40 && low_addr_in < 'h80) begin
+		if (addr_in >= 'h4040 && addr_in < 'h4080) begin
 			if (wave_wren)
 				wave_table[addr_in[5:0]] <= data_in[5:0];
 		end
-			case (low_addr_in)
-				8'h80: begin
-					{vol_disable, vol_dir, vol_speed} <= data_in;
-					if (data_in[7]) vol_gain <= data_in[5:0];
+		case (addr_in)
+			16'h4080: begin
+				{vol_disable, vol_dir, vol_speed} <= data_in;
+				if (data_in[7]) vol_gain <= data_in[5:0];
+				vol_ticks <= 0;
+				vol_env_ticks <= 0;
+			end
+
+			16'h4082: wave_frequency[7:0] <= data_in;
+
+			16'h4083: begin
+				wave_frequency[11:8] <= data_in[3:0];
+				wave_disable <= data_in[7];
+				env_disable <= data_in[6];
+
+				if (data_in[7]) begin
+					wave_accum <= 0;
+					cycles <= 0;
+				end
+
+				if (data_in[6]) begin // Reset envelopes
 					vol_ticks <= 0;
+					sweep_ticks <= 0;
 					vol_env_ticks <= 0;
-				end
-
-				8'h82: wave_frequency[7:0] <= data_in;
-
-				8'h83: begin
-					wave_frequency[11:8] <= data_in[3:0];
-					wave_disable <= data_in[7];
-					env_disable <= data_in[6];
-
-					if (data_in[7]) begin
-						wave_accum <= 0;
-						cycles <= 0;
-					end
-
-					if (data_in[6]) begin // Reset envelopes
-						vol_ticks <= 0;
-						sweep_ticks <= 0;
-						vol_env_ticks <= 0;
-						sweep_env_ticks <= 0;
-					end
-				end
-
-				8'h84: begin
-					{sweep_disable, sweep_dir, sweep_speed} <= data_in;
-					if (data_in[7]) sweep_gain <= data_in[5:0];
-					sweep_ticks <= 0;
 					sweep_env_ticks <= 0;
 				end
+			end
 
-				8'h85: mod_bias <= data_in[6:0];
+			16'h4084: begin
+				{sweep_disable, sweep_dir, sweep_speed} <= data_in;
+				if (data_in[7]) sweep_gain <= data_in[5:0];
+				sweep_ticks <= 0;
+				sweep_env_ticks <= 0;
+			end
 
-				8'h86: mod_frequency[7:0] <= data_in;
+			16'h4085: mod_bias <= data_in[6:0];
 
-				8'h87: begin
-					mod_frequency[11:8] <= data_in[3:0];
-					mod_disable <= data_in[7];
-					mod_step <= data_in[6];
+			16'h4086: mod_frequency[7:0] <= data_in;
 
-					if (data_in[7])
-						mod_accum[12:0] <= 0;
+			16'h4087: begin
+				mod_frequency[11:8] <= data_in[3:0];
+				mod_disable <= data_in[7];
+				mod_step <= data_in[6];
+
+				if (data_in[7])
+					mod_accum[12:0] <= 0;
+			end
+
+			16'h4088: begin
+				if (mod_disable) begin
+					mod_table[mod_accum[17:13]] <= data_in[2:0];
+					mod_accum[17:13] <= mod_accum[17:13] + 1'b1;
 				end
+			end
 
-				8'h88: begin
-					if (mod_disable) begin
-						mod_table[mod_accum[17:13]] <= data_in[2:0];
-						mod_accum[17:13] <= mod_accum[17:13] + 1'b1;
-					end
-				end
+			16'h4089: begin
+				wave_wren <= data_in[7];
+				master_vol <= data_in[1:0];
+			end
 
-				8'h89: begin
-					wave_wren <= data_in[7];
-					master_vol <= data_in[1:0];
-				end
-
-				8'h8A: begin
-					env_speed <= data_in;
-					vol_ticks <= 0;
-					sweep_ticks <= 0;
-					vol_env_ticks <= 0; // Undocumented, but I believe this is right.
-					sweep_env_ticks <= 0;
-				end
-			endcase
+			16'h408A: begin
+				env_speed <= data_in;
+				vol_ticks <= 0;
+				sweep_ticks <= 0;
+				vol_env_ticks <= 0; // Undocumented, but I believe this is right.
+				sweep_env_ticks <= 0;
+			end
+		endcase
 	end
 end // if m2
 end

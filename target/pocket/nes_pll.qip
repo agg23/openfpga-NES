@@ -329,7 +329,7 @@ set_global_assignment -entity "nes_pll_01" -library "nes_pll" -name IP_COMPONENT
 set_global_assignment -entity "nes_pll_01" -library "nes_pll" -name IP_COMPONENT_PARAMETER "Z3VpX2VuYWJsZV9jYXNjYWRlX2lu::ZmFsc2U=::Q3JlYXRlIGFuIGFkanBsbGluIG9yIGNjbGsgc2lnbmFsIHRvIGNvbm5lY3Qgd2l0aCBhbiB1cHN0cmVhbSBQTEw="
 
 set_global_assignment -library "nes_pll" -name VERILOG_FILE [file join $::quartus(qip_path) "nes_pll.v"]
-set_global_assignment -library "nes_pll" -name VERILOG_FILE [file join $::quartus(qip_path) "nes_pll_01.v"]
+set_global_assignment -library "nes_pll" -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) "nes_pll_01.sv"]
 set_global_assignment -library "nes_pll" -name QIP_FILE [file join $::quartus(qip_path) "nes_pll_01.qip"]
 
 set_global_assignment -entity "nes_pll_01" -library "nes_pll" -name IP_TOOL_NAME "altera_pll"

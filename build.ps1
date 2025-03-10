@@ -5,6 +5,7 @@ if (($args.count -ne 1) -or ($args[0] -eq "")) {
 
 $build_type = $args[0]
 
+# Tested with Quartus 21.1
 quartus_sh -t generate.tcl $build_type
 
 $exitcode = $LASTEXITCODE
@@ -24,3 +25,6 @@ if (($build_type -eq "NTSC_SET1")) {
 }elseif (($build_type -eq "PAL_SET2")) {
   $output_file = "PAL_SET2.rev"
 }
+
+.\tools\reverse_bits.exe .\projects\output_files\nes_pocket.rbf ".\core_bitstreams\$output_file";
+

@@ -9,9 +9,8 @@
 //Using old style scandoubler code reduces resources usage (don´t implement HQ2x)
 `define USE_OLD_STYLE_SCANDOUBLER  1'b1
 
-module core_top #(parameter reg USE_PAL_PLL = 1'b1)
+module core_top
 (
-
     //
     // physical connections
     //
@@ -227,6 +226,14 @@ module core_top #(parameter reg USE_PAL_PLL = 1'b1)
     input wire [15:0] cont4_trig
 
 );
+
+
+
+parameter USE_PAL_PLL = 1'b0;
+initial begin
+  $info("*** core_top ***");
+  $info("USE_PAL_PLL %d", USE_PAL_PLL);
+end
 
   // not using the IR port, so turn off both the LED, and
   // disable the receive circuit to save power
@@ -748,7 +755,13 @@ module core_top #(parameter reg USE_PAL_PLL = 1'b1)
   //     clk_ppu_21_47
   // );
 
-    synch_3 #(.WIDTH(1)) settings_s (external_reset, external_reset_s,clk_ppu_21_47);
+  //synch_3 #(.WIDTH(1)) settings_s (external_reset, external_reset_s,clk_ppu_21_47);
+
+  reg [1:0] ext_reset_r = 0;
+  always @(posedge clk_ppu_21_47) begin
+    ext_reset_r <= {ext_reset_r[0],external_reset};
+  end
+  assign external_reset_s = ext_reset_r[1];
 
   reg [1:0] prev_region = 0;
 

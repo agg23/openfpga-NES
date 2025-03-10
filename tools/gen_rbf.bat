@@ -1,4 +1,0 @@
-reverse_bits.exe nes_pocket_NTSC_SET1.rbf nes_pocket_NTSC_SET1.rev
-reverse_bits.exe nes_pocket_NTSC_SET2.rbf nes_pocket_NTSC_SET2.rev
-reverse_bits.exe nes_pocket_PAL_SET1.rbf nes_pocket_PAL_SET1.rev
-reverse_bits.exe nes_pocket_PAL_SET2.rbf nes_pocket_PAL_SET2.rev

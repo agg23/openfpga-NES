@@ -10,7 +10,7 @@
 # Project-Wide Assignments
 # ==============================================================================
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 18.1.1
-set_global_assignment -name LAST_QUARTUS_VERSION "18.1.0 Standard Edition"
+set_global_assignment -name LAST_QUARTUS_VERSION "21.1.0 Lite Edition"
 set_global_assignment -name TOP_LEVEL_ENTITY apf_top
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
@@ -22,14 +22,14 @@ set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 # ==============================================================================
 set_global_assignment -name OPTIMIZATION_MODE "HIGH PERFORMANCE EFFORT"
 set_global_assignment -name SAVE_DISK_SPACE OFF
-set_global_assignment -name SEED 1
+set_global_assignment -name SEED 2
 set_global_assignment -name SMART_RECOMPILE ON
 
 # ==============================================================================
 # Analysis & Synthesis Assignments
 # ==============================================================================
 set_global_assignment -name ADV_NETLIST_OPT_SYNTH_WYSIWYG_REMAP ON
-set_global_assignment -name MUX_RESTRUCTURE OFF
+set_global_assignment -name MUX_RESTRUCTURE ON
 set_global_assignment -name OPTIMIZATION_TECHNIQUE SPEED
 set_global_assignment -name PRE_MAPPING_RESYNTHESIS ON
 set_global_assignment -name SAFE_STATE_MACHINE ON
@@ -76,4 +76,13 @@ set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name ENABLE_SIGNALTAP OFF
 set_global_assignment -name ALLOW_SHIFT_REGISTER_MERGING_ACROSS_HIERARCHIES ALWAYS
 set_global_assignment -name IGNORE_PARTITIONS ON
+set_global_assignment -name REMOVE_REDUNDANT_LOGIC_CELLS ON
+set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC_FOR_AREA ON
+set_global_assignment -name ALLOW_ANY_ROM_SIZE_FOR_RECOGNITION ON
+set_global_assignment -name ALLOW_ANY_RAM_SIZE_FOR_RECOGNITION ON
+set_global_assignment -name ALLOW_ANY_SHIFT_REGISTER_SIZE_FOR_RECOGNITION ON
+set_parameter -name USE_MMAPPER_SET1 '0 -entity cart_top
+set_parameter -name USE_MMAPPER_SET2 '1 -entity cart_top
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+set_parameter -name USE_PAL_PLL '0 -entity core_top
+set_parameter -name USE_PAL_PLL '0 -entity nes_pll_01

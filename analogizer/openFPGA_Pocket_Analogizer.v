@@ -146,46 +146,26 @@ module openFPGA_Pocket_Analogizer #(parameter MASTER_CLK_FREQ=50_000_000, parame
 	//Configuration file dat
 	//reg [31:0] analogizer_bridge_rd_data;
 	reg  [31:0] analogizer_config = 0;
-	wire [31:0]   analogizer_config_s;
-	// reg [31:0] config_mem [16]; //configuration memory
-	
-	synch_3 #(.WIDTH(32)) analogizer_sync(analogizer_config, analogizer_config_s, i_clk);
+	wire [15:0]   analogizer_config_s;
+	wire [15:0] R6,G6,B6;
+	assign R6 = R[7:2];
+	assign G6 = G[7:2];
+	assign B6 = B[7:2];
 
-	//wire [31:0] memory_out;
-	//reg [3:0] word_cnt;
-	// handle memory mapped I/O from pocket
+	synch_3 #(.WIDTH(16)) analogizer_sync(analogizer_config[15:0], analogizer_config_s, i_clk);
+
 	always @(posedge clk_74a) begin
-		if(bridge_wr) begin
-			case(bridge_addr[31:24])
-			ADDRESS_ANALOGIZER_CONFIG: begin
-				if (bridge_addr[3:0] == 4'h0) begin
-					//word_cnt <= 4'h1;
-					analogizer_config <= bridge_endian_little ? bridge_wr_data  : {bridge_wr_data[7:0],bridge_wr_data[15:8],bridge_wr_data[23:16],bridge_wr_data[31:24]}; 
-				end
-				// else begin
-				// 	word_cnt <= word_cnt + 4'h1;
-				// 	config_mem[bridge_addr[3:0]] <= bridge_endian_little ? bridge_wr_data  : {bridge_wr_data[7:0],bridge_wr_data[15:8],bridge_wr_data[23:16],bridge_wr_data[31:24]}; 
-				// end
-			end
-			endcase
-		end
-		if(bridge_rd) begin
-			case(bridge_addr[31:24])
-			ADDRESS_ANALOGIZER_CONFIG: begin
-				if (bridge_addr[3:0] == 4'h0) analogizer_bridge_rd_data <= bridge_endian_little ?  analogizer_config_s : {analogizer_config_s[7:0],analogizer_config_s[15:8],analogizer_config_s[23:16],analogizer_config_s[31:24]}; //invert byte order to writeback to the Sav folders
-				//else analogizer_bridge_rd_data <= bridge_endian_little ? config_mem[bridge_addr[3:0]] : {memory_out[7:0],memory_out[15:8],memory_out[23:16],memory_out[31:24]};
-			end
-			endcase
+		if(bridge_wr && bridge_addr == {ADDRESS_ANALOGIZER_CONFIG,24'h0}) begin
+			analogizer_config <=  {bridge_wr_data[23:16],bridge_wr_data[31:24]};
 		end
 	end
-	//assign memory_out = config_mem[bridge_addr[3:0]];
 
   always @(posedge i_clk) begin
     snac_game_cont_type   <= analogizer_config_s[4:0];
     snac_cont_assignment  <= analogizer_config_s[9:6];
     analogizer_video_type <= analogizer_config_s[13:10];
-	 //analogizer_ena	  <= analogizer_config_s[5];	
-	 pocket_blank_screen   <= analogizer_config_s[14];
+	//analogizer_ena	  <= analogizer_config_s[5];	
+	pocket_blank_screen   <= analogizer_config_s[14];
     analogizer_osd_out2	  <= analogizer_config_s[15];
   end
 
@@ -257,8 +237,8 @@ assign analogizer_osd_out        = analogizer_osd_out2;
 	//Choose type of analog video type of signal
 	reg [5:0] Rout, Gout, Bout ;
 	reg HsyncOut, VsyncOut, BLANKnOut ;
-	wire [7:0] Yout, PrOut, PbOut ;
-	wire [7:0] R_Sd, G_Sd, B_Sd ;
+	wire [5:0] Yout, PrOut, PbOut ;
+	wire [5:0] R_Sd, G_Sd, B_Sd ;
 	wire Hsync_Sd, Vsync_Sd ;
 	wire Hblank_Sd, Vblank_Sd ;
 	wire BLANKn_SD = ~(Hblank_Sd || Vblank_Sd) ;
@@ -266,33 +246,33 @@ assign analogizer_osd_out        = analogizer_osd_out2;
 	always @(*) begin
 		case(analogizer_video_type)
 			4'h0: begin //RGBS
-				Rout = R[7:2]&{6{BLANKn}};
-				Gout = G[7:2]&{6{BLANKn}};
-				Bout = B[7:2]&{6{BLANKn}};
+				Rout = R6&{6{BLANKn}};
+				Gout = G6&{6{BLANKn}};
+				Bout = B6&{6{BLANKn}};
 				HsyncOut = Csync;
 				VsyncOut = 1'b1;
 				BLANKnOut = BLANKn;
 			end
 			4'h3, 4'h4: begin// Y/C Modes works for Analogizer R1, R2 Adapters
-				Rout = yc_o[23:18];
-				Gout = yc_o[15:10];
-				Bout = yc_o[7:2];
+				Rout = yc_o[11:6]; //6bpp
+				Gout = yc_o[5:0];  //6bpp
+				Bout = 6'h0;
 				HsyncOut = yc_cs;
 				VsyncOut = 1'b1;
 				BLANKnOut = 1'b1;
 			end
 			4'h1: begin //RGsB
-				Rout = R[7:2]&{6{BLANKn}};
-				Gout = G[7:2]&{6{BLANKn}};
-				Bout = B[7:2]&{6{BLANKn}};
+				Rout = R6&{6{BLANKn}};
+				Gout = G6&{6{BLANKn}};
+				Bout = B6&{6{BLANKn}};
 				HsyncOut = 1'b1;
 				VsyncOut = Csync; //to DAC SYNC pin, SWITCH SOG ON
 				BLANKnOut = BLANKn;
 			end
 			4'h2: begin //YPbPr
-				Rout = PrOut[7:2];
-				Gout = Yout[7:2];
-				Bout = PbOut[7:2];
+				Rout = PrOut;
+				Gout = Yout;
+				Bout = PbOut;
 				HsyncOut = 1'b1;
 				VsyncOut = YPbPr_sync; //to DAC SYNC pin, SWITCH SOG ON
 				BLANKnOut = 1'b1; //ADV7123 needs this
@@ -333,13 +313,13 @@ assign analogizer_osd_out        = analogizer_osd_out2;
 		.ypbpr_en(1'b1),
 		.csync(Csync),
 		.de(BLANKn),
-		.din({R&{8{BLANKn}},G&{8{BLANKn}},B&{8{BLANKn}}}), //NES specific override, because not zero color data while blanking period.
-		.dout({PrOut,Yout,PbOut}),
+		.din({R6&{6{BLANKn}},G6&{6{BLANKn}},B6&{6{BLANKn}}}), //NES specific override, because not zero color data while blanking period. 18 bits
+		.dout({PrOut,Yout,PbOut}), //18 bit
 		.csync_o(YPbPr_sync),
 		.de_o(YPbPr_blank)
 	);
 
-	wire [23:0] yc_o ;
+	wire [17:0] yc_o ;
 	//wire yc_hs, yc_vs, 
 	wire yc_cs ;
 	yc_out yc_out
@@ -350,8 +330,8 @@ assign analogizer_osd_out        = analogizer_osd_out2;
 		.hsync(Hsync),
 		.vsync(Vsync),
 		.csync(Csync),
-    	.din({R&{8{BLANKn}},G&{8{BLANKn}},B&{8{BLANKn}}}),
-		.dout(yc_o),
+    	.din({R6&{6{BLANKn}},G6&{6{BLANKn}},B6&{6{BLANKn}}}), //18 bits
+		.dout(yc_o), //12 bits
 		.hsync_o(),
 		.vsync_o(),
 		.csync_o(yc_cs)

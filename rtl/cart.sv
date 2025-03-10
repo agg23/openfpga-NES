@@ -18,10 +18,7 @@
 //
 //SET2 mapper codes:5,69,24,26,85,210,19,20,31,69
 module cart_top
-#(
-    parameter reg USE_MMAPPER_SET1 = 1'b0, //all mappers except audio mappers
-    parameter reg USE_MMAPPER_SET2 = 1'b1  //all audio mappers
-) (
+(
 	input             clk,
 	input             ce,             // M2
 	input             cpu_ce,         // CPU Phi1 clock (several mappers use m2 inverted)
@@ -81,6 +78,16 @@ module cart_top
 	input  [7:0]  Savestate_MAPRAMWriteData,
 	output [7:0]  Savestate_MAPRAMReadData
 );
+
+parameter USE_MMAPPER_SET1 = 1'b0;
+parameter USE_MMAPPER_SET2 = 1'b1;  //all audio mappers
+initial begin
+	$info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+	$info("cart.sv: Selected System PLL");
+	$info("USE_MMAPPER_SET1 %d", USE_MMAPPER_SET1);
+	$info("USE_MMAPPER_SET2 %d", USE_MMAPPER_SET2);
+	$info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+end
 
 tri0 prg_allow_b, vram_a10_b, vram_ce_b, chr_allow_b, irq_b;
 tri0 [21:0] prg_addr_b, chr_addr_b;

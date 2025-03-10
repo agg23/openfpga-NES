@@ -35,17 +35,17 @@ module yc_out
 	input	vsync,
 	input	csync,
 
-	input	[23:0] din,
-	output	[23:0] dout,
+	input	[17:0] din,
+	output	[11:0] dout,
 
 	output reg	hsync_o,
 	output reg	vsync_o,
 	output reg	csync_o
 );
 
-wire [7:0] red = din[23:16];
-wire [7:0] green = din[15:8];
-wire [7:0] blue = din[7:0];
+wire [7:0] red   = {din[17:12],2'b00};
+wire [7:0] green = {din[11:6],2'b00};
+wire [7:0] blue  = {din[5:0],2'b00};
 
 logic [9:0] red_1, blue_1, green_1, red_2, blue_2, green_2;
 
@@ -64,8 +64,8 @@ typedef struct {
 localparam MAX_PHASES = 7'd8;
 
 phase_t phase[MAX_PHASES];
-reg unsigned [7:0] Y, C, c, U, V;
-
+reg unsigned [7:0] c, U, V;
+reg unsigned [5:0] Y, C;
 
 reg [10:0]  cburst_phase, cburst_length, cburst_start;     // colorburst counter 
 reg unsigned [7:0] vref = 'd128; // Voltage reference point (Used for Chroma)
@@ -265,10 +265,11 @@ always_ff @(posedge clk) begin
 	phase[1].y <= phase[0].y; phase[2].y <= phase[1].y; phase[3].y <= phase[2].y; phase[4].y <= phase[3].y; phase[5].y <= phase[4].y;
 
 	// Set Chroma / Luma output
-	C <= phase[4].c[7:0];
-	Y <= phase[5].y[17:10];
+	//reduce to 6 bits
+	C <= phase[4].c[7:2];
+	Y <= phase[5].y[17:12];
 end
 
-assign dout = {C, Y, 8'd0};
+assign dout = {C, Y};
 
 endmodule

@@ -1,4 +1,4 @@
-set_global_assignment -name VERILOG_FILE          [file join $::quartus(qip_path) "core_top.v"]
+set_global_assignment -name SYSTEMVERILOG_FILE    [file join $::quartus(qip_path) "core_top.sv"]
 set_global_assignment -name VERILOG_FILE          [file join $::quartus(qip_path) "core_bridge_cmd.v"]
 set_global_assignment -name SDC_FILE              [file join $::quartus(qip_path) "core_constraints.sdc"]
 set_global_assignment -name SYSTEMVERILOG_FILE    [file join $::quartus(qip_path) "data_loader.sv"]
