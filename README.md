@@ -69,6 +69,10 @@ You can load external palettes as well. This palette is stored at `Assets/nes/ag
 
 For testing, or to temporarily load a new palette, you can choose the `Load Custom Palette` option (make sure to choose `Core Settings/Palette/Custom`). This palette selection is temporary, and will be reset when quitting and reopening the core.
 
+### Analogizer Options
+
+* `Enable Analogizer`- Enables/Disables the Analogizer adapter globall. When it is disabled, bypass the specific settings for Analogizer, this settings makes the SNAC adapter settings be ignored, using Pocket's default inputs, also forces the video output to be forwarded towards Pocket screen.
+* 
 ### Video Options
 
 There are several options provided for tweaking the displayed video:
