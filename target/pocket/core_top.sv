@@ -341,8 +341,8 @@ end
         end
         12'h31C: begin
           //reset the core if Analogizer was enabled, this resets also Analogizer and ensures proper initialization
-          if (!analogizer_ena && bridge_wr_data[0]) reset_delay <= 32'h100000; 
-          analogizer_ena <= bridge_wr_data[0];
+          // if (!analogizer_ena && bridge_wr_data[0]) reset_delay <= 32'h100000; 
+         analogizer_ena <= bridge_wr_data[0]; //Global switch for Analogizer enable/disable
        end
        12'h330: begin
          region <= bridge_wr_data[1:0]; //When Chip32 loader writes the region to the Core
@@ -764,6 +764,8 @@ end
 
   //synch_3 #(.WIDTH(1)) settings_s (external_reset, external_reset_s,clk_ppu_21_47);
 
+
+  //synchronize signals with clk_ppu_21_47 clock
   reg [1:0] ext_reset_r = 0;
   reg [1:0] analogizer_ena_r = 0;
   always @(posedge clk_ppu_21_47) begin
@@ -792,7 +794,8 @@ wire       pocket_blank_screen;
 
   //create aditional switch to blank Pocket screen.
   wire [23:0] video_rgb_pocket;
-  assign video_rgb_pocket = (pocket_blank_screen) ? 24'h000000: video_rgb_nes;
+  //If Analogizer is disabled globally then show the video output on the Pocket screen
+  assign video_rgb_pocket = (pocket_blank_screen && !analogizer_ena_s) ? 24'h000000: video_rgb_nes;
 
 //switch between Analogizer SNAC and Pocket Controls for P1-P4 (P3,P4 when uses PCEngine Multitap)
   wire [15:0] p1_btn, p2_btn, p3_btn, p4_btn;
@@ -809,7 +812,8 @@ always @(posedge clk_ppu_21_47) begin
   reg [31:0] p3_pocket_btn;
   reg [31:0] p4_pocket_btn;
 
-    if(snac_game_cont_type == 5'h0) begin //SNAC is disabled
+    //If Analogizer is disabled globally then use Pocket default controllers
+    if((snac_game_cont_type == 5'h0) || !analogizer_ena_s) begin //SNAC is disabled
           p1_controls <= cont1_key_s;
 				  p1_joystick <= cont1_joy_s;
           p2_controls <= cont2_key_s;
