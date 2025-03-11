@@ -339,6 +339,9 @@ end
         12'h050: begin
           reset_delay <= 32'h100000;
         end
+        12'h330: begin
+         analogizer_ena <= bridge_wr_data[0]; //When Chip32 loader writes the region to the Core
+       end
        12'h330: begin
          region <= bridge_wr_data[1:0]; //When Chip32 loader writes the region to the Core
        end
@@ -685,6 +688,7 @@ end
 
   // Settings
   //reg [2:0] system_type = 0;
+  reg analogizer_ena = 0;
   reg [1:0] region = 0;
   reg video_dejitter = 0;
 
@@ -711,6 +715,7 @@ end
   // wire allow_extra_sprites_s;
   // wire [2:0] selected_palette_s;
   wire external_reset_s;
+  wire analogizer_ena_s;
 
   // wire multitap_enabled_s;
   // wire [1:0] lightgun_enabled_s;
@@ -758,10 +763,13 @@ end
   //synch_3 #(.WIDTH(1)) settings_s (external_reset, external_reset_s,clk_ppu_21_47);
 
   reg [1:0] ext_reset_r = 0;
+  reg [1:0] analogizer_ena_r = 0;
   always @(posedge clk_ppu_21_47) begin
-    ext_reset_r <= {ext_reset_r[0],external_reset};
+    ext_reset_r      <= {ext_reset_r[0],external_reset};
+    analogizer_ena_r <= {analogizer_ena_r[0],analogizer_ena};
   end
   assign external_reset_s = ext_reset_r[1];
+  assign analogizer_ena_s = analogizer_ena_r[1];
 
   reg [1:0] prev_region = 0;
 
@@ -910,7 +918,8 @@ generate
         .clk_74a(clk_74a),
         .i_clk(clk_analogizer),
         .i_rst(external_reset_s), //i_rst is active high
-        .i_ena(1'b1),
+                //Enable Analogizer (global setting)
+        .i_ena(analogizer_ena_s),
 
         //Video interface
         .video_clk(clk_analogizer),
@@ -979,7 +988,9 @@ generate
         .clk_74a(clk_74a),
         .i_clk(clk_analogizer),
         .i_rst(external_reset_s), //i_rst is active high
-        .i_ena(1'b1),
+
+        //Enable Analogizer (global setting)
+        .i_ena(analogizer_ena_s),
 
         //Video interface
         .video_clk(clk_analogizer),
