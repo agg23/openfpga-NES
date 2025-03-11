@@ -339,8 +339,10 @@ end
         12'h050: begin
           reset_delay <= 32'h100000;
         end
-        12'h330: begin
-         analogizer_ena <= bridge_wr_data[0]; //When Chip32 loader writes the region to the Core
+        12'h31C: begin
+          //reset the core if Analogizer was enabled, this resets also Analogizer and ensures proper initialization
+          if (!analogizer_ena && bridge_wr_data[0]) reset_delay <= 32'h100000; 
+          analogizer_ena <= bridge_wr_data[0];
        end
        12'h330: begin
          region <= bridge_wr_data[1:0]; //When Chip32 loader writes the region to the Core
