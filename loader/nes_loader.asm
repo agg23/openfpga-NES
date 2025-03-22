@@ -72,6 +72,7 @@ ld r1,#rom_dataslot //populate data slot
 open r1,r2
 
 //Load header values into memory
+ld r1,#0
 seek()
 ld r1,#0x10 // Load 0x10 bytes, the NES/NES2 header size
 ld r2,#load_header_area // Read into read_space memory
@@ -79,19 +80,6 @@ read()
 close
 log_string("Loaded header data")
 ld.l r3,(load_header_area)
-
-//*** Analogizer configuration code ***
-//ld r1,#analogizer_dataslot //populate data slot
-//open r1,r2
-
-//Load analogizer configuration into memory
-//seek2()
-//ld r1,#0x4 // Load 0x4 bytes
-//ld r2,#load_analogizer_cfg_area // Read into read_space memory
-//read2()
-//close
-//log_string("Loaded Analogizer configuration data")
-
 
 //Check that is a valid NES header
 cmp r3,#0x1A53454E // Compare against 0xFFFF
@@ -229,7 +217,7 @@ check_mmapper_code:
 
 check_mapper_code_loop:
 	cmp r4,r3 //check if all cores were already checked
-	jp z, check_system
+	jp z, analogizer_conf_file_chk
 
 	ld.w r7,(r6) //load the current code to check
 	cmp r7,r9 //if are equal assign set2 mapper and exit loop
@@ -243,23 +231,119 @@ block_set2:
 	log_string("Mapper is set Block2 (audio mapper)...")
 	ld r12,#1 //mapper set block2 (audio mappers)
 
+//*** Analogizer configuration code ***
+analogizer_conf_file_chk:
+	ld r1,#analogizer_dataslot //populate data slot
+	
+	//check if exist
+	queryslot r1
+	jp nz,check_system
+	//the file exist, then proceed to load the configuration data
+	open r1,r2
+	
+	//Load analogizer configuration into memory
+	ld r1,#0
+	seek2()
+	ld r1,#0x4 // Load 0x4 bytes
+	ld r2,#load_analogizer_cfg_area // Read into read_space memory
+	read2()
+	close
+    
+	log_string("Loaded Analogizer configuration data")
+    
+	//for simulator testing only, disable on real system
+	//ld r3,#0x000588A2
+	//ld.l (load_analogizer_cfg_area),r3 // bits[19:16]: 0 Auto>NTSC, 1 Auto>PAL, 2 Auto>Dendy, 3 Force NTSC, 4 Force PAL, 5 Force Dendy
+    
+	//regional settigs bit[19:16] from Analogizer Config (AC) are stored into r4
+	ld.l r4,(load_analogizer_cfg_area)
+	ld r3,#16 //number of positions to shift
+	lsr r4,r3  //right shift
+	and r4,#0xF //mask the lower 4 bits
+
 check_system:
+	//AC       -> r4
+	//ROM_TYPE -> r6
+	//SYS_TYPE -> r5
     log_string("*** Checking system ***")
-	ld r8,#0 //by default use NTSC system
-	ld r4,#0 //default region is NTSC
+
+	//store SYS_TYPE into r5
+	ld r5,#0 //default SYS_TYPE is NTSC
+
 	//check is ines2.0
-	bit r10,#1
-	jp z, load_core
-	ld.b r8,(load_header_area + 0xC) //System for iNES2.0
-	and r8,#3 //use two lower bits	
-	ld r4,r8 //copy region value to r4
-	and r8,#1 //take one bit 0 on r8   00 NTSC 01 PAL 10 Multi-System 11 Dendy(PAL)
+	cmp r10,#1
+	jp nz, load_core //core #0 or #1 based on mapper value
+
+	//load ROM_TYPE into r6
+	ld.b r6,(load_header_area + 0xC) //System for iNES2.0
+	and r6,#3 //use two lower bits
+
+	//*** Start the configuration of SYS_TYPE ***
+	log_string("*** Start the configuration of SYS_TYPE ***")
+
+	//If AC is "Force NTSC"
+	cmp r4,#3
+	jp z, set_AC_to_NTSC
+
+	//If AC is "Force PAL"
+	cmp r4,#4
+	jp z, set_AC_to_PAL
+
+	//If AC is "Force Dendy"
+	cmp r4,#5
+	jp z, set_AC_to_Dendy
+
+	//now starts the auto detect behaviour
+	//If ROM_TYPE is NTSC
+    cmp r6,#0
+	jp z, set_AC_to_NTSC
+
+	//If ROM_TYPE is PAL
+	cmp r6,#1
+	jp z, set_AC_to_PAL
+
+	//If ROM_TYPE is Dendy
+	cmp r6,#3
+	jp z, set_AC_to_Dendy
+
+	//If ROM_TYPE is Multi-Region, then needs to dissambiguate
+	cmp r6,#2
+	jp nz, AC_already_set
+
+	//If AC is "Auto>NTSC" (is the default value and SYS_TYPE don't need to change)
+	cmp r4,#0
+	jp z, set_AC_to_NTSC
+
+	//If AC is "Auto>PAL"
+	cmp r4,#1
+	jp z, set_AC_to_PAL
+
+	//If AC is "Auto>Dendy"
+	cmp r4,#2
+	jp z, set_AC_to_Dendy
+	jp AC_already_set
+
+set_AC_to_NTSC:
+	ld r5,#0
+	jp AC_already_set
+
+set_AC_to_PAL:
+	ld r5,#1
+	jp AC_already_set
+
+set_AC_to_Dendy:
+	ld r5,#2
+	jp AC_already_set
+
+AC_already_set:
+	ld r8,r5 //copy SYS_TYPE to to r8
+	and r8,#1 //take bit 0 on r8: 0 NTSC/Dendy, 1 PAL
     asl r8,#1 //multiply by 2
-    or r12,r8 //add r3 to r12 now the bitstream to load is encoded into r12
+    or r12,r8 //add r8 to r12 now the bitstream to load is encoded into r12
 
 load_core:
 	//load the core based on mapper code selection and region setting
-	core r12 //core #0 NTSC Block 1, core #1 NTSC Block 2 (audio mappers), core #2 PAL/Dendy Block 1, no PAL game has audio mappers support
+	core r12 //core #0 NTSC Block 1, core #1 NTSC Block 2 (audio mappers), core #2 PAL/Dendy Block 1, core #3 PAL/Dendy Block 2
 	
 load_settings:
 	//load assets files
@@ -275,9 +359,21 @@ load_settings:
 	ld r1,#analogizer_dataslot
 	loadf r1 // Load Analogizer settings
 
-	//Send region to the CORE at address 0x330
+	//Send SYS_TYPE to the CORE at address 0x330
 	ld r8,#0x330
-	pmpw r8,r4
+	pmpw r8,r5 
+
+	//send ROM_TYPE
+	//ld r8,#0x334
+	//pmpw r8,r6 
+
+	//send AC
+	//ld r8,#0x338
+	//pmpw r8,r4 
+
+	//send iNES2.0
+	//ld r8,#0x33C
+	//pmpw r8,r10 
 	
 	// Start core
 	ld r0,#host_init

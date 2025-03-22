@@ -92,11 +92,16 @@ Core supports virtual lightguns by enabling the `Use Zapper > Emulated Zapper (S
 
 This Analogizer core use a configuration file to select Analogizer adapter options, not based on the Pocket's menu system. It is necessary to use [Pupdate](https://github.com/mattpannella/pupdate) release >= 4.3.1 or run an external [utility](https://github.com/RndMnkIII/AnalogizerConfigurator) to generate such a file. Once generated, you must copy the `analogizer.bin` file to the `/Assets/analogizer/common` folder on the Pocket SD card. If this folder does not exist, you must create it or if you have already extracted the Amiga core distribution file it will be created. Pupdate does all actions automatically after running this tool. Inside Pupdate navigate to: `Pocket Setup>Analogizer Config>Standard Analogizer Config`, choose Analogizer settings and exit to save to file.
 
-For the PAL/NTSC/Dendy ROM detection the Chip32 loader reads the NES game ROM header previously to load the core to decode the system type, this needs a iNES2.0 ROM header. If the ROM that are you using is of an older header type or a MultiSystem ROM is detected the core will boot into NTSC mode. 
+For the PAL/NTSC/Dendy ROM detection the Chip32 loader reads the NES game ROM header previously to load the core to decode the system type, this needs a iNES2.0 ROM header. If the ROM that are you using is of an older header type or not `analogizer.bin` file is detected the core will boot into NTSC mode. 
 
-At the moment I cannot add an option to the core menu to force a ROM to load using a system type (NTSC, PAL or Dendy) due to the way the core loader works. I hope to provide a solution to this later.
-
-
+The Loader uses the regional settings from `analogizer.bin`file to determine the mode the ROM is loaded/NES hardware runs. 
+The settings are:
+ 1) Auto>NTSC:     Try to autodetect the regional setting from the ROM header. If the ROM is `Multi-System` uses the NTSC mode.
+ 2) Auto>PAL:      Try to autodetect the regional setting from the ROM header. If the ROM is `Multi-System` uses the PAL mode.
+ 3) Auto>Another:  Try to autodetect the regional setting from the ROM header. If the ROM is `Multi-System` uses the Dendy mode.
+ 4) Force NTSC:    The ROM uses the NTSC mode. 
+ 5) Force PAL:     The ROM uses the PAL mode. 
+ 6) Force Another: The ROM uses the Dendy mode. 
 
 Tested NES SNAC adapters working with the Zapper lightgun:
 * https://ultimatemister.com/product/ultimate-snac-mini-hdmi/
