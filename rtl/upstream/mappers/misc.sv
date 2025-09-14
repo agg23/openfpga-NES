@@ -1005,6 +1005,131 @@ assign vram_a10 = mirroring ? chr_ain[10] : chr_ain[11];
 
 endmodule
 
+// Kaiser KS202 (142)
+module KS202(
+	input        clk,         // System clock
+	input        ce,          // M2 ~cpu_clk
+	input        enable,      // Mapper enabled
+	input [31:0] flags,       // Cart flags
+	input [15:0] prg_ain,     // prg address
+	inout [21:0] prg_aout_b,  // prg address out
+	input        prg_read,    // prg read
+	input        prg_write,   // prg write
+	input  [7:0] prg_din,     // prg data in
+	inout  [7:0] prg_dout_b,  // prg data out
+	inout        prg_allow_b, // Enable access to memory for the specified operation.
+	input [13:0] chr_ain,     // chr address in
+	inout [21:0] chr_aout_b,  // chr address out
+	input        chr_read,    // chr ram read
+	inout        chr_allow_b, // chr allow write
+	inout        vram_a10_b,  // Value for A10 address line
+	inout        vram_ce_b,   // True if the address should be routed to the internal 2kB VRAM.
+	inout        irq_b,       // IRQ
+	input [15:0] audio_in,    // Inverted audio from APU
+	inout [15:0] audio_b,     // Mixed audio output
+	inout [15:0] flags_out_b // flags {0, 0, 0, 0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout}
+);
+
+assign prg_aout_b   = enable ? prg_aout : 22'hZ;
+assign prg_dout_b   = enable ? 8'hFF : 8'hZ;
+assign prg_allow_b  = enable ? prg_allow : 1'hZ;
+assign chr_aout_b   = enable ? chr_aout : 22'hZ;
+assign chr_allow_b  = enable ? chr_allow : 1'hZ;
+assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
+assign vram_ce_b    = enable ? vram_ce : 1'hZ;
+assign irq_b        = enable ? irq : 1'hZ;
+assign flags_out_b  = enable ? flags_out : 16'hZ;
+assign audio_b      = enable ? {1'b0, audio_in[15:1]} : 16'hZ;
+
+wire [21:0] prg_aout, chr_aout;
+wire prg_allow;
+wire chr_allow;
+wire vram_a10;
+wire vram_ce;
+reg irq;
+reg [15:0] flags_out = 0;
+
+
+reg [3:0] prg_bank[3:0];
+reg [2:0] bank_select;
+reg [4:0] irq_enable;
+reg [15:0] irq_latch;
+reg [15:0] irq_counter;
+
+always @(posedge clk)
+if (~enable) begin
+	// Set value for mirroring
+	irq <= 0;
+	irq_enable <= 0;
+	irq_latch <= 0;
+	bank_select <= 0;
+	prg_bank[0] <= 0;
+	prg_bank[1] <= 1;
+	prg_bank[2] <= 2;
+	prg_bank[3] <= 3;	
+end else if (ce) begin
+	irq_enable[3] <= 1'b0;
+	if (prg_ain[15] & prg_write) begin
+		case (prg_ain[14:12])
+			3'b000:  irq_latch[3:0]   <= prg_din[3:0];
+			3'b001:  irq_latch[7:4]   <= prg_din[3:0];
+			3'b010:  irq_latch[11:8]  <= prg_din[3:0];
+			3'b011:  irq_latch[15:12] <= prg_din[3:0];
+			3'b100:  irq_enable[4:0]  <= {2'b11, prg_din[2:0]};
+			3'b101:  irq_enable[4:3]  <= 2'b01;
+			3'b110:  bank_select      <= prg_din[2:0];
+			3'b111:  
+				case (bank_select)
+					1: prg_bank[0] <= prg_din[3:0];
+					2: prg_bank[1] <= prg_din[3:0];
+					3: prg_bank[2] <= prg_din[3:0];
+					4: prg_bank[3] <= prg_din[3:0];	
+				endcase
+		endcase
+	end
+
+	if (irq_enable[1]) begin
+		irq_counter[7:0] <= irq_counter[7:0] + 8'd1;
+		if (irq_counter[7:0] == 8'hFF) begin
+			if (irq_enable[2]) begin
+				irq <= 1'b1;	// IRQ
+			end else begin
+				irq_counter[15:8] <= irq_counter[15:8] + 8'd1;
+				if (irq_counter[15:8] == 8'hFF) begin
+					irq <= 1'b1;	// IRQ
+				end
+			end
+		end
+	end
+
+	if (irq_enable[3]) begin
+		irq <= 1'b0;	// IRQ ACK
+		if (irq_enable[4])
+			irq_counter <= irq_latch;
+	end
+end
+
+reg [3:0] prgout;
+
+always @* begin
+	casez({prg_ain[15:13]})
+		3'b011: prgout = prg_bank[3];
+		3'b100: prgout = prg_bank[0];
+		3'b101: prgout = prg_bank[1];
+		3'b110: prgout = prg_bank[2];
+		3'b111: prgout = 4'b1111;
+		default: prgout = 4'bxxxx;
+	endcase
+end
+
+assign vram_ce = chr_ain[13];
+assign vram_a10 = flags[14] ? chr_ain[10] : chr_ain[11];
+assign prg_aout = {2'b00, prgout[3:0], prg_ain[12:0]};       // 8kB banks
+assign prg_allow = (prg_ain >= 16'h6000) && !prg_write;
+assign chr_allow = flags[15];
+assign chr_aout = {8'b10_0000_00, chr_ain[13:0]};
+
+endmodule
 
 // Mapper 65, IREM H3001
 module Mapper65(

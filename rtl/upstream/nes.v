@@ -601,7 +601,7 @@ PPU ppu(
 /**********************************************************/
 
 wire [15:0] prg_addr = addr;
-wire [7:0] prg_din = dbus & (prg_conflict ? cpumem_din : 8'hFF);
+wire [7:0] prg_din = (dbus & (prg_conflict ? cpumem_din : 8'hFF)) | (prg_conflict_d0 ? cpumem_din & 8'h01 : 8'h00);
 
 wire prg_read  = mr_int && cart_pre && !apu_cs && !ppu_cs;
 wire prg_write = mw_int && cart_pre;
@@ -661,6 +661,7 @@ cart_top multi_mapper (
 	.prg_bus_write     (prg_bus_write),           // PRG data driven to bus
 	.prg_conflict      (prg_conflict),            // Simulate bus conflicts
 	.has_savestate     (mapper_has_savestate),    // Mapper supports savestates
+	.prg_conflict_d0  (prg_conflict_d0),        // Simulate bus conflicts for Mapper 144
 	// User input/FDS controls
 	.fds_eject         (fds_eject),               // Used to trigger FDS disk changes
 	.fds_busy          (fds_busy),                // Used to trigger FDS disk changes
