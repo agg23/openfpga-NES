@@ -30,18 +30,18 @@ module MMC5(
 	input        chr_write,   // CHR Write
 	inout  [7:0] chr_dout_b,  // chr data (non standard)
 	input        paused,
-	// savestates              
+	// savestates
 	input       [63:0]  SaveStateBus_Din,
 	input       [ 9:0]  SaveStateBus_Adr,
 	input               SaveStateBus_wren,
 	input               SaveStateBus_rst,
 	input               SaveStateBus_load,
 	output      [63:0]  SaveStateBus_Dout,
-	
-	input         Savestate_MAPRAMactive, 
-	input  [9:0]  Savestate_MAPRAMAddr,     
-	input         Savestate_MAPRAMRdEn,    
-	input         Savestate_MAPRAMWrEn,    
+
+	input         Savestate_MAPRAMactive,
+	input  [9:0]  Savestate_MAPRAMAddr,
+	input         Savestate_MAPRAMRdEn,
+	input         Savestate_MAPRAMWrEn,
 	input  [7:0]  Savestate_MAPRAMWriteData,
 	output [7:0]  Savestate_MAPRAMReadData
 );
@@ -234,7 +234,7 @@ always @(posedge clk) begin
 		prg_bank_3 <= 7'h7F;
 		prg_mode <= 3;
 	end
-	
+
 	if (SaveStateBus_load) begin
 		prg_mode            <= SS_MAP1[ 1: 0];
 		chr_mode            <= SS_MAP1[ 3: 2];
@@ -298,7 +298,7 @@ assign SS_MAP2_BACK[39:30] = chr_bank_3;
 assign SS_MAP2_BACK[49:40] = chr_bank_4;
 assign SS_MAP2_BACK[59:50] = chr_bank_5;
 assign SS_MAP2_BACK[63:60] = 4'b0; // free to be used
-				  
+
 assign SS_MAP3_BACK[ 9: 0] = chr_bank_6;
 assign SS_MAP3_BACK[19:10] = chr_bank_7;
 assign SS_MAP3_BACK[29:20] = chr_bank_8;
@@ -306,7 +306,7 @@ assign SS_MAP3_BACK[39:30] = chr_bank_9;
 assign SS_MAP3_BACK[49:40] = chr_bank_a;
 assign SS_MAP3_BACK[59:50] = chr_bank_b;
 assign SS_MAP3_BACK[63:60] = 4'b0; // free to be used
-				  
+
 assign SS_MAP4_BACK[ 1: 0] = upper_chr_bank_bits;
 assign SS_MAP4_BACK[    2] = vsplit_enable;
 assign SS_MAP4_BACK[    3] = vsplit_side;
@@ -679,14 +679,14 @@ end
 localparam SAVESTATE_MODULES    = 5;
 wire [63:0] SaveStateBus_wired_or[0:SAVESTATE_MODULES-1];
 wire [63:0] SS_MAP1, SS_MAP2, SS_MAP3, SS_MAP4, SS_MAP5;
-wire [63:0] SS_MAP1_BACK, SS_MAP2_BACK, SS_MAP3_BACK, SS_MAP4_BACK, SS_MAP5_BACK;	
+wire [63:0] SS_MAP1_BACK, SS_MAP2_BACK, SS_MAP3_BACK, SS_MAP4_BACK, SS_MAP5_BACK;
 wire [63:0] SaveStateBus_Dout_active = SaveStateBus_wired_or[0] | SaveStateBus_wired_or[1] | SaveStateBus_wired_or[2] | SaveStateBus_wired_or[3] | SaveStateBus_wired_or[4];
-	
-eReg_SavestateV #(SSREG_INDEX_MAP1, 64'h0000000000000000) iREG_SAVESTATE_MAP1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_MAP1_BACK, SS_MAP1);  
-eReg_SavestateV #(SSREG_INDEX_MAP2, 64'h0000000000000000) iREG_SAVESTATE_MAP2 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[1], SS_MAP2_BACK, SS_MAP2);  
-eReg_SavestateV #(SSREG_INDEX_MAP3, 64'h0000000000000000) iREG_SAVESTATE_MAP3 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[2], SS_MAP3_BACK, SS_MAP3);  
-eReg_SavestateV #(SSREG_INDEX_MAP4, 64'h0000000000000000) iREG_SAVESTATE_MAP4 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[3], SS_MAP4_BACK, SS_MAP4);  
-eReg_SavestateV #(SSREG_INDEX_MAP5, 64'h0000000000000000) iREG_SAVESTATE_MAP5 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[4], SS_MAP5_BACK, SS_MAP5);  
+
+eReg_SavestateV #(SSREG_INDEX_MAP1, 64'h0000000000000000) iREG_SAVESTATE_MAP1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_MAP1_BACK, SS_MAP1);
+eReg_SavestateV #(SSREG_INDEX_MAP2, 64'h0000000000000000) iREG_SAVESTATE_MAP2 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[1], SS_MAP2_BACK, SS_MAP2);
+eReg_SavestateV #(SSREG_INDEX_MAP3, 64'h0000000000000000) iREG_SAVESTATE_MAP3 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[2], SS_MAP3_BACK, SS_MAP3);
+eReg_SavestateV #(SSREG_INDEX_MAP4, 64'h0000000000000000) iREG_SAVESTATE_MAP4 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[3], SS_MAP4_BACK, SS_MAP4);
+eReg_SavestateV #(SSREG_INDEX_MAP5, 64'h0000000000000000) iREG_SAVESTATE_MAP5 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[4], SS_MAP5_BACK, SS_MAP5);
 
 assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000000;
 
@@ -703,7 +703,7 @@ module mmc5_mixed (
 	output  [7:0] data_out,
 	input  [15:0] audio_in,    // Inverted audio from APU
 	output [15:0] audio_out,
-	// savestates              
+	// savestates
 	input       [63:0]  SaveStateBus_Din,
 	input       [ 9:0]  SaveStateBus_Adr,
 	input               SaveStateBus_wren,
@@ -730,7 +730,7 @@ always @(posedge clk) begin
 		odd_or_even <= 0;
 	else if (ce)
 		odd_or_even <= ~odd_or_even;
-		
+
 	if (SaveStateBus_load) begin
 		odd_or_even <= SS_MAP1[0];
 	end
@@ -756,10 +756,10 @@ APU mmc5apu(
 	.DmaAck         (1),
 	.DmaAddr        (DmaAddr),
 	.DmaData        (0),
-	.odd_or_even    (odd_or_even),
+	.get_or_put     (odd_or_even),
 	.IRQ            (apu_irq),
 	// savestates
-	.SaveStateBus_Din  (SaveStateBus_Din ), 
+	.SaveStateBus_Din  (SaveStateBus_Din ),
 	.SaveStateBus_Adr  (SaveStateBus_Adr ),
 	.SaveStateBus_wren (SaveStateBus_wren),
 	.SaveStateBus_rst  (SaveStateBus_rst ),
@@ -775,10 +775,10 @@ defparam mmc5apu.SSREG_INDEX_FCT  = SSREG_INDEX_SNDMAP4;
 localparam SAVESTATE_MODULES    = 2;
 wire [63:0] SaveStateBus_wired_or[0:SAVESTATE_MODULES-1];
 wire [63:0] SS_MAP1;
-wire [63:0] SS_MAP1_BACK;	
+wire [63:0] SS_MAP1_BACK;
 wire [63:0] SaveStateBus_Dout_active = SaveStateBus_wired_or[0] | SaveStateBus_wired_or[1];
-	
-eReg_SavestateV #(SSREG_INDEX_SNDMAP5, 64'h0000000000000000) iREG_SAVESTATE_MAP1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_MAP1_BACK, SS_MAP1);  
+
+eReg_SavestateV #(SSREG_INDEX_SNDMAP5, 64'h0000000000000000) iREG_SAVESTATE_MAP1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_MAP1_BACK, SS_MAP1);
 
 assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000000;
 
