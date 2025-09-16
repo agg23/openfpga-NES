@@ -664,6 +664,7 @@ assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000
 
 endmodule
 
+// #81 NTDEC N715021
 // #78-IREM-HOLYDIVER/JALECO-JF-16
 // #70,#152-Bandai
 module Mapper78(
@@ -720,6 +721,7 @@ reg [3:0] chr_bank;
 reg mirroring;  // See vram_a10_t
 wire vmirror;
 wire mapper70 = (flags[7:0] == 70);
+wire mapper81 = (flags[7:0] == 81); // NTDEC N715021
 wire mapper152 = (flags[7:0] == 152);
 wire onescreen = (flags[22:21] == 1) | mapper152; // default (0 or 3) Holy Diver submapper; (1) JALECO-JF-16
 always @(posedge clk) begin
@@ -733,12 +735,12 @@ always @(posedge clk) begin
 		mirroring <= SS_MAP1[    8];
 	end else if (ce) begin
 		if (prg_ain[15] == 1'b1 && prg_write) begin
-			if (mapper70)
-				{prg_bank, chr_bank} <= prg_din;
-			else if (mapper152)
-				{mirroring, prg_bank[2:0], chr_bank} <= prg_din;
-			else
-				{chr_bank, mirroring, prg_bank[2:0]} <= prg_din;
+			case (flags[7:0])
+				70: {prg_bank, chr_bank} <= prg_din;
+				78: {chr_bank, mirroring, prg_bank[2:0]} <= prg_din;
+				81: {prg_bank[1:0], chr_bank[1:0]} <= prg_din;
+				152: {mirroring, prg_bank[2:0], chr_bank} <= prg_din;
+			endcase
 		end
 	end
 end
@@ -754,7 +756,7 @@ assign chr_allow = flags[15];
 assign chr_aout = {5'b10_000, chr_bank, chr_ain[12:0]};
 assign vram_ce = chr_ain[13];
 
-assign vmirror = mapper70 ? flags[14] : mirroring;
+assign vmirror = (mapper70 || mapper81) ? flags[14] : mirroring;
 
 // The a10 VRAM address line. (Used for mirroring)
 reg vram_a10_t;
