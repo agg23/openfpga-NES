@@ -796,111 +796,7 @@ assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000
 
 endmodule
 
-// Mapper 40, used for unlicensed conversions of Super Mario Bros. 2 (J) to cart.
-module Mapper40(
-	input        clk,         // System clock
-	input        ce,          // M2 ~cpu_clk
-	input        enable,      // Mapper enabled
-	input [31:0] flags,       // Cart flags
-	input [15:0] prg_ain,     // prg address
-	inout [21:0] prg_aout_b,  // prg address out
-	input        prg_read,    // prg read
-	input        prg_write,   // prg write
-	input  [7:0] prg_din,     // prg data in
-	inout  [7:0] prg_dout_b,  // prg data out
-	inout        prg_allow_b, // Enable access to memory for the specified operation.
-	input [13:0] chr_ain,     // chr address in
-	inout [21:0] chr_aout_b,  // chr address out
-	input        chr_read,    // chr ram read
-	inout        chr_allow_b, // chr allow write
-	inout        vram_a10_b,  // Value for A10 address line
-	inout        vram_ce_b,   // True if the address should be routed to the internal 2kB VRAM.
-	inout        irq_b,       // IRQ
-	input [15:0] audio_in,    // Inverted audio from APU
-	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout}
-);
-
-assign prg_aout_b   = enable ? prg_aout : 22'hZ;
-assign prg_dout_b   = enable ? 8'hFF : 8'hZ;
-assign prg_allow_b  = enable ? prg_allow : 1'hZ;
-assign chr_aout_b   = enable ? chr_aout : 22'hZ;
-assign chr_allow_b  = enable ? chr_allow : 1'hZ;
-assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
-assign vram_ce_b    = enable ? vram_ce : 1'hZ;
-assign irq_b        = enable ? irq : 1'hZ;
-assign flags_out_b  = enable ? flags_out : 16'hZ;
-assign audio_b      = enable ? {1'b0, audio_in[15:1]} : 16'hZ;
-
-wire [21:0] prg_aout, chr_aout;
-wire prg_allow;
-wire chr_allow;
-wire vram_a10;
-wire vram_ce;
-reg irq;
-reg [15:0] flags_out = 0;
-
-
-reg [2:0] prg_bank;
-reg [2:0] prg_sel;
-reg [12:0] irq_counter;
-reg irq_enable;
-
-always @(posedge clk)
-if (~enable) begin
-	prg_bank <= 3'b000;
-	irq_counter<= 13'd0;
-	irq_enable <= 1'b0;
-end else if (ce) begin
-	
-	if (prg_write)
-		case(prg_ain & 16'he000)
-			16'h8000: irq_enable <= 0; 				//irq disable
-			16'ha000: irq_enable <= 1; 				//irq enable
-		//	16'hc000: outer_bank <= prg_din[5:0]	//outer bank register (submapper 1 only)
-			16'he000: prg_bank <= prg_din[2:0]; 	//prg bank register
-		endcase
-
-	if (irq_enable)
-		irq_counter <= irq_counter + 13'd1;
-	else begin
-		irq <= 1'b0;	// ACK
-		irq_counter <= 0;
-	end
-
-	if (irq_counter == 13'h1000)
-		irq <= 1'b1;
-	else if (irq_counter == 13'h0000)
-		irq <= 1'b0;	// IRQ will self-acknowledge after 4096 M2 cycles
-	end
-
-always @* begin
-	// PRG bank selection
-	// 6000-7FFF: Fixed to bank 6
-	// 8000-9FFF: Fixed to bank 4
-	// A000-BFFF: Fixed to bank 5
-	// C000-DFFF: Switchable
-	// E000-FFFF: Fixed to bank 7
-	case(prg_ain[15:13])
-		3'b011: 	prg_sel = 3'h6;			// $6000-$7FFF
-		3'b100: 	prg_sel = 3'h4;			// $8000-$9FFF
-		3'b101: 	prg_sel = 3'h5;			// $A000-$BFFF
-		3'b110: 	prg_sel = prg_bank;		// $C000-$DFFF
-		3'b111: 	prg_sel = 3'h7;			// $E000-$FFFF
-	endcase
-end
-
-assign prg_aout = {2'b00, prg_sel, prg_ain[12:0]};       // 8kB banks
-assign chr_aout = {9'b10_0000_000, chr_ain[12:0]};
-
-assign prg_allow = (prg_ain >= 16'h6000) && !prg_write;
-assign chr_allow = flags[15];
-assign vram_ce = chr_ain[13];
-assign vram_a10 = flags[14] ? chr_ain[10] : chr_ain[11];
-
-endmodule
-
-// Mapper 42, used for hacked FDS games converted to cartridge form
+// Mapper 40 & 42, used for hacked FDS games converted to cartridge form
 module Mapper42(
 	input        clk,         // System clock
 	input        ce,          // M2 ~cpu_clk
@@ -937,6 +833,7 @@ assign flags_out_b  = enable ? flags_out : 16'hZ;
 assign audio_b      = enable ? {1'b0, audio_in[15:1]} : 16'hZ;
 
 wire [21:0] prg_aout, chr_aout;
+wire [7:0] mapper = flags[7:0];
 wire prg_allow;
 wire chr_allow;
 wire vram_a10;
@@ -960,38 +857,69 @@ if (~enable) begin
 	irq_counter <= 0;
 end else if (ce) begin
 	if (prg_write)
-		case(prg_ain & 16'he003)
-			16'h8000: chr_bank <= prg_din[3:0];
-			16'he000: prg_bank <= prg_din[3:0];
-			16'he001: mirroring <= prg_din[3];
-			16'he002: irq_enable <= prg_din[1];
+		case(mapper)
+			40: case(prg_ain & 16'he000)
+					16'h8000: irq_enable <= 0; 				//irq disable
+					16'ha000: irq_enable <= 1; 				//irq enable
+				//	16'hc000: outer_bank <= prg_din[5:0]	//outer bank register (submapper 1 only)
+					16'he000: prg_bank <= prg_din[2:0]; 	//prg bank register
+				endcase
+			42: case(prg_ain & 16'he003)
+					16'h8000: chr_bank <= prg_din[3:0];
+					16'he000: prg_bank <= prg_din[3:0];
+					16'he001: mirroring <= prg_din[3];
+					16'he002: irq_enable <= prg_din[1];
+				endcase
 		endcase
-
-	if (irq_enable)
-		irq_counter <= irq_counter + 15'd1;
-	else begin
-		irq <= 1'b0;	// ACK
-		irq_counter <= 0;
-	end
-
-	if (irq_counter == 15'h6000)
-		irq <= 1'b1;
+		if (irq_enable)
+			if (mapper == 40)
+				irq_counter <= irq_counter + 13'd1;
+			else // Mapper 42 (broken)
+				irq_counter <= irq_counter + 15'd1;
+		else begin
+			irq <= 1'b0;	// ACK
+			irq_counter <= 0;
+		end
+		if (mapper == 40)
+			if (irq_counter == 13'h1000)
+				irq <= 1'b1;
+			else if (irq_counter == 13'h0000)
+				irq <= 1'b0;	// IRQ will self-acknowledge after 4096 M2 cycles
+		else // Mapper 42 (broken)
+			if (irq_counter == 15'h6000)
+				irq <= 1'b1;
 end
 
 always @* begin
-	// PRG bank selection
-	// 6000-7FFF: Selectable
-	// 8000-9FFF: bank #0Ch
-	// A000-BFFF: bank #0Dh
-	// C000-DFFF: bank #0Eh
-	// E000-FFFF: bank #0Fh
-	case(prg_ain[15:13])
-		3'b011: 	prg_sel = prg_bank;                // $6000-$7FFF
-		3'b100: 	prg_sel = 4'hC;
-		3'b101: 	prg_sel = 4'hD;
-		3'b110: 	prg_sel = 4'hE;
-		3'b111: 	prg_sel = 4'hF;
-		default: prg_sel = 0;
+	// PRG bank selections
+	case(mapper)
+		// Mapper 40
+		// 6000-7FFF: bank #6
+		// 8000-9FFF: bank #4
+		// A000-BFFF: bank #5
+		// C000-DFFF: Selectable
+		// E000-FFFF: bank #7	
+		40: case(prg_ain[15:13])
+				3'b011: 	prg_sel = 3'h6;
+				3'b100: 	prg_sel = 3'h4;
+				3'b101: 	prg_sel = 3'h5;
+				3'b110: 	prg_sel = prg_bank;
+				3'b111: 	prg_sel = 3'h7;
+			endcase
+		// Mapper 42
+		// 6000-7FFF: Selectable
+		// 8000-9FFF: bank #0Ch
+		// A000-BFFF: bank #0Dh
+		// C000-DFFF: bank #0Eh
+		// E000-FFFF: bank #0Fh	
+		42: case(prg_ain[15:13])
+				3'b011: 	prg_sel = prg_bank;                // $6000-$7FFF
+				3'b100: 	prg_sel = 4'hC;
+				3'b101: 	prg_sel = 4'hD;
+				3'b110: 	prg_sel = 4'hE;
+				3'b111: 	prg_sel = 4'hF;
+				default: prg_sel = 0;
+			endcase
 	endcase
 end
 
@@ -1001,7 +929,7 @@ assign chr_aout = {5'b10_000, chr_bank, chr_ain[12:0]}; // 8kB banks
 assign prg_allow = (prg_ain >= 16'h6000) && !prg_write;
 assign chr_allow = flags[15];
 assign vram_ce = chr_ain[13];
-assign vram_a10 = mirroring ? chr_ain[10] : chr_ain[11];
+assign vram_a10 = mirroring ? chr_ain[11] : chr_ain[10];
 
 endmodule
 

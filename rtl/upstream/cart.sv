@@ -638,37 +638,6 @@ Mapper34 map34(
 );
 
 //*****************************************************************************//
-// Name   : NTDEC 2722                                                         //
-// Mappers: 40                                                                 //
-// Status : Working                                                            //
-// Notes  : Used for converted FDS carts.                                      //
-// Games  : Super Mario Bros. 2 (LF36)                                         //
-//*****************************************************************************//
-Mapper40 map40(
-	.clk        (clk),
-	.ce         (ce),
-	.enable     (me[40]),
-	.flags      (flags),
-	.prg_ain    (prg_ain),
-	.prg_aout_b (prg_addr_b),
-	.prg_read   (prg_read),
-	.prg_write  (prg_write),
-	.prg_din    (prg_din),
-	.prg_dout_b (prg_dout_b),
-	.prg_allow_b(prg_allow_b),
-	.chr_ain    (chr_ain),
-	.chr_aout_b (chr_addr_b),
-	.chr_read   (chr_read),
-	.chr_allow_b(chr_allow_b),
-	.vram_a10_b (vram_a10_b),
-	.vram_ce_b  (vram_ce_b),
-	.irq_b      (irq_b),
-	.flags_out_b(flags_out_b),
-	.audio_in   (audio_in),
-	.audio_b    (audio_out_b)
-);
-
-//*****************************************************************************//
 // Name   : Mapper 41                                                          //
 // Mappers: 41                                                                 //
 // Status : Working                                                            //
@@ -700,16 +669,16 @@ Mapper41 map41(
 );
 
 //*****************************************************************************//
-// Name   : Mapper 42                                                          //
-// Mappers: 42                                                                 //
+// Name   : NTDEC 2722, Mapper42                                               //
+// Mappers: 40, 42                                                             //
 // Status : Not working                                                        //
 // Notes  : Used for converted FDS carts.                                      //
-// Games  : Love Warrior Nicol, Green Beret (unl)                              //
+// Games  : Super Mario Bros. 2 (LF36) Love Warrior Nicol, Green Beret (unl)   //
 //*****************************************************************************//
 Mapper42 map42(
 	.clk        (clk),
 	.ce         (ce),
-	.enable     (me[42]),
+	.enable     (me[40] | me[42]),
 	.flags      (flags),
 	.prg_ain    (prg_ain),
 	.prg_aout_b (prg_addr_b),
@@ -737,29 +706,29 @@ Mapper42 map42(
 // Notes  : Used for converted FDS carts.                                      //
 // Games  : Bubble Bobble, Super Mario Bros. 2(j)                              //
 //*****************************************************************************//
-KS202 map142(
-	.clk        (clk),
-	.ce         (ce),
-	.enable     (me[142]),
-	.flags      (flags),
-	.prg_ain    (prg_ain),
-	.prg_aout_b (prg_addr_b),
-	.prg_read   (prg_read),
-	.prg_write  (prg_write),
-	.prg_din    (prg_din),
-	.prg_dout_b (prg_dout_b),
-	.prg_allow_b(prg_allow_b),
-	.chr_ain    (chr_ain),
-	.chr_aout_b (chr_addr_b),
-	.chr_read   (chr_read),
-	.chr_allow_b(chr_allow_b),
-	.vram_a10_b (vram_a10_b),
-	.vram_ce_b  (vram_ce_b),
-	.irq_b      (irq_b),
-	.flags_out_b(flags_out_b),
-	.audio_in   (audio_in),
-	.audio_b    (audio_out_b)
-);
+// KS202 map142(
+// 	.clk        (clk),
+// 	.ce         (ce),
+// 	.enable     (me[142]),
+// 	.flags      (flags),
+// 	.prg_ain    (prg_ain),
+// 	.prg_aout_b (prg_addr_b),
+// 	.prg_read   (prg_read),
+// 	.prg_write  (prg_write),
+// 	.prg_din    (prg_din),
+// 	.prg_dout_b (prg_dout_b),
+// 	.prg_allow_b(prg_allow_b),
+// 	.chr_ain    (chr_ain),
+// 	.chr_aout_b (chr_addr_b),
+// 	.chr_read   (chr_read),
+// 	.chr_allow_b(chr_allow_b),
+// 	.vram_a10_b (vram_a10_b),
+// 	.vram_ce_b  (vram_ce_b),
+// 	.irq_b      (irq_b),
+// 	.flags_out_b(flags_out_b),
+// 	.audio_in   (audio_in),
+// 	.audio_b    (audio_out_b)
+// );
 
 //*****************************************************************************//
 // Name   : Irem H3001                                                         //
@@ -1067,16 +1036,16 @@ Mapper77 map77(
 );
 
 //*****************************************************************************//
-// Name   : Holy Diver                                                         //
-// Mappers: 78, 70, 152                                                        //
-// Status : Needs testing overall                                             //
+// Name   : Holy Diver, NTDEC N715021                                          //
+// Mappers: 78, 70, 152, 81                                                    //
+// Status : Needs testing overall                                              //
 // Notes  : Submapper 1 Requires NES 2.0                                       //
-// Games  : Holy Diver, Uchuusent                                              //
+// Games  : Holy Diver, Uchuusent, Super Gun                                   //
 //*****************************************************************************//
 Mapper78 map78(
 	.clk        (clk),
 	.ce         (ce),
-	.enable     (me[152] | me[70] | me[78]),
+	.enable     (me[152] | me[70] | me[78] | me[81]),
 	.flags      (flags),
 	.prg_ain    (prg_ain),
 	.prg_aout_b (prg_addr_b),
