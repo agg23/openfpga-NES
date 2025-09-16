@@ -9,6 +9,7 @@ import regs_savestates::*;
 // Module handles updating the loopy scroll register
 module LoopyGen (
 	input clk,
+	input clear,
 	input ce,
 	input reset,
 	input is_rendering,
@@ -20,7 +21,7 @@ module LoopyGen (
 	input [8:0] cycle,
 	output [14:0] loopy,
 	output [2:0] fine_x_scroll,  // Current loopy value
-	// savestates              
+	// savestates
 	input [63:0]  SaveStateBus_Din,
 	input [ 9:0]  SaveStateBus_Adr,
 	input         SaveStateBus_wren,
@@ -30,7 +31,7 @@ module LoopyGen (
 
 wire [63:0] SS_LOOPY;
 wire [63:0] SS_LOOPY_BACK;
-eReg_SavestateV #(SSREG_INDEX_LOOPY, SSREG_DEFAULT_LOOPY) iREG_SAVESTATE (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_Dout, SS_LOOPY_BACK, SS_LOOPY);  
+eReg_SavestateV #(SSREG_INDEX_LOOPY, SSREG_DEFAULT_LOOPY) iREG_SAVESTATE (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_Dout, SS_LOOPY_BACK, SS_LOOPY);
 
 // Controls how much to increment on each write
 reg ppu_incr; // 0 = 1, 1 = 32
@@ -76,7 +77,7 @@ always @(posedge clk) begin
 				loopy_v[4:0] <= loopy_v[4:0] + 1'd1;
 				loopy_v[10] <= loopy_v[10] ^ (loopy_v[4:0] == 31);
 			end
-	
+
 			// Vertical Increment
 			if (cycle == 251) begin
 				loopy_v[14:12] <= loopy_v[14:12] + 1'd1;
@@ -89,18 +90,18 @@ always @(posedge clk) begin
 					end
 				end
 			end
-	
+
 			// Horizontal Reset at cycle 257
 			if (cycle == 256)
 				{loopy_v[10], loopy_v[4:0]} <= {loopy_t[10], loopy_t[4:0]};
-	
+
 			// On cycle 256 of each scanline, copy horizontal bits from loopy_t into loopy_v
 			// On cycle 304 of the pre-render scanline, copy loopy_t into loopy_v
 			if (cycle == 304 && is_pre_render) begin
 				loopy_v <= loopy_t;
 			end
 		end
-	
+
 		if (write && ain == 0) begin
 			loopy_t[10] <= din[0];
 			loopy_t[11] <= din[1];
@@ -122,7 +123,7 @@ always @(posedge clk) begin
 			// Increment address every time we accessed a reg
 			if (~is_rendering) begin
 				loopy_v <= loopy_v + (ppu_incr ? 15'd32 : 15'd1);
-			end else begin
+			end else if (!clear) begin
 				// During rendering (on the pre-render line and the visible lines 0-239, provided either background or sprite rendering is
 				// enabled), it will update v in an odd way, triggering a coarse X increment and a Y increment simultaneously (with normal
 				// wrapping behavior). Internally, this is caused by the carry inputs to various sections of v being set up for rendering,
@@ -143,12 +144,12 @@ always @(posedge clk) begin
 				end
 			end
 		end
-	
+
 		// Writes to vram address appear to be delayed by 2 cycles
 		latch_shift <= {latch_shift[0], ppu_address_latch};
 		write_shift <= {write_shift[0], (write && ain == 6)};
 		din_shift <= '{din, din_shift[0]};
-	
+
 		if (write_shift[1]) begin
 			if (!latch_shift[1]) begin
 				loopy_t[13:8] <= din_shift[1][5:0];
@@ -158,6 +159,13 @@ always @(posedge clk) begin
 				loopy_v <= {loopy_t[14:8], din_shift[1]};
 			end
 		end
+
+		if (clear) begin
+			loopy_t <= 0;
+			loopy_x <= 0;
+			ppu_address_latch <= 0;
+		end
+
 	end
 end
 
@@ -185,7 +193,7 @@ module ClockGen #(parameter USE_SAVESTATE = 0) (
 	output short_frame,
 	output is_vbe_sl,
 	output evenframe,
-	// savestates              
+	// savestates
 	input [63:0]  SaveStateBus_Din,
 	input [ 9:0]  SaveStateBus_Adr,
 	input         SaveStateBus_wren,
@@ -250,7 +258,7 @@ generate
 	if (USE_SAVESTATE) begin
 		wire [63:0] SS_CLKGEN_BACK;
 		wire [63:0] SS_CLKGEN_OUT;
-		eReg_SavestateV #(SSREG_INDEX_CLOCKGEN, SSREG_DEFAULT_CLOCKGEN) iREG_SAVESTATE (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SS_CLKGEN_OUT, SS_CLKGEN_BACK, SS_CLKGEN);  
+		eReg_SavestateV #(SSREG_INDEX_CLOCKGEN, SSREG_DEFAULT_CLOCKGEN) iREG_SAVESTATE (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SS_CLKGEN_OUT, SS_CLKGEN_BACK, SS_CLKGEN);
 		assign SaveStateBus_Dout = SS_CLKGEN_OUT;
 
 		assign SS_CLKGEN_BACK[  8:0] = cycle;
@@ -271,7 +279,7 @@ always @(posedge clk) if (reset) begin
 	if (USE_SAVESTATE) begin
 		cycle        <= SS_CLKGEN[  8:0]; // 338;
 		is_in_vblank <= SS_CLKGEN[    9]; // 0;
-		rendering_sr <= SS_CLKGEN[13:10]; // no reset before => 0 should be ok;	
+		rendering_sr <= SS_CLKGEN[13:10]; // no reset before => 0 should be ok;
 	end else begin
 		cycle        <= 338;
 		is_in_vblank <= 0;
@@ -428,23 +436,23 @@ module OAMEval(
 	input is_vbe,              // Last line before pre-render
 	input PAL,
 	output masked_sprites,     // If the game is trying to mask extra sprites
-	// savestates              
+	// savestates
 	input [63:0]  SaveStateBus_Din,
 	input [ 9:0]  SaveStateBus_Adr,
 	input         SaveStateBus_wren,
 	input         SaveStateBus_rst,
 	output [63:0] SaveStateBus_Dout,
-	
-	input  [7:0]  Savestate_OAMAddr,     
-	input         Savestate_OAMRdEn,    
-	input         Savestate_OAMWrEn,    
+
+	input  [7:0]  Savestate_OAMAddr,
+	input         Savestate_OAMRdEn,
+	input         Savestate_OAMWrEn,
 	input  [7:0]  Savestate_OAMWriteData,
 	output [7:0]  Savestate_OAMReadData
 );
 
 wire [63:0] SS_OAMEVAL;
 wire [63:0] SS_OAMEVAL_BACK;
-eReg_SavestateV #(SSREG_INDEX_OAMEVAL, SSREG_DEFAULT_OAMEVAL) iREG_SAVESTATE (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_Dout, SS_OAMEVAL_BACK, SS_OAMEVAL);  
+eReg_SavestateV #(SSREG_INDEX_OAMEVAL, SSREG_DEFAULT_OAMEVAL) iREG_SAVESTATE (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_Dout, SS_OAMEVAL_BACK, SS_OAMEVAL);
 
 
 // https://wiki.nesdev.com/w/index.php/PPU_sprite_evaluation
@@ -491,28 +499,28 @@ reg n_ovr, ex_ovr;
 reg [1:0] eval_counter;
 reg overflow;
 
-assign SS_OAMEVAL_BACK[ 7: 0] = oam_data;        
-assign SS_OAMEVAL_BACK[    8] = oam_temp_wren;   
-assign SS_OAMEVAL_BACK[14: 9] = oam_temp_addr;   
-assign SS_OAMEVAL_BACK[17:15] = oam_temp_slot;   
+assign SS_OAMEVAL_BACK[ 7: 0] = oam_data;
+assign SS_OAMEVAL_BACK[    8] = oam_temp_wren;
+assign SS_OAMEVAL_BACK[14: 9] = oam_temp_addr;
+assign SS_OAMEVAL_BACK[17:15] = oam_temp_slot;
 assign SS_OAMEVAL_BACK[21:18] = oam_temp_slot_ex;
-assign SS_OAMEVAL_BACK[   22] = n_ovr;           
-assign SS_OAMEVAL_BACK[25:23] = spr_counter;     
-assign SS_OAMEVAL_BACK[28:26] = repeat_count;    
-assign SS_OAMEVAL_BACK[   29] = sprite0;         
-assign SS_OAMEVAL_BACK[   30] = sprite0_curr;    
-assign SS_OAMEVAL_BACK[37:31] = feed_cnt;        
-assign SS_OAMEVAL_BACK[   38] = overflow;        
-assign SS_OAMEVAL_BACK[40:39] = eval_counter;    
-assign SS_OAMEVAL_BACK[   41] = ex_ovr;          
-assign SS_OAMEVAL_BACK[47:42] = oam_addr_ex; 
-assign SS_OAMEVAL_BACK[55:48] = oam_addr; 
+assign SS_OAMEVAL_BACK[   22] = n_ovr;
+assign SS_OAMEVAL_BACK[25:23] = spr_counter;
+assign SS_OAMEVAL_BACK[28:26] = repeat_count;
+assign SS_OAMEVAL_BACK[   29] = sprite0;
+assign SS_OAMEVAL_BACK[   30] = sprite0_curr;
+assign SS_OAMEVAL_BACK[37:31] = feed_cnt;
+assign SS_OAMEVAL_BACK[   38] = overflow;
+assign SS_OAMEVAL_BACK[40:39] = eval_counter;
+assign SS_OAMEVAL_BACK[   41] = ex_ovr;
+assign SS_OAMEVAL_BACK[47:42] = oam_addr_ex;
+assign SS_OAMEVAL_BACK[55:48] = oam_addr;
 assign SS_OAMEVAL_BACK[58:56] = (oam_state == STATE_IDLE)  ? 3'd0 :
 										  (oam_state == STATE_CLEAR) ? 3'd1 :
 										  (oam_state == STATE_EVAL)  ? 3'd2 :
 										  (oam_state == STATE_FETCH) ? 3'd3 :
 																				 3'd4;
-assign SS_OAMEVAL_BACK[63:59] = 5'b0; // free to be used 
+assign SS_OAMEVAL_BACK[63:59] = 5'b0; // free to be used
 
 always @(posedge clk) begin :oam_eval
 reg old_rendering; // unused?
@@ -521,14 +529,14 @@ reg [8:0] last_y, last_tile, last_attr; // unused?
 if (cycle == 340 && ce) begin
 	sprite0 <= sprite0_curr;
 	sprite0_curr <= 0;
-end  
+end
 
 if (Savestate_OAMRdEn) Savestate_OAMReadData  <= oam[Savestate_OAMAddr];
 if (Savestate_OAMWrEn) oam[Savestate_OAMAddr] <= Savestate_OAMWriteData;
 
 if (reset) begin
 	oam_temp <= '{64{8'hFF}};
-	
+
 	oam_data         <= SS_OAMEVAL[ 7: 0]; //oam_temp[0] == 8'hFF
 	oam_temp_wren    <= SS_OAMEVAL[    8]; //1;
 	oam_temp_addr    <= SS_OAMEVAL[14: 9]; //0;
@@ -750,7 +758,7 @@ end else if (ce) begin
 			oam_data <= (oam_addr[1:0] == 2'b10) ? (oam_din & 8'hE3) : oam_din;
 			oam_addr <= oam_addr + 1'b1;
 		end else begin
-			oam_addr <= oam_addr + 8'd4;
+			oam_addr <= (oam_addr + 8'd4) & 8'hFC;
 		end
 	end
 
@@ -1000,7 +1008,7 @@ module PaletteRam
 	output [5:0] dout,
 	input write,
 	input reset,
-	// savestates              
+	// savestates
 	input [63:0]  SaveStateBus_Din,
 	input [ 9:0]  SaveStateBus_Adr,
 	input         SaveStateBus_wren,
@@ -1015,10 +1023,10 @@ assign SaveStateBus_Dout  = SaveStateBus_wired_or[ 0] | SaveStateBus_wired_or[ 1
 
 wire [63:0] SS_PAL [3:0];
 wire [63:0] SS_PAL_BACK [3:0];
-eReg_SavestateV #(SSREG_INDEX_PAL0, SSREG_DEFAULT_PAL0) iREG_SAVESTATE_PAL0 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_PAL_BACK[0], SS_PAL[0]);  
-eReg_SavestateV #(SSREG_INDEX_PAL1, SSREG_DEFAULT_PAL1) iREG_SAVESTATE_PAL1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[1], SS_PAL_BACK[1], SS_PAL[1]);  
-eReg_SavestateV #(SSREG_INDEX_PAL2, SSREG_DEFAULT_PAL2) iREG_SAVESTATE_PAL2 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[2], SS_PAL_BACK[2], SS_PAL[2]);  
-eReg_SavestateV #(SSREG_INDEX_PAL3, SSREG_DEFAULT_PAL3) iREG_SAVESTATE_PAL3 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[3], SS_PAL_BACK[3], SS_PAL[3]);  
+eReg_SavestateV #(SSREG_INDEX_PAL0, SSREG_DEFAULT_PAL0) iREG_SAVESTATE_PAL0 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_PAL_BACK[0], SS_PAL[0]);
+eReg_SavestateV #(SSREG_INDEX_PAL1, SSREG_DEFAULT_PAL1) iREG_SAVESTATE_PAL1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[1], SS_PAL_BACK[1], SS_PAL[1]);
+eReg_SavestateV #(SSREG_INDEX_PAL2, SSREG_DEFAULT_PAL2) iREG_SAVESTATE_PAL2 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[2], SS_PAL_BACK[2], SS_PAL[2]);
+eReg_SavestateV #(SSREG_INDEX_PAL3, SSREG_DEFAULT_PAL3) iREG_SAVESTATE_PAL3 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[3], SS_PAL_BACK[3], SS_PAL[3]);
 
 reg [5:0] palette [32];
 // = '{
@@ -1067,6 +1075,7 @@ module PPU(
 	input         clk,
 	input         ce,
 	input         reset,            // input clock  21.48 MHz / 4. 1 clock cycle = 1 pixel
+	input         cold_reset,       // power cycle
 	inout   [1:0] sys_type,         // System type. 0 = NTSC 1 = PAL 2 = Dendy 3 = Vs.
 	output  [5:0] color,            // output color value, one pixel outputted every clock
 	input   [7:0] din,              // input data from bus
@@ -1090,17 +1099,17 @@ module PPU(
 	input  [1:0]  mask,
 	output        render_ena_out,
 	output        evenframe,
-	// savestates              
+	// savestates
 	input [63:0]  SaveStateBus_Din,
 	input [ 9:0]  SaveStateBus_Adr,
 	input         SaveStateBus_wren,
 	input         SaveStateBus_rst,
 	input         SaveStateBus_load,
 	output [63:0] SaveStateBus_Dout,
-	
-	input  [7:0]  Savestate_OAMAddr,     
-	input         Savestate_OAMRdEn,    
-	input         Savestate_OAMWrEn,    
+
+	input  [7:0]  Savestate_OAMAddr,
+	input         Savestate_OAMRdEn,
+	input         Savestate_OAMWrEn,
 	input  [7:0]  Savestate_OAMWriteData,
 	output [7:0]  Savestate_OAMReadData
 );
@@ -1114,14 +1123,15 @@ wire [63:0] SS_PPU;
 wire [63:0] SS_PPU_BACK;
 wire [63:0] SS_PPU_DECAY;
 wire [63:0] SS_PPU_DECAY_BACK;
-eReg_SavestateV #(SSREG_INDEX_PPU_1, SSREG_DEFAULT_PPU_1) iREG_SAVESTATE_PPU       (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_PPU_BACK,       SS_PPU);  
-eReg_SavestateV #(SSREG_INDEX_PPU_2, SSREG_DEFAULT_PPU_2) iREG_SAVESTATE_PPU_DECAY (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[1], SS_PPU_DECAY_BACK, SS_PPU_DECAY);  
+eReg_SavestateV #(SSREG_INDEX_PPU_1, SSREG_DEFAULT_PPU_1) iREG_SAVESTATE_PPU       (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_PPU_BACK,       SS_PPU);
+eReg_SavestateV #(SSREG_INDEX_PPU_2, SSREG_DEFAULT_PPU_2) iREG_SAVESTATE_PPU_DECAY (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[1], SS_PPU_DECAY_BACK, SS_PPU_DECAY);
 
 // These are stored in control register 0
 reg obj_patt; // Object pattern table
 reg bg_patt;  // Background pattern table
 reg obj_size; // 1 if sprites are 16 pixels high, else 0.
 reg vbl_enable;  // Enable VBL flag
+reg clear; // Enable write after first vblank
 
 // These are stored in control register 1
 reg grayscale; // Disable color burst
@@ -1139,6 +1149,7 @@ initial begin
 	enable_playfield = 0;
 	enable_objects = 0;
 	emphasis = 0;
+	clear = 1;
 end
 
 reg nmi_occured;         // True if NMI has occured but not cleared.
@@ -1179,7 +1190,7 @@ ClockGen clock(
 	.is_vbe_sl           (is_vbe_sl),
 	.evenframe				(evenframe),
 	// savestates
-	.SaveStateBus_Din  (SaveStateBus_Din ), 
+	.SaveStateBus_Din  (SaveStateBus_Din ),
 	.SaveStateBus_Adr  (SaveStateBus_Adr ),
 	.SaveStateBus_wren (SaveStateBus_wren),
 	.SaveStateBus_rst  (SaveStateBus_rst ),
@@ -1195,6 +1206,7 @@ LoopyGen loopy0(
 	.clk           (clk),
 	.ce            (ce),
 	.reset         (reset),
+	.clear         (clear),
 	.is_rendering  (is_rendering),
 	.ain           (ain),
 	.din           (din),
@@ -1205,7 +1217,7 @@ LoopyGen loopy0(
 	.loopy         (loopy),
 	.fine_x_scroll (fine_x_scroll),
 	 // savestates
-	.SaveStateBus_Din  (SaveStateBus_Din ), 
+	.SaveStateBus_Din  (SaveStateBus_Din ),
 	.SaveStateBus_Adr  (SaveStateBus_Adr ),
 	.SaveStateBus_wren (SaveStateBus_wren),
 	.SaveStateBus_rst  (SaveStateBus_rst ),
@@ -1260,14 +1272,14 @@ OAMEval spriteeval (
 	.PAL               (sys_type[0]),
 	.masked_sprites    (masked_sprites),
 	 // savestates
-	.SaveStateBus_Din       (SaveStateBus_Din        ), 
+	.SaveStateBus_Din       (SaveStateBus_Din        ),
 	.SaveStateBus_Adr       (SaveStateBus_Adr        ),
 	.SaveStateBus_wren      (SaveStateBus_wren       ),
 	.SaveStateBus_rst       (SaveStateBus_rst        ),
 	.SaveStateBus_Dout      (SaveStateBus_wired_or[4]),
-	.Savestate_OAMAddr      (Savestate_OAMAddr       ),     
-	.Savestate_OAMRdEn      (Savestate_OAMRdEn       ),    
-	.Savestate_OAMWrEn      (Savestate_OAMWrEn       ),    
+	.Savestate_OAMAddr      (Savestate_OAMAddr       ),
+	.Savestate_OAMRdEn      (Savestate_OAMRdEn       ),
+	.Savestate_OAMWrEn      (Savestate_OAMWrEn       ),
 	.Savestate_OAMWriteData (Savestate_OAMWriteData  ),
 	.Savestate_OAMReadData  (Savestate_OAMReadData   )
 );
@@ -1360,7 +1372,7 @@ always @(posedge clk) begin
 			is_obj0_pixel       &&    // True if the pixel came from tempram #0.
 			show_obj_on_pixel   &&
 			bg_pixel[1:0] != 0) begin // Background pixel nonzero.
-	
+
 				sprite0_hit_bg <= 1;
 		end
 	end
@@ -1426,7 +1438,7 @@ PaletteRam palette_ram(
 	.dout  (color2),    // Output color
 	.write (write && (ain == 7) && is_pal_address && ~is_rendering), // Condition for writing
 	// savestates
-	.SaveStateBus_Din  (SaveStateBus_Din ), 
+	.SaveStateBus_Din  (SaveStateBus_Din ),
 	.SaveStateBus_Adr  (SaveStateBus_Adr ),
 	.SaveStateBus_wren (SaveStateBus_wren),
 	.SaveStateBus_rst  (SaveStateBus_rst ),
@@ -1480,7 +1492,7 @@ always @(posedge clk) begin
 					obj_size <= din[5];
 					vbl_enable <= din[7];
 				end
-	
+
 				1: begin // PPU Control Register 2
 					grayscale <= din[0];
 					playfield_clip <= din[1];
@@ -1490,6 +1502,18 @@ always @(posedge clk) begin
 					emphasis <= |sys_type ? {din[7], din[5], din[6]} : din[7:5];
 				end
 			endcase
+			if (clear) begin
+				obj_patt         <= 'd0;
+				bg_patt          <= 'd0;
+				obj_size         <= 'd0;
+				vbl_enable       <= 'd0;
+				grayscale        <= 'd0;
+				playfield_clip   <= 'd0;
+				object_clip      <= 'd0;
+				enable_playfield <= 'd0;
+				enable_objects   <= 'd0;
+				emphasis         <= 'd0;
+			end
 		end
 		// https://wiki.nesdev.com/w/index.php/NMI
 		if (set_nmi)
@@ -1507,7 +1531,7 @@ assign nmi = nmi_occured && vbl_enable;
 // is available on the bus.
 reg vram_read_delayed;
 
-assign SS_PPU_BACK[21:14] = vram_latch;       
+assign SS_PPU_BACK[21:14] = vram_latch;
 assign SS_PPU_BACK[   22] = vram_read_delayed;
 
 always @(posedge clk) begin
@@ -1533,15 +1557,18 @@ reg [23:0] decay_low;
 reg refresh_high, refresh_low;
 
 assign SS_PPU_BACK[   23] = refresh_high;
-assign SS_PPU_BACK[   24] = refresh_low; 
+assign SS_PPU_BACK[   24] = refresh_low;
 assign SS_PPU_BACK[32:25] = latched_dout;
-assign SS_PPU_BACK[63:33] = 31'b0; // free to be used
+assign SS_PPU_BACK[   33] = clear;
+assign SS_PPU_BACK[63:34] = 30'b0; // free to be used
 
 assign SS_PPU_DECAY_BACK[23: 0] = decay_low;
 assign SS_PPU_DECAY_BACK[47:24] = decay_high;
 assign SS_PPU_DECAY_BACK[63:48] = 16'b0; // free to be use
 
 always @(posedge clk) begin
+	if (ce && cycle == 340 && is_vbe_sl)
+		clear <= 0;
 	if (refresh_high) begin
 		decay_high <= 3221590; // aprox 600ms decay rate
 		refresh_high <= 0;
@@ -1591,19 +1618,22 @@ always @(posedge clk) begin
 			default: latched_dout <= latched_dout;
 		endcase
 
-		if (reset)
-			latched_dout <= 8'd0;
-
 	end else if (write) begin
 		refresh_high <= 1'b1;
 		refresh_low <= 1'b1;
 		latched_dout <= din;
 	end
-	
+
+	if (reset) begin
+		latched_dout <= 8'd0;
+		clear <= 1;
+	end
+
 	if (SaveStateBus_load) begin
 		refresh_high <= SS_PPU[   23];
 		refresh_low  <= SS_PPU[   24];
 		latched_dout <= SS_PPU[32:25];
+		clear        <= SS_PPU[   33];
 		decay_low    <= SS_PPU_DECAY[23: 0];
 		decay_high   <= SS_PPU_DECAY[47:24];
 	end
