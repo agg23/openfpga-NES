@@ -74,6 +74,7 @@ endmodule
 module NES(
 	input         clk,
 	input         reset_nes,
+	input         ppu_rst_behavior,
 	input         cold_reset,
 	input         pausecore,
 	output        corepaused,
@@ -577,6 +578,7 @@ assign scanline = (corepause_active) ? scanline_paused : scanline_ppu;
 
 PPU ppu(
 	.clk              (clk),
+	.rst_behavior     (ppu_rst_behavior),
 	.ce               (ppu_ce),
 	.reset            (reset),
 	.sys_type         (sys_type),

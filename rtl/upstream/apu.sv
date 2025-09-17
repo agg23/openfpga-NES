@@ -356,7 +356,7 @@ module TriangleChan (
 			endcase
 		end
 
-		if (reset) begin
+		if (cold_reset) begin
 			sample_latch <= 4'hF;
 			Period <= 0;
 			TimerCtr <= 0;
