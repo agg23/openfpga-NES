@@ -1073,6 +1073,7 @@ endmodule  // PaletteRam
 
 module PPU(
 	input         clk,
+	input         rst_behavior,
 	input         ce,
 	input         reset,            // input clock  21.48 MHz / 4. 1 clock cycle = 1 pixel
 	input         cold_reset,       // power cycle
@@ -1149,7 +1150,7 @@ initial begin
 	enable_playfield = 0;
 	enable_objects = 0;
 	emphasis = 0;
-	clear = 1;
+	clear = 0;
 end
 
 reg nmi_occured;         // True if NMI has occured but not cleared.
@@ -1626,7 +1627,7 @@ always @(posedge clk) begin
 
 	if (reset) begin
 		latched_dout <= 8'd0;
-		clear <= 1;
+		clear <= rst_behavior;
 	end
 
 	if (SaveStateBus_load) begin
