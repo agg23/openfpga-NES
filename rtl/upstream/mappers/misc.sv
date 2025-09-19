@@ -864,7 +864,7 @@ end else if (ce) begin
 				//	16'hc000: outer_bank <= prg_din[5:0]	//outer bank register (submapper 1 only)
 					16'he000: prg_bank <= prg_din[2:0]; 	//prg bank register
 				endcase
-			42: case(prg_ain & 16'he003)
+			default: case(prg_ain & 16'he003)
 					16'h8000: chr_bank <= prg_din[3:0];
 					16'he000: prg_bank <= prg_din[3:0];
 					16'he001: mirroring <= prg_din[3];
@@ -874,14 +874,14 @@ end else if (ce) begin
 		if (irq_enable)
 			case(mapper)
 				40: irq_counter <= irq_counter + 13'd1;
-				42: irq_counter <= irq_counter + 15'd1;
+				default: irq_counter <= irq_counter + 15'd1;
 			endcase
 		else begin
 			irq_counter <= 0;
 		end
 		case(mapper) //IRQ will self-acknowledge when counter overflows
 			40: irq <= irq_counter[12];
-			42: irq <= &irq_counter[14:13];
+			default: irq <= &irq_counter[14:13];
 		endcase
 end
 
@@ -900,6 +900,7 @@ always @* begin
 				3'b101: 	prg_sel = 3'h5;
 				3'b110: 	prg_sel = prg_bank;
 				3'b111: 	prg_sel = 3'h7;
+				default: prg_sel = 0;
 			endcase
 		// Mapper 42
 		// 6000-7FFF: Selectable
@@ -907,14 +908,14 @@ always @* begin
 		// A000-BFFF: bank #0Dh
 		// C000-DFFF: bank #0Eh
 		// E000-FFFF: bank #0Fh	
-		42: case(prg_ain[15:13])
-				3'b011: 	prg_sel = prg_bank;                // $6000-$7FFF
-				3'b100: 	prg_sel = 4'hC;
-				3'b101: 	prg_sel = 4'hD;
-				3'b110: 	prg_sel = 4'hE;
-				3'b111: 	prg_sel = 4'hF;
-				default: prg_sel = 0;
-			endcase
+		default: 	case(prg_ain[15:13])
+						3'b011: 	prg_sel = prg_bank;                // $6000-$7FFF
+						3'b100: 	prg_sel = 4'hC;
+						3'b101: 	prg_sel = 4'hD;
+						3'b110: 	prg_sel = 4'hE;
+						3'b111: 	prg_sel = 4'hF;
+						default: prg_sel = 0;
+					endcase
 	endcase
 end
 
