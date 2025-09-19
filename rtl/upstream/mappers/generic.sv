@@ -738,7 +738,7 @@ always @(posedge clk) begin
 			case (flags[7:0])
 				70: {prg_bank, chr_bank} <= prg_din;
 				78: {chr_bank, mirroring, prg_bank[2:0]} <= prg_din;
-				81: {prg_bank[1:0], chr_bank[1:0]} <= prg_din;
+				81: {prg_bank[1:0], chr_bank[1:0]} <= prg_din[3:0];
 				152: {mirroring, prg_bank[2:0], chr_bank} <= prg_din;
 			endcase
 		end
