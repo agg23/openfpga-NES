@@ -9,11 +9,16 @@ module video
 	input  [5:0] color,
 	input  [8:0] count_h,
 	input  [8:0] count_v,
-	input        hide_overscan,
+	input  [1:0] hide_overscan,
 	input  [3:0] palette,
 	input  [2:0] emphasis,
 	input  [1:0] reticle,
+	input  [1:0] sys_type,
 	input        pal_video,
+	input        nes_hblank,
+	input        nes_hsync,
+	input        nes_vsync,
+	input        nes_vblank,
 
 	input        load_color,
 	input [23:0] load_color_data,
@@ -22,21 +27,33 @@ module video
 	output   reg hold_reset,
 
 	output       ce_pix,
-	output reg   HSync,
-	output reg   VSync,
-	output reg   HBlank,
-	output reg   VBlank,
+	output       HSync,
+	output       VSync,
+	output       HBlank,
+	output       VBlank,
 	output [7:0] R,
 	output [7:0] G,
 	output [7:0] B
 );
 
-reg pix_ce, pix_ce_n;
-wire [5:0] color_ef = reticle[0] ? (reticle[1] ? 6'h21 : 6'h15) : is_padding ? 6'd63 : color;
+reg vsync_reg, hsync_reg, hblank_reg, vblank_reg;
+reg [1:0] hsync_shift, vsync_shift, hblank_shift, vblank_shift;
 
-always @(negedge clk) begin
+assign HSync = hsync_shift[1];
+assign VSync = vsync_shift[1];
+assign HBlank = hblank_shift[1];
+assign VBlank = vblank_shift[1];
+
+wire hsync_out = hsync_reg | nes_hsync;
+wire vsync_out = vsync_reg | nes_vsync;
+wire hblank_out = hblank_reg | nes_hblank;
+wire vblank_out = vblank_reg | nes_vblank;
+
+reg pix_ce;
+wire [5:0] color_ef = reticle[0] ? (reticle[1] ? 6'h21 : 6'h15) : color;
+
+always @(posedge clk) begin
 	pix_ce   <= ~cnt[1] & ~cnt[0];
-	pix_ce_n <=  cnt[1] & ~cnt[0];
 end
 
 assign ce_pix = pix_ce;
@@ -117,8 +134,7 @@ reg [23:0] pixel;
 reg hbl, vbl;
 
 always @(posedge clk) begin
-	
-	if(pix_ce_n) begin
+	if(pix_ce) begin
 		case (palette)
 			0: pixel <= pal_kitrinx_lut[color_ef][23:0];
 			1: pixel <= pal_smooth_lut[color_ef][23:0];
@@ -128,139 +144,158 @@ always @(posedge clk) begin
 			5: pixel <= mem_data;
 			default:pixel <= pal_kitrinx_lut[color_ef][23:0];
 		endcase
-	
-		hbl <= hblank;
-		vbl <= vblank;
 	end
 end
 
+wire disengaged = reset || hold_reset;
 
 reg  hblank, vblank;
-reg  [9:0] h, v;
-reg  [1:0] free_sync = 0;
-wire [9:0] hc = (&free_sync | reset) ? h : count_h;
-wire [9:0] vc = (&free_sync | reset) ? v : count_v;
-wire [9:0] vsync_start = (pal_video ? 10'd270 : 10'd243);
+reg  [8:0] h, v;
+wire [8:0] hc = disengaged ? h : count_h;
+wire [8:0] vc = disengaged ? v : count_v;
+wire [8:0] vblank_start, vblank_end, hblank_start, hblank_end, hsync_start, hsync_end;
+wire [8:0] vblank_start_sl, vblank_end_sl, vsync_start_sl;
+wire hblank_period;
 
-always @(posedge clk) begin
-	reg [8:0] old_count_v;
-	if (h == 0 && v == 0)
-		hold_reset <= 1'b0;
-	else if (reset)
-		hold_reset <= 1'b1;
-
-	if(pix_ce_n) begin
-		if((old_count_v == 511) && (count_v == 0)) begin
-			h <= 0;
-			v <= 0;
-			free_sync <= 0;
-		end else begin
-			if(h == 340) begin
-				h <= 0;
-				if(v == (pal_video ? 311 : 261)) begin
-					v <= 0;
-					if(~&free_sync) free_sync <= free_sync + 1'd1;
-				end else begin
-					v <= v + 1'd1;
-				end
-			end else begin
-				h <= h + 1'd1;
-			end
+always_comb begin
+	case (sys_type)
+		2'b00,2'b11: begin // NTSC/Vs.
+			vblank_start_sl = 9'd241;
+			vblank_end_sl   = 9'd260;
+			vsync_start_sl = 9'd244;
 		end
 
-		old_count_v <= count_v;
-	end
-
-	// The NES and SNES proper resolutions are 280 pixels wide, and 240 lines high. Only 256 of these pixels per line
-	// are drawn with image data, but the real PPU padded the rest with color 0 to make the aspect ratio correct, since
-	// they anticipated the overscan. This padding MUST be considered when scaling the image to 4:3 AR.
-	// http://wiki.nesdev.com/w/index.php?title=Overscan#For_emulator_developers
-
-	// Overscan is simply a zoom-in, and most emulators will take off 8 from the top and bottom to reach the magic
-	// number of 224 pixels, so we take off a proportional percentage from the sides to compensate.
-
-	if(pix_ce) begin
-		if(hide_overscan) begin
-			hblank <= (hc >= HBL_START && hc <= HBL_END);                  // 280 - ((224/240) * 16) = 261.3
-			vblank <= (vc > (VBL_START - 9)) || (vc < 8);                  // 240 - 16 = 224
-		end else begin
-			hblank <= (hc >= HBL_START) && (hc <= HBL_END);                // 280 pixels
-			vblank <= (vc >= VBL_START);                                   // 240 lines
-		end
-		
-		if(hc == 279) begin
-			HSync <= 1;
-			VSync <= ((vc >= vsync_start) && (vc < vsync_start+3));
+		2'b01: begin       // PAL
+			vblank_start_sl = 9'd241;
+			vblank_end_sl   = 9'd310;
+			vsync_start_sl = 9'd269;
 		end
 
-		if(hc == 304) HSync <= 0;
-	end
+		2'b10: begin       // Dendy
+			vblank_start_sl = 9'd241; // Vblank starts here allegedly, even though the flag is set at 291
+			vblank_end_sl   = 9'd310;
+			vsync_start_sl = 9'd269; // Guessing it's the same as PAL
+		end
+	endcase
+
+	case (hide_overscan)
+		2'b00: begin // Normal, trim to 224 lines, 256 dots
+			hblank_period = (hc >= 257 || (hc <= 9'd0));
+			vblank_start = vblank_start_sl - 9'd10;
+			vblank_end = 9'd7;
+		end
+		2'b01: begin // "full" trim to 240 lines, 256 dots
+			hblank_period = (hc >= 257 || (hc <= 9'd0));
+			vblank_start = vblank_start_sl - 9'd2;
+			vblank_end = 9'd511;
+		end
+		2'b10: begin // show border trim to 240 lines, 282 dots
+			hblank_period = (hc >= 270 && hc <= 327);
+			vblank_start = vblank_start_sl - 9'd2;
+			vblank_end = 9'd511;
+		end
+		default: begin // Just show everything for the masochists
+			hblank_period = (hc >= 270 && hc <= 326);
+			vblank_start = vblank_start_sl;
+			vblank_end = 9'd511;
+		end
+	endcase
 end
 
-localparam HBL_START = 256;
-localparam HBL_END   = 340;
-localparam VBL_START = 240;
-localparam VBL_END   = 511;
-
-wire is_padding = (hc > 255);
-
-reg dark_r, dark_g, dark_b;
+wire hsync_period = (hc >= 278 && hc <= 302);
 
 wire [7:0] ri = pixel[23:16];
 wire [7:0] gi = pixel[15:8];
 wire [7:0] bi = pixel[7:0];
-
 reg [7:0] ro,go,bo;
-always @(posedge clk) if (pix_ce_n) begin
+
+
+always @(posedge clk) begin
 	reg [2:0] emph;
-	ro <= ri;
-	go <= gi;
-	bo <= bi;
-	emph <= 0;
-	if (~&color_ef[3:1]) begin // Only applies in draw range
-		emph <= emphasis;
+
+	if (pix_ce) begin
+		hsync_shift <= {hsync_shift[0], hsync_out};
+		vsync_shift <= {vsync_shift[0], vsync_out};
+		hblank_shift <= {hblank_shift[0], hblank_out};
+		vblank_shift <= {vblank_shift[0], vblank_out};
+
+		if (h == 240 && v == 0)
+			hold_reset <= 1'b0;
+		else if (reset)
+			hold_reset <= 1'b1;
+
+		h <= h + 1'd1;
+		if (h >= 340) begin
+			h <= 0;
+			v <= v + 1'd1;
+			if (v == vblank_end_sl)
+				v <= 9'd511;
+		end
+
+		if (count_h == 0 && count_v == 0) begin // Resync the counters in case of skipped dots
+			h <= 1;
+			v <= 0;
+		end
+
+		hsync_reg <= hsync_period;
+		hblank_reg <= hblank_period;
+
+		if (vc == vsync_start_sl && hsync_period)
+			vsync_reg <= 1;
+		if (vc == (vsync_start_sl + 2'd3) && hsync_period)
+			vsync_reg <= 0;
+
+		if (vc == vblank_start && hsync_period)
+			vblank_reg <= 1;
+		if (vc == vblank_end && hsync_period)
+			vblank_reg <= 0;
+
+		ro <= ri;
+		go <= gi;
+		bo <= bi;
+		emph <= 0;
+		if (~&color_ef[3:1]) begin // Only applies in draw range
+			emph <= emphasis;
+		end
+
+		case(emph)
+			1: begin
+					ro <= ri;
+					go <= gi - gi[7:2];
+					bo <= bi - bi[7:2];
+				end
+			2: begin
+					ro <= ri - ri[7:2];
+					go <= gi;
+					bo <= bi - bi[7:2];
+				end
+			3: begin
+					ro <= ri - ri[7:2];
+					go <= gi - gi[7:3];
+					bo <= bi - bi[7:2] - bi[7:3];
+				end
+			4: begin
+					ro <= ri - ri[7:3];
+					go <= gi - gi[7:3];
+					bo <= bi;
+				end
+			5: begin
+					ro <= ri - ri[7:3];
+					go <= gi - gi[7:2];
+					bo <= bi - bi[7:3];
+				end
+			6: begin
+					ro <= ri - ri[7:2];
+					go <= gi - gi[7:3];
+					bo <= bi - bi[7:3];
+				end
+			7: begin
+					ro <= ri - ri[7:2];
+					go <= gi - gi[7:2];
+					bo <= bi - bi[7:2];
+				end
+		endcase
 	end
-	
-	case(emph)
-		1: begin
-				ro <= ri;
-				go <= gi - gi[7:2];
-				bo <= bi - bi[7:2];
-			end
-		2: begin
-				ro <= ri - ri[7:2];
-				go <= gi;
-				bo <= bi - bi[7:2];
-			end
-		3: begin
-				ro <= ri - ri[7:2];
-				go <= gi - gi[7:3];
-				bo <= bi - bi[7:2] - bi[7:3];
-			end
-		4: begin
-				ro <= ri - ri[7:3];
-				go <= gi - gi[7:3];
-				bo <= bi;
-			end
-		5: begin
-				ro <= ri - ri[7:3];
-				go <= gi - gi[7:2];
-				bo <= bi - bi[7:3];
-			end
-		6: begin
-				ro <= ri - ri[7:2];
-				go <= gi - gi[7:3];
-				bo <= bi - bi[7:3];
-			end
-		7: begin
-				ro <= ri - ri[7:2];
-				go <= gi - gi[7:2];
-				bo <= bi - bi[7:2];
-			end
-	endcase
-	
-	HBlank <= hbl;
-	VBlank <= vbl;
 end
 
 assign R = ro;
