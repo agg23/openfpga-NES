@@ -23,7 +23,7 @@ module MMC1(
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
 	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout}
-	// savestates              
+	// savestates
 	input       [63:0]  SaveStateBus_Din,
 	input       [ 9:0]  SaveStateBus_Adr,
 	input               SaveStateBus_wren,
@@ -80,19 +80,20 @@ reg [4:0] chr_bank_1;
 reg [4:0] prg_bank;
 
 reg delay_ctrl;	// used to prevent fast-write to the control register
+reg chr_write_disable;
 
 wire [3:0] prg_ram_size = flags[29:26];
 wire [3:0] prg_nvram_size = flags[34:31];
 wire [2:0] chr_size = flags[13:11];
 
 // Update shift register
-always @(posedge clk) 
+always @(posedge clk)
 	if (~enable) begin
 		shift <= 5'b10000;
 		control <= 5'b0_11_00;
 		chr_bank_0 <= 0;
 		chr_bank_1 <= 0;
-		prg_bank <= 5'b00000;
+		prg_bank <= 5'b10000;
 		delay_ctrl <= 0;
 	end else if (SaveStateBus_load) begin
 		shift      <= SS_MAP1[ 4: 0];
@@ -101,15 +102,13 @@ always @(posedge clk)
 		chr_bank_1 <= SS_MAP1[19:15];
 		prg_bank   <= SS_MAP1[24:20];
 		delay_ctrl <= SS_MAP1[   25];
-	end else if (ce) begin
-		if (!prg_write)
-			delay_ctrl <= 1'b0;
-		if (prg_write && prg_ain[15] && !delay_ctrl) begin
+	end else if (ce) begin // M2
+		if (prg_write && prg_ain[15]) begin // /ROMSEL && /CPURnW
 			delay_ctrl <= 1'b1;
 			if (prg_din[7]) begin
-				shift <= 5'b10000;
+				shift <= 5'b10000;  // Shift and Control are reset, nothing else
 				control <= control | 5'b0_11_00;
-			end else begin
+			end else if (!delay_ctrl) begin // Only clocked if DIN bit 7 is not set, and this is the first falling edge of rw during M2
 				if (shift[0]) begin
 					casez(prg_ain[14:13])
 						0: control    <= {prg_din[0], shift[4:1]};
@@ -122,14 +121,16 @@ always @(posedge clk)
 					shift <= {prg_din[0], shift[4:1]};
 				end
 			end
+		end else begin
+			delay_ctrl <= 1'b0;
 		end
 	end
 
-assign SS_MAP1_BACK[ 4: 0]	= shift;   
-assign SS_MAP1_BACK[ 9: 5] = control;   
+assign SS_MAP1_BACK[ 4: 0]	= shift;
+assign SS_MAP1_BACK[ 9: 5] = control;
 assign SS_MAP1_BACK[14:10] = chr_bank_0;
 assign SS_MAP1_BACK[19:15] = chr_bank_1;
-assign SS_MAP1_BACK[24:20] = prg_bank;  
+assign SS_MAP1_BACK[24:20] = prg_bank;
 assign SS_MAP1_BACK[   25] = delay_ctrl;
 assign SS_MAP1_BACK[63:26] = 38'b0; // free to be used
 
@@ -199,9 +200,9 @@ assign chr_allow = flags[15];
 
 // savestate
 wire [63:0] SS_MAP1;
-wire [63:0] SS_MAP1_BACK;	
-wire [63:0] SaveStateBus_Dout_active;	
-eReg_SavestateV #(SSREG_INDEX_MAP1, 64'h0000000000000000) iREG_SAVESTATE_MAP1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_Dout_active, SS_MAP1_BACK, SS_MAP1);  
+wire [63:0] SS_MAP1_BACK;
+wire [63:0] SaveStateBus_Dout_active;
+eReg_SavestateV #(SSREG_INDEX_MAP1, 64'h0000000000000000) iREG_SAVESTATE_MAP1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_Dout_active, SS_MAP1_BACK, SS_MAP1);
 
 assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000000;
 
