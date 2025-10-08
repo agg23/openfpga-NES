@@ -2404,6 +2404,7 @@ module NSF(
 	inout [15:0] audio_b,     // Mixed audio output
 	output [5:0] exp_audioe,  // Expansion Enabled (0x0=None, 0x1=VRC6, 0x2=VRC7, 0x4=FDS, 0x8=MMC5, 0x10=N163, 0x20=SS5B
 	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout}
+	input        chr_write,   // CHR Write
 	input  [7:0] fds_din      // fds data in
 );
 
@@ -2433,6 +2434,7 @@ wire has_chr_dout;
 wire [7:0] chr_dout;
 
 wire [3:0] submapper = flags[24:21];
+wire IsNSF = submapper == 4'hF;
 reg [7:0] nsf_reg [15:0];
 reg [15:0] counter;
 reg [5:0] clk1MHz;
@@ -2816,7 +2818,7 @@ assign exp_strs = '{8'h56,8'h43,8'h36,8'h20,  // 0 = VC6
                     8'h53,8'h35,8'h42,8'h20,  // 5 = S5B
                     8'h41,8'h50,8'h55,8'h20}; //default = APU
 
-assign prg_aout = ((submapper == 4'hF) && ({prg_ain[15:1],1'b0} == 16'hFFFC)) ? {10'h0, prg_ain[11:0]} : {prg_bank, prg_ain[11:0]};
+assign prg_aout = ((IsNSF) && ({prg_ain[15:1],1'b0} == 16'hFFFC)) ? {10'h0, prg_ain[11:0]} : {prg_bank, prg_ain[11:0]};
 assign prg_allow = (((prg_ain[15] || ((prg_ain>=16'h4080) && (prg_ain<16'h4FFF))) && !prg_write) || (prg_ain[15:13]==3'b011)
                    || (prg_ain[15:10]==6'b010111 && prg_ain[9:4]!=6'b111111) || ((prg_ain>=16'h8000) && (prg_ain<16'hDFFF) && exp_audioe[2]));
 assign chr_allow = flags[15]; // CHR RAM always...
@@ -2858,8 +2860,8 @@ wire [4:0] note_no = inc_note ? 5'd4 : (note_val + (note_val > 5'd14 ? 5'd9 : no
 wire [7:0] letter = {5'b0100_0,note_no[4:2]}; // A=$41,G=$47
 wire       sharp = note_no[1];    // #=$23
 
-wire cpu_ppu_write = prg_write && prg_ain[15:12]==4'h2; // 'h2000-2FFF
-assign has_chr_dout = !(cpu_ppu_write) && (print_reg || print_exp || print_spot || print_midi || print_oct || print_let || print_shp);
+wire cpu_ppu_write = (prg_write && prg_ain[15:12]==4'h2) || chr_write; // Do not override if this is the cpu writing to the ppu. 'h2000-2FFF - writes may no longer overlap the cpu and ppu access?: using chr_write ; Alternatively could track rendering: never override if not rendering
+assign has_chr_dout = IsNSF && !(cpu_ppu_write) && (print_reg || print_exp || print_spot || print_midi || print_oct || print_let || print_shp);
 assign chr_dout = print_exp ? exp_letter : print_let ? letter : print_shp ? 8'h23 : (print_spot && !print_oct) ? has_spot_chr ? !spot_vol_row ? use_freq?8'h00:{5'h00,spot[voi_tab_idx][2:0]}:{use_freq?4'b0001:{1'b1,spot[voi_tab_idx][2:0]},spot_vol} : {8'h20} : {4'h0, chr_ain[0] ? chr_num[3:0] : chr_num[7:4]};
 
 endmodule

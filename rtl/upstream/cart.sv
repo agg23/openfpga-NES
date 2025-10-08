@@ -2266,6 +2266,8 @@ wire [5:0] exp_audioe;
 // 					 audio_in),
 // 	.exp_audioe (exp_audioe),  // Expansion Enabled (0x0=None, 0x1=VRC6, 0x2=VRC7, 0x4=FDS, 0x8=MMC5, 0x10=N163, 0x20=SS5B
 // 	.audio_b    (audio_out_b),
+// 	// Special ports
+// 	.chr_write  (chr_write),
 // 	.fds_din    (fds_data)
 // );
 

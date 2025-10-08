@@ -4,7 +4,7 @@ module MMC5(
 	input        clk,         // System clock
 	input        ce,          // M2 ~cpu_clk
 	input        enable,      // Mapper enabled
-	input [31:0] flags,       // Cart flags
+	input [63:0] flags,       // Cart flags
 	input [15:0] prg_ain,     // prg address
 	inout [21:0] prg_aout_b,  // prg address out
 	input        prg_read,    // prg read
@@ -598,7 +598,8 @@ always @* begin
 	//  prgsel[7:3] = 5'b1_1100;  //RAM location for saves
 end
 
-assign prg_aout = {prgsel[7] ? {2'b00, prgsel[6:0]} : {6'b11_1100, prgsel[2:0]}, prg_ain[12:0]};    // 8kB banks
+wire [1:0] prgrammasked = (prgsel[2] || (flags[34:31] != 4'h7)) ? prgsel[1:0] : 2'b00; // if only 8kb of save ram, make sure it gets put in lowest 8k block for save file
+assign prg_aout = {prgsel[7] ? {2'b00, prgsel[6:0]} : {6'b11_1100, prgsel[2], prgrammasked}, prg_ain[12:0]};    // 8kB banks
 
 // Registers $5120-$5127 apply to sprite graphics and $5128-$512B for background graphics but ONLY when 8x16 sprites are enabled.
 // If not rendering, the last set of registers written to (either $5120-$5127 or $5128-$512B) will be used.
