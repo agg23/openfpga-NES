@@ -385,11 +385,11 @@ begin
   process (Clk)
   begin
     if Clk'event and Clk = '1' then
-      if Res_n_i = '0' then
+      if Pwr_n = '0' then
+        S <= (others => '0');
+      elsif Res_n_i = '0' then
         PC             <= unsigned(SS_1(15 downto  0));      -- (others => '0');  -- Program Counter
         IR             <= SS_1(23 downto 16);                -- "00000000";
-        S(15 downto 8) <= (others => '0');                                             -- Dummy
-        S( 7 downto 0) <= unsigned(SS_1(31 downto 24));      -- (others => '0');       -- Dummy
         PBR            <= SS_1(39 downto 32);                -- (others => '0');
         DBR            <= SS_1(47 downto 40);                -- (others => '0');
         Mode_r         <= SS_1(49 downto 48);                -- (others => '0');
@@ -403,7 +403,8 @@ begin
         XF_i           <= SS_2(           0);                -- '1';
 
       elsif (SaveStateBus_load = '1') then
-
+        S(15 downto 8) <= (others => '0');                                             -- Dummy
+        S( 7 downto 0) <= unsigned(SS_1(31 downto 24));      -- (others => '0');       -- Dummy
         rdy_mod <= SS_2(1);
 
       elsif (Enable = '1') then
@@ -503,9 +504,9 @@ begin
         ABC            <= (others => '0');
         X              <= (others => '0');
         Y              <= (others => '0');
-      elsif (Res_n_i = '0') then
-        P <= SS_2(9 downto 2); -- x"00"; -- ensure we have nothing set on reset
+        P              <= (others => '0');
       elsif (SaveStateBus_load = '1') then
+        P <= SS_2(9 downto 2); -- x"00";
         ABC(7 downto 0) <= SS_2(17 downto 10);
         X(7 downto 0)   <= SS_2(25 downto 18);
         Y(7 downto 0)   <= SS_2(33 downto 26);
@@ -562,7 +563,9 @@ begin
           end if;
           if RstCycle = '1' then
             tmpP(Flag_I) := '1';
-            tmpP(Flag_D) := '0';
+            if mode /= "00" then
+              tmpP(Flag_D) := '0';
+            end if;
           end if;
           tmpP(Flag_1) := '1';
 

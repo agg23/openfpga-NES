@@ -476,6 +476,7 @@ module OAMEval(
 	input PAL,
 	output in_range,
 	output masked_sprites,     // If the game is trying to mask extra sprites
+	input is_pre_render,
 	// savestates
 	input [63:0]  SaveStateBus_Din,
 	input [ 9:0]  SaveStateBus_Adr,
@@ -526,7 +527,7 @@ reg old_rendering;
 reg old_using_secondary;
 
 wire visible = (scanline < 240);
-wire rendering = (scanline == 9'd511 || visible) && rendering_enabled;
+wire rendering = (is_pre_render || visible) && rendering_enabled;
 wire evaluating = visible && rendering_enabled;
 wire secondary_write = cycle[0];
 
@@ -584,6 +585,8 @@ assign SS_OAMEVAL_BACK[60] = old_using_secondary;
 assign SS_OAMEVAL_BACK[37:31] = '0; // free to be used
 assign SS_OAMEVAL_BACK[63:61] = 3'b0; // free to be used
 
+wire oam_wr_enabled = ~oam_secondary_ovr && ~is_pre_render;
+
 always @(posedge clk) begin :oam_eval
 
 reg [8:0] last_y, last_tile, last_attr; // unused?
@@ -632,6 +635,7 @@ end else if (ce) begin
 	if (end_of_line)
 		oam_state <= STATE_CLEAR;
 
+
 	old_rendering <= rendering;
 	old_using_secondary <= using_secondary;
 
@@ -660,18 +664,19 @@ end else if (ce) begin
 	end
 
 	if (rendering) begin
-		if (oam_state == STATE_CLEAR) begin               // Initialization state
+		if (cycle < 64) begin               // Initialization state
 			oam_data <= 8'hFF;
 			n_ovr <= 0;
 
 			if (secondary_write) begin
-				if (~oam_secondary_ovr) begin // If this overflows due to rendering status corrupting the addr, oamdata will still be FF
+				if (oam_wr_enabled) begin // If this overflows due to rendering status corrupting the addr, oamdata will still be FF
 					oam_temp[oam_secondary_addr] <= 8'hFF;
-					{oam_secondary_ovr, oam_secondary_addr} <= {1'b0, oam_secondary_addr} + 6'd1;
+
+					// Clear extra sprite space too
+					oam_temp[{1'b1, oam_secondary_addr}] <= 8'hFF;
 				end
 
-				// Clear extra sprite space too
-				oam_temp[{1'b1, oam_secondary_addr}] <= 8'hFF;
+				{oam_secondary_ovr, oam_secondary_addr} <= {1'b0, oam_secondary_addr} + 6'd1;
 			end
 
 			// During init, we hunt for the 8th sprite in OAM, so we know where to start for extra sprites
@@ -680,7 +685,7 @@ end else if (ce) begin
 				if (scanline[7:0] >= oam[{oam_addr_ex, 2'b00}] && scanline[7:0] < oam[{oam_addr_ex, 2'b00}] + (obj_size ? 16 : 8))
 					spr_counter <= spr_counter + 1'b1;
 			end
-		end else if (oam_state == STATE_EVAL) begin             // Evaluation State
+		end else if (cycle < 256) begin             // Evaluation State
 			if (evaluating || (visible && PAL)) begin
 				// This phase has exactly enough cycles to evaluate all 64 sprites if 8 are on the current line,
 				// so extra sprite evaluation has to be done seperately.
@@ -700,18 +705,18 @@ end else if (ce) begin
 
 				//On even cycles, data is read from (primary) OAM
 				if (!secondary_write) begin
-					oam_data <= (oam[oam_read_addr] & (is_attr_byte ? 8'hE3 : 8'hFF));
+					oam_data <= is_pre_render ? oam_temp[oam_secondary_addr] : (oam[oam_read_addr] & (is_attr_byte ? 8'hE3 : 8'hFF));
 				end else begin
-					if (~oam_secondary_ovr && ~n_ovr) // The Attr byte of secondary OAM is NOT missing bits 4:2
+					if (oam_wr_enabled && ~n_ovr) // The Attr byte of secondary OAM is NOT missing bits 4:2
 						oam_temp[oam_secondary_addr] <= oam_dbus;
 					else
 						oam_data <= oam_temp[oam_secondary_addr];
 
 					if (cycle == 65)
-						sprite0_curr <= in_range;
+						sprite0_curr <= in_range && ~is_pre_render;
 
 					if (eval_count == 2'd0) begin // Evaluate Y for in_range
-						if (in_range && ~n_ovr) begin
+						if (in_range && ~is_pre_render && ~n_ovr) begin
 							eval_count <= 2'd1; // is good, start copy
 							{n_ovr, oam_addr} <= {1'b0, oam_addr} + 9'd1;
 
@@ -722,11 +727,13 @@ end else if (ce) begin
 							end
 
 						end else begin
-							if (oam_secondary_ovr & ~n_ovr) begin // Not in range but due to the secondary oam read, it buggily triggers a +1 increment too
-								{n_ovr, oam_addr[7:2]} <= {1'b0, oam_addr[7:2]} + 6'd1;
-								oam_addr[1:0] <= oam_addr[1:0] + 2'd1;
-							end else begin // Normal and proper advance to the next Y position "slot"
-								{n_ovr, oam_addr} <= ({1'b0, oam_addr} + 9'd4) & 9'h1FC;
+							if (~is_pre_render) begin
+								if (oam_secondary_ovr & ~n_ovr) begin // Not in range but due to the secondary oam read, it buggily triggers a +1 increment too
+									{n_ovr, oam_addr[7:2]} <= {1'b0, oam_addr[7:2]} + 6'd1;
+									oam_addr[1:0] <= oam_addr[1:0] + 2'd1;
+								end else begin // Normal and proper advance to the next Y position "slot"
+									{n_ovr, oam_addr} <= ({1'b0, oam_addr} + 9'd4) & 9'h1FC;
+								end
 							end
 						end
 					end else if (eval_count == 2'd3) begin // end of copy
@@ -773,7 +780,7 @@ end else if (ce) begin
 
 			if (n_ovr) n_ovr <= 1;// Prevent this from being cleared by oam primary rollover
 
-		end else if (oam_state == STATE_FETCH) begin
+		end else if (cycle < 320) begin
 			oam_addr <= '0;
 			sprite0 <= sprite0_curr;
 			oam_data <= oam_temp[oam_secondary_addr];
@@ -819,7 +826,7 @@ end else if (ce) begin
 	// writes during rendering.
 	if (oam_data_write) begin
 		if (~rendering) begin
-			oam[oam_read_addr] <= (is_attr_byte) ? (oam_din & 8'hE3) : oam_din; // byte 3 has no bits 2-4
+			oam[oam_read_addr] <= (is_attr_byte) ? (oam_din & 8'hE3) : oam_din; // attr has no bits 2-4
 			oam_data <= oam_din;
 			oam_addr <= oam_addr + 1'b1;
 		end else begin
@@ -1034,12 +1041,12 @@ always @(posedge clk) if (pclk0) begin
 		if (latch_pattern1)
 			bg0 <= vram_data; // Pattern table bitmap #0
 
-		playfield_pipe_1[14:0] <= playfield_pipe_1[15:1];
-		playfield_pipe_2[14:0] <= playfield_pipe_2[15:1];
+		playfield_pipe_1[15:0] <= {1'b1, playfield_pipe_1[15:1]};
+		playfield_pipe_2[15:0] <= {1'b0, playfield_pipe_2[15:1]};
 		playfield_pipe_3[7:0] <= playfield_pipe_3[8:1];
 		playfield_pipe_4[7:0] <= playfield_pipe_4[8:1];
 
-		if (latch_pattern2) begin
+		if (latch_pattern2) begin // This should be the cycle that horizontal v increment is seen
 			playfield_pipe_1[15:8] <= {bg0[0], bg0[1], bg0[2], bg0[3], bg0[4], bg0[5], bg0[6], bg0[7]};
 			playfield_pipe_2[15:8] <= {bg1[0], bg1[1], bg1[2], bg1[3], bg1[4], bg1[5], bg1[6], bg1[7]};
 			playfield_pipe_3[8] <= current_attribute_table[0];
@@ -1363,13 +1370,14 @@ reg enable_playfield, enable_objects;
 // the spr/bg enabled registers don't apply til the write ends, and then all timing signals but one
 // then have to go through a pclk1, so that's 1-2 cycles to apply, then +1 (or more) for everything
 // except skip_dot calculation.
-reg [2:0] re_sr; // rendering enable shift register
+reg [2:0] re_sr, eo_sr, eb_sr; // rendering enable shift register
 wire rendering_enabled = re_sr[1];
 wire rendering_regs = enable_objects | enable_playfield;
 assign render_ena_out = rendering_regs;
 
 // 2C02 has an "is_vblank" flag that is true from pixel 0 of line 241 to pixel 0 of line 0;
 wire is_rendering = rendering_enabled && (scanline < 240 || is_pre_render_line);
+wire is_rendering_d = rendering_enabled && (scanline < 240 || (is_pre_render_line && cycle != 0) || (scanline == 241 && cycle == 0));
 wire is_vbe_sl;
 
 wire clear_signal = is_pre_render_line;
@@ -1445,13 +1453,13 @@ wire in_visible_frame = (scanline < 240 || is_pre_render_line) && cycle > 0 && c
 wire out_of_clip = cycle > 8'd8;
 
 // Cycle 0 is excluded because the H_LT_256R signal is delayed by a pixel, so 0 is missed.
-wire bgp_en = ((in_visible_frame || (cycle >= 321 && cycle <= 336))) && re_sr[0];
+wire bgp_en = ((in_visible_frame || (cycle >= 321 && cycle <= 336))) && rendering_enabled;
 
 BgPainter bg_painter(
 	.clk            (clk),
 	.pclk0          (ce),
 	.clear          (reset),
-	.latch_nametable(cycle[2:0] == 2 && re_sr[0]),
+	.latch_nametable(cycle[2:0] == 2 && rendering_enabled),
 	.latch_attrtable(cycle[2:0] == 4),
 	.latch_pattern1 (cycle[2:0] == 6),
 	.latch_pattern2 (cycle[2:0] == 0),
@@ -1464,11 +1472,13 @@ BgPainter bg_painter(
 );
 
 // Blank out BG in the leftmost 8 pixels
-wire show_bg_on_pixel = (playfield_clip || out_of_clip) && enable_playfield;
+wire show_bg_on_pixel = (playfield_clip || out_of_clip) && eb_sr[1];
 wire [3:0] bg_pixel = {bg_pixel_noblank[3:2], show_bg_on_pixel ? bg_pixel_noblank[1:0] : 2'b00};
 
 wire [31:0] oam_bus_ex;
 wire masked_sprites;
+
+wire [8:0] scanline_nopr = is_pre_render_line ? (~|sys_type ? 9'd261 : 9'd311) : scanline;
 
 OAMEval spriteeval (
 	.clk               (clk),
@@ -1477,7 +1487,7 @@ OAMEval spriteeval (
 	.end_of_line       (end_of_line),
 	.rendering_enabled (rendering_enabled),
 	.obj_size          (obj_size1),
-	.scanline          (scanline),
+	.scanline          (scanline_nopr),
 	.cycle             (cycle),
 	.clear_signal      (clear_signal),
 	.oam_bus           (oam_bus),
@@ -1489,6 +1499,7 @@ OAMEval spriteeval (
 	.overflow          (sprite_overflow),
 	.sprite0           (obj0_on_line),
 	.is_vbe            (is_vbe_sl),
+	.is_pre_render     (is_pre_render_line),
 	.PAL               (sys_type[0]),
 	.masked_sprites    (masked_sprites),
 	 // savestates
@@ -1524,11 +1535,11 @@ SpriteAddressGen address_gen(
 	.ce        (ce),
 	.rendering (rendering_enabled),
 	.in_range  (in_range & rendering_enabled),
-	.enabled   (sprite_load_en),  // Load sprites between 256..319
+	.enabled   (sprite_load_en),  // Load sprites between 257..320
 	.obj_size  (obj_size1),
-	.scanline  (scanline),
+	.scanline  (scanline_nopr),
 	.obj_patt  (obj_patt1),               // Object size and pattern table
-	.temp      (is_pre_render_line || ~is_rendering ? 8'hFF : oam_bus),                // Info from temp buffer.
+	.temp      (~is_rendering ? 8'hFF : oam_bus),                // Info from temp buffer.
 	.vram_addr (sprite_vram_addr),       // [out] VRAM Address that we want data from
 	.vram_data (vram_din),               // [in] Data at the specified address
 	.load      (spriteset_load),
@@ -1546,9 +1557,9 @@ SpriteAddressGenEx address_gen_ex(
 	.rendering      (rendering_enabled),
 	.enabled        (sprite_load_en),  // Load sprites between 256..319
 	.obj_size       (obj_size1),
-	.scanline       (scanline[7:0]),
+	.scanline       (scanline_nopr[7:0]),
 	.obj_patt       (obj_patt1),               // Object size and pattern table
-	.temp           (is_pre_render_line || ~is_rendering ? 32'hFFFFFFFF : oam_bus_ex),                // Info from temp buffer.
+	.temp           (~is_rendering ? 32'hFFFFFFFF : oam_bus_ex),                // Info from temp buffer.
 	.vram_addr      (sprite_vram_addr_ex),    // [out] VRAM Address that we want data from
 	.vram_data      (vram_din),               // [in] Data at the specified address
 	.load           (spriteset_load_ex),
@@ -1557,12 +1568,14 @@ SpriteAddressGenEx address_gen_ex(
 	.masked_sprites (masked_sprites)
 );
 
+reg re0_latch;
+
 // Between 1..256 (256 cycles), draws pixels.
 // Between 257..320 (64 cycles), will be populated for next line
 SpriteSet sprite_gen(
 	.clk           (clk),
 	.ce            (ce),
-	.enable        (in_visible_frame),
+	.enable        (in_visible_frame && re0_latch),
 	.rendering     (rendering_enabled),
 	.load          (spriteset_load),
 	.load_in       (spriteset_load_in),
@@ -1574,7 +1587,7 @@ SpriteSet sprite_gen(
 );
 
 // Blank out obj in the leftmost 8 pixels?
-wire show_obj_on_pixel = (object_clip || out_of_clip) && enable_objects;
+wire show_obj_on_pixel = (object_clip || out_of_clip) && eo_sr[1];
 wire [4:0] obj_pixel = {obj_pixel_noblank[4:2], show_obj_on_pixel ? obj_pixel_noblank[1:0] : 2'b00};
 
 reg sprite0_hit_bg;            // True if sprite#0 has collided with the BG in the last frame.
@@ -1595,6 +1608,8 @@ always @(posedge clk) begin
 	if (SaveStateBus_load) begin
 		sprite0_hit_bg <= SS_PPU[0];
 	end else if (ce) begin
+		if (cycle == 0)
+			re0_latch <= re_sr[2];
 		if (clear_signal) begin
 			sprite0_hit_bg <= 0;
 		end else if (spr0_hit) begin
@@ -1657,7 +1672,7 @@ wire pattern_table_upper = cycle[1:0] == 3 || cycle[1:0] == 0;
 wire read_cycle = ~cycle[0];
 
 always_comb begin
-	if (~is_rendering || (is_pre_render_line && cycle == 0)) begin
+	if (~is_rendering_d) begin
 		vram_a = vram[13:0];
 		vram_r_ex = 0;
 	end else begin
@@ -1684,13 +1699,13 @@ wire vram_r_ppudata_d = read_2007_delayed[3];
 wire vram_w_ppudata = write_2007_delayed[2];
 wire vram_w_ppudata_d = write_2007_delayed[3];
 
-wire ALE = (is_rendering && ~read_cycle) | (read_2007_delayed[1] || write_2007_delayed[1]);
+wire ALE = (is_rendering_d && ~read_cycle) | (read_2007_delayed[1] || write_2007_delayed[1]);
 
 wire [7:0] vram_din = vram_r ? vram_dbus_in : (vram_w ? vram_dout : (ALE ? vram_a[7:0] : vram_dbus_in));
 
 // The true and proper logic is that it will read if rendering is enabled and the previous cycle was odd.
 // this is important when you go from 340->0 or 339->0.
-assign vram_r = vram_r_ppudata | (is_rendering && read_cycle && (cycle != 0 || special_dot));
+assign vram_r = vram_r_ppudata | (is_rendering_d && read_cycle && (cycle != 0 || special_dot));
 assign vram_w = ~vram_r && vram_w_ppudata && !is_pal_address; // R&W at the same time should yield to read most of the time
 
 // Value currently being written to video ram
@@ -1844,6 +1859,8 @@ always @(posedge clk) begin
 		bg_patt1  <= bg_patt;
 		obj_size1 <= obj_size;
 		re_sr <= {re_sr[1:0], rendering_regs};
+		eo_sr <= {eo_sr[1:0], enable_objects};
+		eb_sr <= {eb_sr[1:0], enable_playfield};
 		if (write) begin
 			case (ain)
 				0: begin // PPU Control Register 1
