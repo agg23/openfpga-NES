@@ -640,6 +640,7 @@ PPU ppu(
 
 wire [15:0] prg_addr = addr;
 wire [7:0] prg_din = (dbus & (prg_conflict ? cpumem_din : 8'hFF)) | (prg_conflict_d0 ? cpumem_din & 8'h01 : 8'h00);
+wire prg_conflict_d0;
 
 wire prg_read  = mr_int && cart_pre && (addr[15:5] != 11'b0100_0000_000) && !ppu_cs;
 wire prg_write = mw_int && cart_pre;
