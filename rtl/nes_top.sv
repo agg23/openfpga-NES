@@ -415,25 +415,29 @@ module nes_top (
   wire [1:0] reticle;
   wire trigger;
   wire light;
-
+  wire gun_enable;
+  assign gun_enable = lightgun_enabled & ~reset_nes;
+  
+  
   zapper zap (
-      .clk(clk_ppu_21_47),
-      .reset(reset_nes | ~lightgun_enabled),
-      .dpad_up(p1_dpad_up),
-      .dpad_down(p1_dpad_down),
-      .dpad_left(p1_dpad_left),
-      .dpad_right(p1_dpad_right),
-      .dpad_aim_speed(lightgun_dpad_aim_speed),
-      .analog({p1_lstick_y, p1_lstick_x}),
-      .analog_trigger(p1_button_a),
-      .cycle(cycle),
-      .scanline(scanline),
-      .vde(~VBlank),
-      .color(color),
-      .reticle(reticle),
-      .light(light),
-      .trigger(trigger)
-  );
+     .clk(clk_ppu_21_47),
+     .reset(~gun_enable),        // active-high reset inside module
+	 .lightgun_enabled(gun_enable), // enable signal
+     .dpad_up(p1_dpad_up),
+     .dpad_down(p1_dpad_down),
+     .dpad_left(p1_dpad_left),
+     .dpad_right(p1_dpad_right),
+     .dpad_aim_speed(lightgun_dpad_aim_speed),
+     .analog({p1_lstick_y, p1_lstick_x}),
+     .analog_trigger(p1_button_a),
+     .cycle(cycle),
+     .scanline(scanline),
+     .vde(~VBlank),
+     .color(color),
+     .reticle(reticle),
+     .light(light),
+     .trigger(trigger)
+);
 
   always @(posedge clk_ppu_21_47) begin
     if (reset_nes) begin
