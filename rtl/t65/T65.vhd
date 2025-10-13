@@ -354,12 +354,12 @@ begin
 
   -- the 65xx design requires at least two clock cycles before
   -- starting its reset sequence (according to datasheet)
-  process (Res_n, Clk)
+  process (Res_n, Clk, Enable)
   begin
     if Res_n = '0' then
       Res_n_i <= '0';
       Res_n_d <= '0';
-    elsif Clk'event and Clk = '1' then
+    elsif Clk'event and Clk = '1' and Enable = '1' then
       Res_n_i <= Res_n_d;
       Res_n_d <= '1';
     end if;

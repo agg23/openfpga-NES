@@ -295,7 +295,7 @@ always @(posedge clk) if (reset) begin
 		vsync        <= SS_CLKGEN[   28]; // 0;
 		hsync        <= SS_CLKGEN[   29]; // 0;
 	end else begin
-		cycle        <= 240;
+		cycle        <= 0;
 		is_in_vblank <= 0;
 		rendering_sr <= '0;
 		skip_next    <= 0;
@@ -353,6 +353,7 @@ module Sprite(
 	input clk,
 	input ce,
 	input enable,
+	input counting,
 	input rendering,
 	input [3:0] load,
 	input [26:0] load_in,
@@ -364,17 +365,15 @@ reg [1:0] upper_color; // Upper 2 bits of color
 reg [7:0] x_coord;     // X coordinate where we want things
 reg [7:0] pix1, pix2;  // Shift registers, output when x_coord == 0
 reg aprio;             // Current prio
-wire active = (x_coord == 0);
+wire active = (x_coord == 0) || (enable && !counting); // Set to 1 when x_coord is zero
 
 always @(posedge clk) if (ce) begin
-	if (enable) begin
-		if (!active) begin
-			// Decrease until x_coord is zero.
-			x_coord <= x_coord - 8'h01;
-		end else if (rendering) begin
-			pix1 <= pix1 >> 1;
-			pix2 <= pix2 >> 1;
-		end
+	if (!active && counting) begin
+		// Decrease until x_coord is zero.
+		x_coord <= x_coord - 8'h01;
+	end else if (rendering && enable) begin
+		pix1 <= pix1 >> 1;
+		pix2 <= pix2 >> 1;
 	end
 	if (load[3]) pix1 <= load_in[26:19];
 	if (load[2]) pix2 <= load_in[18:11];
@@ -393,6 +392,7 @@ module SpriteSet(
 	input clk,
 	input ce,               // Input clock
 	input enable,           // Enable pixel generation
+	input counting,         // Set to 1 if counting is enabled
 	input rendering,        // Set to 1 if rendering is enabled
 	input [3:0] load,       // Which parts of the state to load/shift.
 	input [3:0] load_ex,    // Which parts of the state to load/shift for extra sprites.
@@ -409,24 +409,24 @@ wire [4:0] bits7, bits6, bits5, bits4, bits3, bits2, bits1, bits0,
 	bits15, bits14, bits13, bits12, bits11, bits10, bits9, bits8;
 
 // Extra sprites
-Sprite sprite15(clk, ce, enable, rendering, load_ex, load_in_ex, load_out15, bits15);
-Sprite sprite14(clk, ce, enable, rendering, load_ex, load_out15, load_out14, bits14);
-Sprite sprite13(clk, ce, enable, rendering, load_ex, load_out14, load_out13, bits13);
-Sprite sprite12(clk, ce, enable, rendering, load_ex, load_out13, load_out12, bits12);
-Sprite sprite11(clk, ce, enable, rendering, load_ex, load_out12, load_out11, bits11);
-Sprite sprite10(clk, ce, enable, rendering, load_ex, load_out11, load_out10, bits10);
-Sprite sprite9( clk, ce, enable, rendering, load_ex, load_out10, load_out9,  bits9);
-Sprite sprite8( clk, ce, enable, rendering, load_ex, load_out9,  load_out8,  bits8);
+Sprite sprite15(clk, ce, enable, counting, rendering, load_ex, load_in_ex, load_out15, bits15);
+Sprite sprite14(clk, ce, enable, counting, rendering, load_ex, load_out15, load_out14, bits14);
+Sprite sprite13(clk, ce, enable, counting, rendering, load_ex, load_out14, load_out13, bits13);
+Sprite sprite12(clk, ce, enable, counting, rendering, load_ex, load_out13, load_out12, bits12);
+Sprite sprite11(clk, ce, enable, counting, rendering, load_ex, load_out12, load_out11, bits11);
+Sprite sprite10(clk, ce, enable, counting, rendering, load_ex, load_out11, load_out10, bits10);
+Sprite sprite9( clk, ce, enable, counting, rendering, load_ex, load_out10, load_out9,  bits9);
+Sprite sprite8( clk, ce, enable, counting, rendering, load_ex, load_out9,  load_out8,  bits8);
 
 // Basic Sprites
-Sprite sprite7( clk, ce, enable, rendering, load, load_in,    load_out7,  bits7);
-Sprite sprite6( clk, ce, enable, rendering, load, load_out7,  load_out6,  bits6);
-Sprite sprite5( clk, ce, enable, rendering, load, load_out6,  load_out5,  bits5);
-Sprite sprite4( clk, ce, enable, rendering, load, load_out5,  load_out4,  bits4);
-Sprite sprite3( clk, ce, enable, rendering, load, load_out4,  load_out3,  bits3);
-Sprite sprite2( clk, ce, enable, rendering, load, load_out3,  load_out2,  bits2);
-Sprite sprite1( clk, ce, enable, rendering, load, load_out2,  load_out1,  bits1);
-Sprite sprite0( clk, ce, enable, rendering, load, load_out1,  load_out0,  bits0);
+Sprite sprite7( clk, ce, enable, counting, rendering, load, load_in,    load_out7,  bits7);
+Sprite sprite6( clk, ce, enable, counting, rendering, load, load_out7,  load_out6,  bits6);
+Sprite sprite5( clk, ce, enable, counting, rendering, load, load_out6,  load_out5,  bits5);
+Sprite sprite4( clk, ce, enable, counting, rendering, load, load_out5,  load_out4,  bits4);
+Sprite sprite3( clk, ce, enable, counting, rendering, load, load_out4,  load_out3,  bits3);
+Sprite sprite2( clk, ce, enable, counting, rendering, load, load_out3,  load_out2,  bits2);
+Sprite sprite1( clk, ce, enable, counting, rendering, load, load_out2,  load_out1,  bits1);
+Sprite sprite0( clk, ce, enable, counting, rendering, load, load_out1,  load_out0,  bits0);
 
 // Determine which sprite is visible on this pixel.
 assign bits = bits_orig;
@@ -1105,8 +1105,7 @@ module PaletteRam
 	input rendering,
 	input c_corrupt,
 	input [4:0] raw_addr,
-	input is_addressed,
-	input in_frame,
+	input in_range,
 	// savestates
 	input [63:0]  SaveStateBus_Din,
 	input [ 9:0]  SaveStateBus_Adr,
@@ -1140,17 +1139,11 @@ reg [5:0] palette [32];
 //};
 
 // If 0x0,4,8,C: mirror every 0x10
+wire corrupting = old_rendering && ~rendering && c_corrupt && in_range;
 wire [4:0] addr2 = (addr[1:0] == 0) ? {1'b0, addr[3:0]} : addr;
+wire [4:0] addr3 = corrupting ? {addr2[4], raw_addr[3:2], addr2[1:0]} : addr2;
 
-// 0/4/8/C and 10/14/18/1C (same row)
-// 1/5/9/D
-// 2/6/A/E
-// 3/7/B/F
-// 11/15/19/1D
-// 12/16/1A/1E
-// 13/17/1B/1F
-
-assign dout = palette[addr2];
+assign dout = palette[addr3];
 
 assign SS_PAL_BACK[0][ 5: 0] = palette[ 0]; assign SS_PAL_BACK[1][ 5: 0] = palette[1 ]; assign SS_PAL_BACK[2][ 5: 0] = palette[2 ]; assign SS_PAL_BACK[3][ 5: 0] = palette[3 ];
 assign SS_PAL_BACK[0][13: 8] = palette[ 4]; assign SS_PAL_BACK[1][13: 8] = palette[5 ]; assign SS_PAL_BACK[2][13: 8] = palette[6 ]; assign SS_PAL_BACK[3][13: 8] = palette[7 ];
@@ -1162,9 +1155,6 @@ assign SS_PAL_BACK[0][53:48] = palette[24]; assign SS_PAL_BACK[1][53:48] = palet
 assign SS_PAL_BACK[0][61:56] = palette[28]; assign SS_PAL_BACK[1][61:56] = palette[29]; assign SS_PAL_BACK[2][61:56] = palette[30]; assign SS_PAL_BACK[3][61:56] = palette[31];
 
 reg old_rendering;
-reg [1:0] old_extra_bits;
-reg was_addressed;
-reg [4:0] last_addr;
 
 always @(posedge clk) if (reset) begin
 	palette[ 0] <= SS_PAL[0][ 5: 0]; palette[1 ] <= SS_PAL[1][ 5: 0]; palette[2 ] <= SS_PAL[2][ 5: 0]; palette[3 ] <= SS_PAL[3][ 5: 0];
@@ -1179,20 +1169,12 @@ end else if (ce) begin
 	if (write) begin
 		palette[addr2] <= din;
 	end
-	// Disabled for now, but leaving palette corruption for when the behavior is better understood.
-	// It doesn't impact the functional behavior of any game.
-	// old_rendering <= rendering;
-	// old_extra_bits <= extra_bits;
-	// if (rendering) begin
-	// 	was_addressed <= is_addressed;
-	// 	last_addr <= addr2;
-	// end
-	// if (old_rendering && ~rendering) begin
 
-	// 	if (in_frame && c_corrupt /* && (addr2[4] == raw_addr[4])*/) begin
-	// 		palette[{raw_addr[4:0]}] <= palette[addr2[4:0]];
-	// 	end
-	// end
+	old_rendering <= rendering;
+
+	if (corrupting) begin
+		palette[{addr2[4], raw_addr[3:0]}] <= palette[{addr2[4], raw_addr[3:2], addr2[1:0]}];
+	end
 end
 
 endmodule  // PaletteRam
@@ -1377,7 +1359,7 @@ assign render_ena_out = rendering_regs;
 
 // 2C02 has an "is_vblank" flag that is true from pixel 0 of line 241 to pixel 0 of line 0;
 wire is_rendering = rendering_enabled && (scanline < 240 || is_pre_render_line);
-wire is_rendering_d = rendering_enabled && (scanline < 240 || (is_pre_render_line && cycle != 0) || (scanline == 241 && cycle == 0));
+wire is_rendering_d = re_sr[2] && (scanline < 240 || (is_pre_render_line && cycle != 0) || (scanline == 241 && cycle == 0));
 wire is_vbe_sl;
 
 wire clear_signal = is_pre_render_line;
@@ -1568,14 +1550,15 @@ SpriteAddressGenEx address_gen_ex(
 	.masked_sprites (masked_sprites)
 );
 
-reg re0_latch;
+reg [3:0] sprite_sr;
 
 // Between 1..256 (256 cycles), draws pixels.
 // Between 257..320 (64 cycles), will be populated for next line
 SpriteSet sprite_gen(
 	.clk           (clk),
 	.ce            (ce),
-	.enable        (in_visible_frame && re0_latch),
+	.enable        (in_visible_frame), // Enable between 1..256 if rendering enabled
+	.counting      (sprite_sr[2]),
 	.rendering     (rendering_enabled),
 	.load          (spriteset_load),
 	.load_in       (spriteset_load_in),
@@ -1608,8 +1591,12 @@ always @(posedge clk) begin
 	if (SaveStateBus_load) begin
 		sprite0_hit_bg <= SS_PPU[0];
 	end else if (ce) begin
-		if (cycle == 0)
-			re0_latch <= re_sr[2];
+		if (!sprite_sr[2])
+			sprite_sr <= {sprite_sr[2:0], 1'b0};
+		if (cycle == 339 && in_rendering_frame)
+			sprite_sr <= {3'b000, rendering_regs};
+		if (cycle == 256)
+			sprite_sr <= {4'b0000};
 		if (clear_signal) begin
 			sprite0_hit_bg <= 0;
 		end else if (spr0_hit) begin
@@ -1617,8 +1604,6 @@ always @(posedge clk) begin
 		end
 	end
 end
-
-
 
 wire [4:0] pixel;
 wire pixel_is_obj;
@@ -1666,8 +1651,8 @@ assign vram_a_ex = {1'b0, sprite_vram_addr_ex};
 
 wire special_dot = ~evenframe && cycle == 0 && scanline == 0; // This dot is skipped on even frames
 
-wire nametable_read = cycle[2:0] == 1 || cycle[2:0] == 2 || (sprite_load_en && attribute_read) || cycle > 336 || special_dot;
-wire attribute_read = cycle[2:0] == 3 || cycle[2:0] == 4;
+wire nametable_read = cycle[2:0] == 1 || cycle[2:0] == 2 || (sprite_load_en && (cycle[2:0] == 3 || cycle[2:0] == 4)) || cycle > 336 || special_dot;
+wire attribute_read = (cycle[2:0] == 3 || cycle[2:0] == 4) && ~nametable_read;
 wire pattern_table_upper = cycle[1:0] == 3 || cycle[1:0] == 0;
 wire read_cycle = ~cycle[0];
 
@@ -1763,11 +1748,11 @@ PaletteRam palette_ram(
 	.din          (ppu_dbus[5:0]),  // Value to write
 	.dout         (color2),    // Output color
 	.write        (vram_w_ppudata && pal_writes_valid), // Condition for writing
-	.rendering    (rendering_regs),
-	.in_frame     (in_rendering_frame),
-	.c_corrupt    (|vram[13:10]),
+	// Palette corruption signals
+	.rendering    (rendering_enabled),
+	.c_corrupt    (attribute_read ? (&{vram[13:12], vram_a[11:8]}) : &vram[13:8]), // Corrupt palette writes
 	.raw_addr     (vram[4:0]),
-	.is_addressed (is_pal_address),
+	.in_range     (in_rendering_frame),
 	// savestates
 	.SaveStateBus_Din  (SaveStateBus_Din ),
 	.SaveStateBus_Adr  (SaveStateBus_Adr ),
