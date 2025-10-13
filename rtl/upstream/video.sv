@@ -219,7 +219,7 @@ always @(posedge clk) begin
 		hblank_shift <= {hblank_shift[0], hblank_out};
 		vblank_shift <= {vblank_shift[0], vblank_out};
 
-		if (h == 240 && v == 0)
+		if (h == 0 && v == 0)
 			hold_reset <= 1'b0;
 		else if (reset)
 			hold_reset <= 1'b1;
@@ -232,8 +232,8 @@ always @(posedge clk) begin
 				v <= 9'd511;
 		end
 
-		if (count_h == 0 && count_v == 0) begin // Resync the counters in case of skipped dots
-			h <= 1;
+		if (count_h == 5 && count_v == 0) begin // Resync the counters in case of skipped dots
+			h <= 6'd0;
 			v <= 0;
 		end
 
