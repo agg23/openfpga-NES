@@ -58,8 +58,8 @@ module nes_top (
     input wire p4_dpad_right,
 
     // Settings
-    input wire hide_overscan,
-    input wire [1:0] mask_vid_edges,
+    input wire [1:0] hide_overscan,
+    input wire [1:0] mask,
     input wire allow_extra_sprites,
     input wire [2:0] selected_palette,
 
@@ -218,7 +218,7 @@ module nes_top (
       .emphasis      (emphasis),
       .cycle         (cycle),
       .scanline      (scanline),
-      .mask          (mask_vid_edges),
+      .mask          (mask),
       // User Input
       .joypad_out    (joypad_out),
       .joypad_clock  (joypad_clock),

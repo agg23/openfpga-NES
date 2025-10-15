@@ -194,7 +194,7 @@ always_comb begin
 			vblank_start = vblank_start_sl - 9'd2;
 			vblank_end = 9'd511;
 		end
-		default: begin // Just show everything for the masochists
+		2'b11: begin // Just show everything for the masochists
 			hblank_period = (hc >= 270 && hc <= 326);
 			vblank_start = vblank_start_sl;
 			vblank_end = 9'd511;
