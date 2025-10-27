@@ -167,26 +167,70 @@ reg vram_a10;
 wire vram_ce;
 reg [15:0] flags_out = {12'h0, 1'b1, 3'b0};
 
-
 reg [4:0] prgbank;
 reg [1:0] chrbank;
 reg nametable;
 wire four_screen = flags[16] && flags[14];
 wire battery = flags[25];
 
+reg [1:0] write_state;
+localparam [1:0] STATE_IDLE    = 2'b00,
+                 STATE_UNLOCK1 = 2'b01,
+                 STATE_UNLOCK2 = 2'b10,
+                 STATE_CMD     = 2'b11;
+
+wire [14:0] prg_addr_15bit = {
+	(prg_ain[15:14] == 2'b11) ? 1'b1 : prgbank[0],  // Bank bit [14] (LSB of bank)
+	prg_ain[13:0]                                   // Offset [13:0]
+};
+
+wire unlock1_match = (prg_addr_15bit == 15'h5555);  // Bank 1, offset $1555
+wire unlock2_match = (prg_addr_15bit == 15'h2AAA);  // Bank 0, offset $2AAA
+
+wire flash_write = (write_state == STATE_CMD) &&
+                   (prg_ain[15:14] == 2'b10) &&  // $8000-$BFFF only
+                   battery;
+
 always @(posedge clk) begin
 	if (~enable) begin
-		prgbank   <= 0;
-		chrbank   <= 0;
-		nametable <= 0;
+		prgbank		<= 0;
+		chrbank		<= 0;
+		nametable	<= 0;
+		write_state	<= STATE_IDLE;
 	end else if (SaveStateBus_load) begin
-		prgbank   <= SS_MAP1[ 4: 0];
-		chrbank   <= SS_MAP1[ 6: 5];
-		nametable <= SS_MAP1[    7];
-	end else if (ce) begin
-		// with battery bit set $C000-$FFFF else $8000-$FFFF
-		if (prg_ain[15] & (prg_ain[14] | ~battery) & prg_write) begin
-			{nametable, chrbank, prgbank}   <= prg_din[7:0];
+		prgbank		<= SS_MAP1[ 4: 0];
+		chrbank		<= SS_MAP1[ 6: 5];
+		nametable	<= SS_MAP1[    7];
+		write_state	<= SS_MAP1[9:8];
+	end else if (ce && prg_write && prg_ain[15]) begin
+		// Mapper register writes (battery=1: $C000-$FFFF, battery=0: $8000-$FFFF)
+		if (battery ? prg_ain[14] : 1'b1) begin
+			{nametable, chrbank, prgbank} <= prg_din[7:0];
+		end
+		// Flash sequence tracking (only for $8000-$BFFF when battery=1)
+		else if (battery && !prg_ain[14]) begin
+			case (write_state)
+				STATE_IDLE: begin
+					write_state <= (unlock1_match && prg_din == 8'hAA) ? STATE_UNLOCK1 : STATE_IDLE;
+				end
+
+				STATE_UNLOCK1: begin
+					write_state <= (unlock2_match && prg_din == 8'h55) ? STATE_UNLOCK2 : STATE_IDLE;
+				end
+
+				STATE_UNLOCK2: begin
+					if (unlock1_match && prg_din == 8'hA0) begin
+						write_state <= STATE_CMD;  // Byte program
+					end else begin
+						write_state <= STATE_IDLE;
+					end
+				end
+
+				STATE_CMD: begin
+					// Data write - return to idle after
+					write_state <= STATE_IDLE;
+				end
+			endcase
 		end
 	end
 end
@@ -194,7 +238,8 @@ end
 assign SS_MAP1_BACK[ 4: 0] = prgbank;
 assign SS_MAP1_BACK[ 6: 5] = chrbank;
 assign SS_MAP1_BACK[    7] = nametable;
-assign SS_MAP1_BACK[63: 8] = 56'b0; // free to be used
+assign SS_MAP1_BACK[ 9: 8] = write_state;
+assign SS_MAP1_BACK[63:10] = 54'b0; // free to be used
 
 always begin
 	// mirroring mode
@@ -207,7 +252,11 @@ always begin
 end
 
 assign prg_aout = {3'b000, (prg_ain[15:14] == 2'b11) ? 5'b11111 : prgbank, prg_ain[13:0]};
-assign prg_allow = prg_ain[15] && !prg_write;
+assign prg_allow = prg_ain[15] ? (
+	prg_read ? 1'b1 :  							// Always allow reads
+	battery ? (!prg_ain[14] && flash_write) :	// Flash writes OR mapper register
+	!prg_write									// Standard UNROM: reads only
+) : 1'b0;
 assign chr_allow = flags[15];
 assign chr_aout = {flags[15] ? 7'b11_1111_1 : 7'b10_0000_0, (four_screen && chr_ain[13]) ? 2'b11 : chrbank, chr_ain[12:0]};
 assign vram_ce = chr_ain[13] && !four_screen;

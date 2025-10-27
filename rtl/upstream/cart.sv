@@ -197,9 +197,9 @@ Mapper28 map28(
 //*****************************************************************************//
 // Name   : UNROM 512                                                          //
 // Mappers: 30                                                                 //
-// Status : No Self Flashing/Needs testing                                     //
+// Status : Basic Self Flashing/Needs testing                                  //
 // Notes  : Homebrew mapper                                                    //
-// Games  : ?                                                                  //
+// Games  : More Glider                                                        //
 //*****************************************************************************//
 Mapper30 map30(
 	.clk        (clk),
