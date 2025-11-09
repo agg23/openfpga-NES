@@ -139,7 +139,7 @@ module Mapper30(
 	inout        irq_b,       // IRQ
 	input [15:0] audio_in,    // Inverted audio from APU
 	inout [15:0] audio_b,     // Mixed audio output
-	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout}
+	inout [15:0] flags_out_b, // flags {0, 0, has_flashsaves, prg_conflict_d0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout}
 	// savestates              
 	input       [63:0]  SaveStateBus_Din,
 	input       [ 9:0]  SaveStateBus_Adr,
@@ -165,7 +165,7 @@ wire prg_allow;
 wire chr_allow;
 reg vram_a10;
 wire vram_ce;
-reg [15:0] flags_out = {12'h0, 1'b1, 3'b0};
+wire [15:0] flags_out = {10'h0, battery, 1'b0, 1'b1, 3'b0}; // has_flashsaves when battery=1, has_savestate
 
 reg [4:0] prgbank;
 reg [1:0] chrbank;
@@ -186,7 +186,6 @@ wire [14:0] prg_addr_15bit = {
 
 wire unlock1_match = (prg_addr_15bit == 15'h5555);  // Bank 1, offset $1555
 wire unlock2_match = (prg_addr_15bit == 15'h2AAA);  // Bank 0, offset $2AAA
-
 wire flash_write = (write_state == STATE_CMD) &&
                    (prg_ain[15:14] == 2'b10) &&  // $8000-$BFFF only
                    battery;
@@ -201,36 +200,33 @@ always @(posedge clk) begin
 		prgbank		<= SS_MAP1[ 4: 0];
 		chrbank		<= SS_MAP1[ 6: 5];
 		nametable	<= SS_MAP1[    7];
-		write_state	<= SS_MAP1[9:8];
-	end else if (ce && prg_write && prg_ain[15]) begin
-		// Mapper register writes (battery=1: $C000-$FFFF, battery=0: $8000-$FFFF)
-		if (battery ? prg_ain[14] : 1'b1) begin
-			{nametable, chrbank, prgbank} <= prg_din[7:0];
-		end
-		// Flash sequence tracking (only for $8000-$BFFF when battery=1)
-		else if (battery && !prg_ain[14]) begin
-			case (write_state)
-				STATE_IDLE: begin
-					write_state <= (unlock1_match && prg_din == 8'hAA) ? STATE_UNLOCK1 : STATE_IDLE;
-				end
+		write_state	<= SS_MAP1[ 9: 8];
+	end else if (ce) begin
+		if (prg_ain[15] && prg_write) begin
+			// Mapper register writes (battery=1: $C000-$FFFF, battery=0: $8000-$FFFF)
+			if (battery ? prg_ain[14] : 1'b1) begin
+				{nametable, chrbank, prgbank} <= prg_din[7:0];
+			end
+			// Flash sequence tracking (only for $8000-$BFFF when battery=1)
+			else if (battery && !prg_ain[14]) begin
+				case (write_state)
+					STATE_IDLE: begin
+						write_state <= (unlock1_match && prg_din == 8'hAA) ? STATE_UNLOCK1 : STATE_IDLE;
+					end
 
-				STATE_UNLOCK1: begin
-					write_state <= (unlock2_match && prg_din == 8'h55) ? STATE_UNLOCK2 : STATE_IDLE;
-				end
+					STATE_UNLOCK1: begin
+						write_state <= (unlock2_match && prg_din == 8'h55) ? STATE_UNLOCK2 : STATE_IDLE;
+					end
 
-				STATE_UNLOCK2: begin
-					if (unlock1_match && prg_din == 8'hA0) begin
-						write_state <= STATE_CMD;  // Byte program
-					end else begin
+					STATE_UNLOCK2: begin
+						write_state <= (unlock1_match && prg_din == 8'hA0) ? STATE_CMD : STATE_IDLE;
+					end
+
+					STATE_CMD: begin
 						write_state <= STATE_IDLE;
 					end
-				end
-
-				STATE_CMD: begin
-					// Data write - return to idle after
-					write_state <= STATE_IDLE;
-				end
-			endcase
+				endcase
+			end
 		end
 	end
 end
@@ -252,11 +248,7 @@ always begin
 end
 
 assign prg_aout = {3'b000, (prg_ain[15:14] == 2'b11) ? 5'b11111 : prgbank, prg_ain[13:0]};
-assign prg_allow = prg_ain[15] ? (
-	prg_read ? 1'b1 :  							// Always allow reads
-	battery ? (!prg_ain[14] && flash_write) :	// Flash writes OR mapper register
-	!prg_write									// Standard UNROM: reads only
-) : 1'b0;
+assign prg_allow = prg_ain[15] && (!prg_write || flash_write);
 assign chr_allow = flags[15];
 assign chr_aout = {flags[15] ? 7'b11_1111_1 : 7'b10_0000_0, (four_screen && chr_ain[13]) ? 2'b11 : chrbank, chr_ain[12:0]};
 assign vram_ce = chr_ain[13] && !four_screen;

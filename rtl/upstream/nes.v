@@ -133,6 +133,7 @@ module NES(
 	input         gg_reset,
 	output  [2:0] emphasis,
 	output        save_written,
+	output        mapper_has_flashsaves,
 	input         debug_dots,
 
 	// savestates
@@ -640,19 +641,22 @@ PPU ppu(
 
 wire [15:0] prg_addr = addr;
 wire [7:0] prg_din = (dbus & (prg_conflict ? cpumem_din : 8'hFF)) | (prg_conflict_d0 ? cpumem_din & 8'h01 : 8'h00);
-wire prg_conflict_d0;
 
 wire prg_read  = mr_int && cart_pre && (addr[15:5] != 11'b0100_0000_000) && !ppu_cs;
 wire prg_write = mw_int && cart_pre;
 
-wire prg_allow, prg_bus_write, prg_conflict, vram_a10, vram_ce, chr_allow;
+wire prg_allow, vram_a10, vram_ce, chr_allow;
 wire [24:0] prg_linaddr;
 wire [21:0] chr_linaddr;
 wire [7:0] prg_dout_mapper, chr_from_ppu_mapper;
-wire has_chr_from_ppu_mapper;
 wire [15:0] sample_ext;
+wire has_chr_from_ppu_mapper, prg_bus_write, prg_conflict, prg_conflict_d0, has_flashsaves;
 
-assign save_written = (mapper_flags[7:0] == 8'h14) ? (prg_linaddr[21:18] == 4'b1111 && prg_write && prg_allow) : (prg_addr[15:13] == 3'b011 && prg_write) | bram_write;
+assign save_written = has_flashsaves ? (!prg_linaddr[24] && prg_write && prg_allow) :                            // Flash save: writes to PRG-ROM
+                      (mapper_flags[7:0] == 8'h14) ? (prg_linaddr[21:18] == 4'b1111 && prg_write && prg_allow) : // Mapper 20/FDS
+                      (prg_addr[15:13] == 3'b011 && prg_write) | bram_write;                                     // Default - $6000-$7FFF or BRAM
+
+assign mapper_has_flashsaves = has_flashsaves;
 
 cart_top multi_mapper (
 	// FPGA specific
@@ -700,7 +704,8 @@ cart_top multi_mapper (
 	.prg_bus_write     (prg_bus_write),           // PRG data driven to bus
 	.prg_conflict      (prg_conflict),            // Simulate bus conflicts
 	.has_savestate     (mapper_has_savestate),    // Mapper supports savestates
-	.prg_conflict_d0  (prg_conflict_d0),        // Simulate bus conflicts for Mapper 144
+	.prg_conflict_d0   (prg_conflict_d0),         // Simulate bus conflicts for Mapper 144
+	.has_flashsaves    (has_flashsaves),          // Homebrew mapper that saves to PRG-ROM in flash memory
 	// User input/FDS controls
 	.fds_eject         (fds_eject),               // Used to trigger FDS disk changes
 	.fds_busy          (fds_busy),                // Used to trigger FDS disk changes
