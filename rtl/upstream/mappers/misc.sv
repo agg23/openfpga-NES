@@ -2867,7 +2867,7 @@ assign chr_dout = print_exp ? exp_letter : print_let ? letter : print_shp ? 8'h2
 endmodule
 
 // 111 - Cheapocabra/GTROM
-// Supports all features except LED and self-reflashing support
+// Supports all features except LED and sector erase flash command
 module Mapper111(
 	input        clk,         // System clock
 	input        ce,          // M2 ~cpu_clk
@@ -2917,29 +2917,64 @@ wire vram_ce, vram_a10;
 wire [15:0] audio = audio_in;
 wire irq;
 
-reg [15:0] flags_out = {12'h0, 1'b1, 3'b0};
+wire [15:0] flags_out = {10'h0, 1'b1, 1'b0, 1'b1, 3'b0}; // has_flashsaves, has_savestate
 reg [3:0] prgbank_reg;
 reg chrbank_reg;
 reg namebank_reg;
 
+reg [1:0] write_state;
+localparam [1:0] STATE_IDLE    = 2'b00,
+                 STATE_UNLOCK1 = 2'b01,
+                 STATE_UNLOCK2 = 2'b10,
+                 STATE_CMD     = 2'b11;
+
+wire unlock1_match = (prg_ain == 16'hD555);  // CPU $D555 (flash chip $5555, page 1)
+wire unlock2_match = (prg_ain == 16'hAAAA);  // CPU $AAAA (flash chip $2AAA, page 0)
+wire flash_write = (write_state == STATE_CMD) && prg_ain[15] && prg_write;
+
 always@(posedge clk) begin // register mask: 01x1 xxxx xxxx xxxx
     if (~enable) begin
         {prgbank_reg, chrbank_reg, namebank_reg} <= 0;
+        write_state	<= STATE_IDLE;
     end else if (SaveStateBus_load) begin
         prgbank_reg  <= SS_MAP1[ 3: 0];
         chrbank_reg  <= SS_MAP1[    4];
         namebank_reg <= SS_MAP1[    5];
-    end else if(ce & prg_write & prg_ain[12] & prg_ain[14] & !prg_ain[15]) begin
-        prgbank_reg <= prg_din[3:0];
-        chrbank_reg <= prg_din[4];
-        namebank_reg <= prg_din[5];
+        write_state	 <= SS_MAP1[ 7: 6];
+    end else if(ce) begin
+		if (prg_write & prg_ain[12] & prg_ain[14] & !prg_ain[15]) begin
+			prgbank_reg <= prg_din[3:0];
+			chrbank_reg <= prg_din[4];
+			namebank_reg <= prg_din[5];
+		end
+		// Flash sequence tracking to $8000-$FFFF
+		else if (prg_ain[15] && prg_write) begin
+            case (write_state)
+                STATE_IDLE: begin
+                    write_state <= (unlock1_match && prg_din == 8'hAA) ? STATE_UNLOCK1 : STATE_IDLE;
+                end
+
+                STATE_UNLOCK1: begin
+                    write_state <= (unlock2_match && prg_din == 8'h55) ? STATE_UNLOCK2 : STATE_IDLE;
+                end
+
+                STATE_UNLOCK2: begin
+					write_state <= (unlock1_match && prg_din == 8'hA0) ? STATE_CMD : STATE_IDLE;
+                end
+
+                STATE_CMD: begin
+                    write_state <= STATE_IDLE;
+                end
+            endcase
+        end
     end
 end
 
 assign SS_MAP1_BACK[ 3: 0] = prgbank_reg;
 assign SS_MAP1_BACK[    4] = chrbank_reg;
 assign SS_MAP1_BACK[    5] = namebank_reg;
-assign SS_MAP1_BACK[63: 6] = 58'b0; // free to be used
+assign SS_MAP1_BACK[ 7: 6] = write_state;
+assign SS_MAP1_BACK[63: 8] = 56'b0; // free to be used
 
 assign chr_aout[21:15] = 7'b11_1100_0;
 assign chr_aout[14:13] = {chr_ain[13], chr_ain[13]?namebank_reg:chrbank_reg};
@@ -2948,7 +2983,7 @@ assign vram_a10 = chr_aout[10];
 assign prg_aout[21:19] = 3'b000;
 assign prg_aout[18:15] = prgbank_reg;
 assign prg_aout[14:0] = prg_ain[14:0];
-assign prg_allow = prg_ain[15] && !prg_write;
+assign prg_allow = prg_ain[15] && (!prg_write || flash_write);
 assign chr_allow = 1'b1;
 assign prg_dout = 8'hFF;
 assign vram_ce = 1'b0;

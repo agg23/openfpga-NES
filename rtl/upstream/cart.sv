@@ -34,6 +34,7 @@ module cart_top (
 	output reg        prg_conflict,   // PRG Data is ROM & prg_din
 	output reg        has_savestate,  // mapper supports savestates
 	output reg        prg_conflict_d0,   // PRG Data is ROM & (prg_din | 1)
+	output reg        has_flashsaves, // Homebrew mapper that saves to PRG-ROM in flash memory
 	input       [9:0] prg_mask,       // PRG Mask for SDRAM translation
 	input       [9:0] chr_mask,       // CHR Mask for SDRAM translation
 	input             chr_ex,         // chr_addr is from an extra sprite read if high
@@ -197,7 +198,7 @@ Mapper28 map28(
 //*****************************************************************************//
 // Name   : UNROM 512                                                          //
 // Mappers: 30                                                                 //
-// Status : Basic Self Flashing/Needs testing                                  //
+// Status : Self flashing except sector erase                                  //
 // Notes  : Homebrew mapper                                                    //
 // Games  : More Glider                                                        //
 //*****************************************************************************//
@@ -1215,8 +1216,8 @@ Mapper107 map107(
 //*****************************************************************************//
 // Name   : GTROM                                                              //
 // Mappers: 111                                                                //
-// Status : Passes all tests except reflash test                               //
-// Notes  : No LED or self-reflash support                                     //
+// Status : Passes all tests except flash sector erase                         //
+// Notes  : No LED or flash sector erase                                       //
 // Games  : Super Homebrew War, Candelabra: Estoscerro, more homebrew          //
 //*****************************************************************************//
 Mapper111 map111(
@@ -2415,7 +2416,12 @@ always @* begin
 	{diskside} = {fds_diskside};
 
 	// Behavior helper flags
-	{prg_conflict_d0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout} = {flags_out_b[4], flags_out_b[3], flags_out_b[2], flags_out_b[1], flags_out_b[0]};
+	has_chr_dout    = flags_out_b[0];
+	prg_bus_write   = flags_out_b[1];
+	prg_conflict    = flags_out_b[2];
+	has_savestate   = flags_out_b[3];
+	prg_conflict_d0 = flags_out_b[4];
+	has_flashsaves  = flags_out_b[5];
 
 	// Address translation for SDRAM
 	if ((prg_aout[21] == 1'b0) && (prg_aout[24] == 1'b0))
