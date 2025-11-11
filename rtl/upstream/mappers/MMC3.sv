@@ -74,10 +74,10 @@ reg [1:0] cycle_counter;
 wire mapper158 = (flags[7:0] == 158);
 
 // This code detects rising edges on a12.
-reg old_a12_edge;
+reg old_a12_edge, a12_edge_delayed;
 reg [4:0] a12_ctr;
 wire a12_edge = (chr_ain_o[12] && a12_ctr == 0) || old_a12_edge;
-reg reload_extra = 0;
+
 always @(posedge clk) begin
 	if (SaveStateBus_load) begin
 		old_a12_edge       <= SS_MAP1[   33];
@@ -100,7 +100,6 @@ if (~enable) begin
 	prg_rom_bank_mode <= 0;
 	chr_K <= 0;
 	chr_a12_invert <= 0;
-	reload_extra <= 0;
 	mirroring <= 0;
 	{irq_enable, irq_reload} <= 0;
 	{irq_latch, counter} <= 0;
@@ -113,12 +112,13 @@ if (~enable) begin
 	cycle_counter <= 0;
 	irq <= 0;
 	irq_delay <= 0;
+	a12_edge_delayed <= 0;
 end else if (SaveStateBus_load) begin
 	irq                <= SS_MAP1[    0];
 	cycle_counter      <= SS_MAP1[ 2: 1];
 	irq_cycle_mode     <= SS_MAP1[    3];
 	next_irq_cycle_mode<= SS_MAP1[    4];
-	reload_extra       <= SS_MAP1[    5];
+	a12_edge_delayed   <= SS_MAP1[    5];
 	bank_select        <= SS_MAP1[ 9: 6];
 	prg_rom_bank_mode  <= SS_MAP1[   10];
 	chr_a12_invert     <= SS_MAP1[   11];
@@ -146,20 +146,33 @@ end else if (ce) begin
 	// Process these before writes so irq_reload and cycle_counter register writes take precedence.
 	cycle_counter <= cycle_counter + 1'd1;
 	irq_cycle_mode <= next_irq_cycle_mode;
+	a12_edge_delayed <= a12_edge;
 
-	if (irq_cycle_mode ? (cycle_counter == 3) : a12_edge) begin
-		if (counter == 8'h00) begin
-			counter <= irq_latch + ((irq_reload && reload_extra) ? 1'd1 : 1'd0);
-			if (~|({irq_latch, ((irq_reload && reload_extra) ? 1'd1 : 1'd0)}) && irq_reload && irq_enable) begin
+	if (irq_cycle_mode ? (cycle_counter == 3) : a12_edge_delayed) begin
+		if (irq_reload) begin
+		    if (|irq_latch) begin
+				// Wiki and Nintendulator source: OR with 1 if not zero
+				counter <= irq_latch | 8'h01;
+			end else begin
+				counter <= 8'h00;
+			end
+			if (~|irq_latch && irq_enable) begin
 				irq_delay <= 1;
 			end
-		end else begin
+			irq_reload <= 0;
+		end
+		else if (counter == 8'h00) begin
+			counter <= irq_latch;
+			if (~|irq_latch && irq_enable) begin
+				irq_delay <= 1;
+			end
+		end
+		else begin
 			counter <= counter - 1'd1;
 			if (counter == 8'h01 && irq_enable) begin
 				irq_delay <= 1;
 			end
 		end
-		irq_reload <= 0;
 	end
 
 	if (irq_delay) begin
@@ -190,10 +203,8 @@ end else if (ce) begin
 			3'b01_1: begin end
 			3'b10_0: irq_latch <= prg_din;                      // IRQ latch ($C000-$DFFE, even)
 			3'b10_1: begin
-						reload_extra <= |a12_ctr ? 1'd0 : 1'd1;
 						{irq_reload, next_irq_cycle_mode} <= {1'b1, prg_din[0]}; // IRQ reload ($C001-$DFFF, odd)
 						cycle_counter <= 0;
-						counter <= 0;
 					end
 			3'b11_0: {irq_enable, irq} <= 2'b00;                 // IRQ disable ($E000-$FFFE, even)
 			3'b11_1: {irq_enable, irq} <= 2'b10;                 // IRQ enable ($E001-$FFFF, odd)
@@ -205,7 +216,7 @@ assign SS_MAP1_BACK[    0] = irq;
 assign SS_MAP1_BACK[ 2: 1] = cycle_counter;
 assign SS_MAP1_BACK[    3] = irq_cycle_mode;
 assign SS_MAP1_BACK[    4] = next_irq_cycle_mode;
-assign SS_MAP1_BACK[    5] = reload_extra;
+assign SS_MAP1_BACK[    5] = a12_edge_delayed;
 assign SS_MAP1_BACK[ 9: 6] = bank_select;
 assign SS_MAP1_BACK[   10] = prg_rom_bank_mode;
 assign SS_MAP1_BACK[   11] = chr_a12_invert;
