@@ -17,7 +17,7 @@
     "release": {
         "folders": {
             "output_folder": "projects/output_files",
-            "pkg_folder": "pkg",
+            "pkg_folder": "pkg/pocket",
             "meta_folder": "pkg/meta",
             "stage_folder": "staging",
             "release_folder": "release"
