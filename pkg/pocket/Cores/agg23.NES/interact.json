@@ -30,13 +30,30 @@
       {
         "name": "Hide Overscan",
         "id": 40,
-        "type": "check",
+        "type": "list",
         "enabled": true,
-        "address": "0x200",
         "persist": true,
         "writeonly": true,
-        "defaultval": 1,
-        "value": 1
+		"address": "0x200",
+        "defaultval": 0,
+        "options": [
+          {
+            "value": 0,
+            "name": "Normal"
+          },
+          {
+            "value": 1,
+            "name": "Vertical Overscan"
+          },
+          {
+            "value": 2,
+            "name": "Borders"
+          },
+          {
+            "value": 3,
+            "name": "Everything"
+          }
+        ]
       },
       {
         "name": "Edge Masking",

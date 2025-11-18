@@ -329,10 +329,10 @@ module core_top (
         //   region <= bridge_wr_data[1:0];
         // end
         32'h200: begin
-          hide_overscan <= bridge_wr_data[0];
+          hide_overscan <= bridge_wr_data[1:0];
         end
         32'h204: begin
-          mask_vid_edges <= bridge_wr_data[1:0];
+          mask <= bridge_wr_data[1:0];
         end
         32'h208: begin
           allow_extra_sprites <= bridge_wr_data[0];
@@ -669,8 +669,8 @@ module core_top (
   // Settings
   reg [1:0] region = 0;
 
-  reg hide_overscan = 0;
-  reg [1:0] mask_vid_edges = 0;
+  reg [1:0] hide_overscan = 0;
+  reg [1:0] mask = 0;
   reg square_pixels = 0;
   reg allow_extra_sprites = 0;
   reg [2:0] selected_palette = 0;
@@ -685,8 +685,8 @@ module core_top (
 
   wire [1:0] region_s;
 
-  wire hide_overscan_s;
-  wire [1:0] mask_vid_edges_s;
+  wire [1:0] hide_overscan_s;
+  wire [1:0] mask_s;
   wire square_pixels_s;
   wire allow_extra_sprites_s;
   wire [2:0] selected_palette_s;
@@ -699,13 +699,25 @@ module core_top (
   wire [2:0] turbo_speed_s;
   wire swap_controllers_s;
 
+localparam [11:0] X_DEFAULT = 12'd64;
+localparam [11:0] X_LSB     = 12'd128;
+localparam [11:0] X_MSB     = 12'd4;
+
+localparam [11:0] Y_DEFAULT = 12'd49;
+localparam [11:0] Y_LSB     = 12'd105;
+localparam [11:0] Y_MSB     = 12'd3;
+
+// Combinational assignment using only hide_overscan
+wire [11:0] slot_x = (|hide_overscan_s) ? (hide_overscan_s[1] ? X_MSB : X_LSB) : X_DEFAULT;
+wire [11:0] slot_y = (|hide_overscan_s) ? (hide_overscan_s[1] ? Y_MSB : Y_LSB) : Y_DEFAULT;
+
   synch_3 #(
-      .WIDTH(24)
+      .WIDTH(26)
   ) settings_s (
       {
         region,
         hide_overscan,
-        mask_vid_edges,
+        mask,
         square_pixels,
         allow_extra_sprites,
         selected_palette,
@@ -719,7 +731,7 @@ module core_top (
       {
         region_s,
         hide_overscan_s,
-        mask_vid_edges_s,
+        mask_s,
         square_pixels_s,
         allow_extra_sprites_s,
         selected_palette_s,
@@ -741,7 +753,7 @@ module core_top (
 
   reg [31:0] reset_delay = 0;
 
-  wire hide_overscan_with_region = hide_overscan_s && region_s == 2'b0;
+  
 
   nes_top nes (
       .clk_74a(clk_74a),
@@ -804,8 +816,8 @@ module core_top (
       .p4_dpad_right(cont4_key_s[3]),
 
       // Settings
-      .hide_overscan(hide_overscan_with_region),
-      .mask_vid_edges(mask_vid_edges_s),
+      .hide_overscan(hide_overscan_s),
+      .mask(hide_overscan[1] ? 2'b00 : mask_s),
       .allow_extra_sprites(allow_extra_sprites_s),
       .selected_palette(selected_palette_s),
 
@@ -897,7 +909,7 @@ module core_top (
   reg de_prev;
 
   wire de = ~(h_blank || v_blank);
-  wire [23:0] video_slot_rgb = {9'b0, hide_overscan_with_region, square_pixels_s, 10'b0, 3'b0};
+  wire [24:0] video_slot_rgb = {9'b0, hide_overscan_s, square_pixels_s, 10'b0, 3'b0};
 
   always @(posedge clk_video_5_37) begin
     video_hs_reg  <= 0;

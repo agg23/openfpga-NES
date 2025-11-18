@@ -13,7 +13,7 @@
 -- Ver 312 WoS January 2015
 --   Undoc opcode timing fixes for $B3 (LAX iy) and $BB (LAS ay)
 --   Added comments in MCode section to find handling of individual opcodes more easily
---   All "basic" Lorenz instruction test (individual functional checks, CPUTIMING check) work now with 
+--   All "basic" Lorenz instruction test (individual functional checks, CPUTIMING check) work now with
 --       actual FPGAARCADE C64 core (sources used: SVN version 1021).
 --
 -- Ver 305, 306, 307, 308, 309, 310, 311 WoS January 2015
@@ -120,7 +120,7 @@
 --              DI      => cpu_din_s,
 --              DO      => cpu_dout_s
 --          );
---      cpu_din_s <= cpu_dout_s when cpu_rwn_s='0' else 
+--      cpu_din_s <= cpu_dout_s when cpu_rwn_s='0' else
 --                   [....other sources from peripherals and memories...]
 --
 -- ----- IMPORTANT NOTES -----
@@ -130,7 +130,7 @@ library IEEE;
   use IEEE.std_logic_1164.all;
   use IEEE.numeric_std.all;
   use work.T65_Pack.all;
-  
+
   use work.pBus_savestates.all;
 
 entity T65 is
@@ -139,6 +139,7 @@ entity T65 is
     BCD_en  : in  std_logic := '1';             -- '0' => 2A03/2A07, '1' => others
 
     Res_n   : in  std_logic;
+    Pwr_n   : in  std_logic; -- Cold boot, power reset, must be paired with reset
     Enable  : in  std_logic;
     Clk     : in  std_logic;
     Rdy     : in  std_logic;
@@ -163,7 +164,7 @@ entity T65 is
     DEBUG   : out T_t65_dbg;
     NMI_ack : out std_logic;
     Instrnew: out std_logic;
-    -- savestates              
+    -- savestates
     SaveStateBus_Din  : in  std_logic_vector(63 downto 0);
     SaveStateBus_Adr  : in  std_logic_vector(9 downto 0);
     SaveStateBus_wren : in  std_logic;
@@ -256,30 +257,30 @@ architecture rtl of T65 is
   signal WRn_i          : std_logic;
 
   signal NMI_entered    : std_logic;
-  
+
   	-- savestates
 	signal reg_wired_or_0 : std_logic_vector(63 downto 0);
 	signal reg_wired_or_1 : std_logic_vector(63 downto 0);
 	signal reg_wired_or_2 : std_logic_vector(63 downto 0);
 
 	signal SS_1      : std_logic_vector(63 downto 0);
-	signal SS_1_BACK : std_logic_vector(63 downto 0);	
+	signal SS_1_BACK : std_logic_vector(63 downto 0);
 	signal SS_2      : std_logic_vector(63 downto 0);
-	signal SS_2_BACK : std_logic_vector(63 downto 0);	
+	signal SS_2_BACK : std_logic_vector(63 downto 0);
 	signal SS_3      : std_logic_vector(63 downto 0);
-	signal SS_3_BACK : std_logic_vector(63 downto 0);	
+	signal SS_3_BACK : std_logic_vector(63 downto 0);
 
 begin
 
-  iREG_SAVESTATE_T80_1 : entity work.eReg_SavestateV generic map (0, x"E064000000000000") port map (Clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, reg_wired_or_0, SS_1_BACK, SS_1);  
-  iREG_SAVESTATE_T80_2 : entity work.eReg_SavestateV generic map (1, x"0000012000000001") port map (Clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, reg_wired_or_1, SS_2_BACK, SS_2);  
-  iREG_SAVESTATE_T80_3 : entity work.eReg_SavestateV generic map (2, x"0000000000000000") port map (Clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, reg_wired_or_2, SS_3_BACK, SS_3);  
+  iREG_SAVESTATE_T80_1 : entity work.eReg_SavestateV generic map (0, x"E064000000000000") port map (Clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, reg_wired_or_0, SS_1_BACK, SS_1);
+  iREG_SAVESTATE_T80_2 : entity work.eReg_SavestateV generic map (1, x"0000012000000001") port map (Clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, reg_wired_or_1, SS_2_BACK, SS_2);
+  iREG_SAVESTATE_T80_3 : entity work.eReg_SavestateV generic map (2, x"0000000000000000") port map (Clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, reg_wired_or_2, SS_3_BACK, SS_3);
   SaveStateBus_Dout <= reg_wired_or_0 or reg_wired_or_1 or reg_wired_or_2;
-  
+
 
   NMI_ack <= NMIAct;
 
-  -- gate Rdy with read/write to make an "OK, it's really OK to stop the processor 
+  -- gate Rdy with read/write to make an "OK, it's really OK to stop the processor
   really_rdy <= Rdy or not(WRn_i);
   Sync <= '1' when MCycle = "000" else '0';
   EF <= EF_i;
@@ -353,44 +354,44 @@ begin
 
   -- the 65xx design requires at least two clock cycles before
   -- starting its reset sequence (according to datasheet)
-  process (Res_n, Clk)
+  process (Res_n, Clk, Enable)
   begin
     if Res_n = '0' then
       Res_n_i <= '0';
       Res_n_d <= '0';
-    elsif Clk'event and Clk = '1' then
+    elsif Clk'event and Clk = '1' and Enable = '1' then
       Res_n_i <= Res_n_d;
       Res_n_d <= '1';
     end if;
   end process;
-  
-  
-  SS_1_BACK(15 downto  0) <= std_logic_vector(PC);            
-  SS_1_BACK(23 downto 16) <= IR;            
+
+
+  SS_1_BACK(15 downto  0) <= std_logic_vector(PC);
+  SS_1_BACK(23 downto 16) <= IR;
   SS_1_BACK(31 downto 24) <= std_logic_vector(S(7 downto 0));
-  SS_1_BACK(39 downto 32) <= PBR;           
-  SS_1_BACK(47 downto 40) <= DBR;           
-  SS_1_BACK(49 downto 48) <= Mode_r;        
-  SS_1_BACK(          50) <= BCD_en_r;      
-  SS_1_BACK(54 downto 51) <= std_logic_vector(to_unsigned(T_ALU_Op'POS(ALU_Op_r), 4));     
-  SS_1_BACK(58 downto 55) <= std_logic_vector(to_unsigned(T_Write_Data'POS(Write_Data_r), 4));  
-  SS_1_BACK(60 downto 59) <= std_logic_vector(to_unsigned(T_Set_Addr_To'POS(Set_Addr_To_r), 2));  
-  SS_1_BACK(          61) <= WRn_i;         
-  SS_1_BACK(          62) <= EF_i;          
-  SS_1_BACK(          63) <= MF_i;          
-  SS_2_BACK(           0) <= XF_i;          
-  SS_2_BACK(           1) <= rdy_mod;          
+  SS_1_BACK(39 downto 32) <= PBR;
+  SS_1_BACK(47 downto 40) <= DBR;
+  SS_1_BACK(49 downto 48) <= Mode_r;
+  SS_1_BACK(          50) <= BCD_en_r;
+  SS_1_BACK(54 downto 51) <= std_logic_vector(to_unsigned(T_ALU_Op'POS(ALU_Op_r), 4));
+  SS_1_BACK(58 downto 55) <= std_logic_vector(to_unsigned(T_Write_Data'POS(Write_Data_r), 4));
+  SS_1_BACK(60 downto 59) <= std_logic_vector(to_unsigned(T_Set_Addr_To'POS(Set_Addr_To_r), 2));
+  SS_1_BACK(          61) <= WRn_i;
+  SS_1_BACK(          62) <= EF_i;
+  SS_1_BACK(          63) <= MF_i;
+  SS_2_BACK(           0) <= XF_i;
+  SS_2_BACK(           1) <= rdy_mod;
 
   process (Clk)
   begin
     if Clk'event and Clk = '1' then
-      if Res_n_i = '0' then
+      if Pwr_n = '0' then
+        S <= (others => '0');
+      elsif Res_n_i = '0' then
         PC             <= unsigned(SS_1(15 downto  0));      -- (others => '0');  -- Program Counter
         IR             <= SS_1(23 downto 16);                -- "00000000";
-        S(15 downto 8) <= (others => '0');                                             -- Dummy
-        S( 7 downto 0) <= unsigned(SS_1(31 downto 24));      -- (others => '0');       -- Dummy
         PBR            <= SS_1(39 downto 32);                -- (others => '0');
-        DBR            <= SS_1(47 downto 40);                -- (others => '0');                                                    
+        DBR            <= SS_1(47 downto 40);                -- (others => '0');
         Mode_r         <= SS_1(49 downto 48);                -- (others => '0');
         BCD_en_r       <= SS_1(          50);                -- '1';
         ALU_Op_r       <= T_ALU_Op'VAL(to_integer(unsigned(SS_1(54 downto 51))));  -- ALU_OP_BIT; -- "1100"
@@ -400,9 +401,10 @@ begin
         EF_i           <= SS_1(          62);                -- '1';
         MF_i           <= SS_1(          63);                -- '1';
         XF_i           <= SS_2(           0);                -- '1';
-        
+
       elsif (SaveStateBus_load = '1') then
-      
+        S(15 downto 8) <= (others => '0');                                             -- Dummy
+        S( 7 downto 0) <= unsigned(SS_1(31 downto 24));      -- (others => '0');       -- Dummy
         rdy_mod <= SS_2(1);
 
       elsif (Enable = '1') then
@@ -485,28 +487,33 @@ begin
 
   PCAdder <= resize(PC(7 downto 0),9) + resize(unsigned(DL(7) & DL),9) when PCAdd = '1'
          else "0" & PC(7 downto 0);
-         
+
   SS_2_BACK( 9 downto  2) <= P;
   SS_2_BACK(17 downto 10) <= ABC(7 downto 0);
-  SS_2_BACK(25 downto 18) <= X(7 downto 0);  
-  SS_2_BACK(33 downto 26) <= Y(7 downto 0);  
-  SS_2_BACK(          34) <= IRQ_n_o;        
-  SS_2_BACK(          35) <= NMI_n_o;        
-  SS_2_BACK(          36) <= SO_n_o;         
+  SS_2_BACK(25 downto 18) <= X(7 downto 0);
+  SS_2_BACK(33 downto 26) <= Y(7 downto 0);
+  SS_2_BACK(          34) <= IRQ_n_o;
+  SS_2_BACK(          35) <= NMI_n_o;
+  SS_2_BACK(          36) <= SO_n_o;
 
   process (Clk)
     variable tmpP:std_logic_vector(7 downto 0);--Lets try to handle loading P at mcycle=0 and set/clk flags at same cycle
   begin
     if Clk'event and Clk = '1' then
-      if Res_n_i = '0' then
-        P <= SS_2(9 downto 2); -- x"00"; -- ensure we have nothing set on reset      
+      if (Pwr_n = '0') then
+        ABC            <= (others => '0');
+        X              <= (others => '0');
+        Y              <= (others => '0');
+        P              <= (others => '0');
       elsif (SaveStateBus_load = '1') then
+        P <= SS_2(9 downto 2); -- x"00";
         ABC(7 downto 0) <= SS_2(17 downto 10);
         X(7 downto 0)   <= SS_2(25 downto 18);
         Y(7 downto 0)   <= SS_2(33 downto 26);
         IRQ_n_o         <= SS_2(          34);
         NMI_n_o         <= SS_2(          35);
         SO_n_o          <= SS_2(          36);
+
       elsif (Enable = '1') then
         tmpP:=P;
         if (really_rdy = '1') then
@@ -556,7 +563,9 @@ begin
           end if;
           if RstCycle = '1' then
             tmpP(Flag_I) := '1';
-            tmpP(Flag_D) := '0';
+            if mode /= "00" then
+              tmpP(Flag_D) := '0';
+            end if;
           end if;
           tmpP(Flag_1) := '1';
 
@@ -590,12 +599,12 @@ begin
 ---------------------------------------------------------------------------
 
   SS_3_BACK( 7 downto  0) <= BusA_r;
-  SS_3_BACK(15 downto  8) <= BusB;  
+  SS_3_BACK(15 downto  8) <= BusB;
   SS_3_BACK(23 downto 16) <= BusB_r;
-  SS_3_BACK(31 downto 24) <= AD;    
-  SS_3_BACK(40 downto 32) <= BAL;   
-  SS_3_BACK(48 downto 41) <= BAH;   
-  SS_3_BACK(56 downto 49) <= DL;    
+  SS_3_BACK(31 downto 24) <= AD;
+  SS_3_BACK(40 downto 32) <= BAL;
+  SS_3_BACK(48 downto 41) <= BAH;
+  SS_3_BACK(56 downto 49) <= DL;
   SS_3_BACK(          57) <= NMI_entered;
   SS_3_BACK(63 downto 58) <= (others => '0'); -- free to use
 
@@ -743,11 +752,11 @@ begin
 --
 -------------------------------------------------------------------------
 
-  SS_2_BACK(39 downto 37) <= MCycle;  
+  SS_2_BACK(39 downto 37) <= MCycle;
   SS_2_BACK(          40) <= RstCycle;
   SS_2_BACK(          41) <= IRQCycle;
   SS_2_BACK(          42) <= NMICycle;
-  SS_2_BACK(          43) <= NMIAct;  
+  SS_2_BACK(          43) <= NMIAct;
   SS_2_BACK(63 downto 44) <= (others => '0'); -- free to use
 
   Instrnew <= '1' when (MCycle = LCycle and Break = '0') else '0';
@@ -778,7 +787,7 @@ begin
             MCycle <= std_logic_vector(unsigned(MCycle) + 1);
           end if;
         end if;
-        --detect NMI even if not rdy    
+        --detect NMI even if not rdy
         if NMI_n_o = '1' and (NMI_n = '0' and (IR(4 downto 0)/="10000" or Jump/="01")) then -- branches have influence on NMI start (not best way yet, though - but works...)
           NMIAct <= '1';
         end if;

@@ -130,7 +130,7 @@ module SquareChan (
 	input  logic [7:0] lc_load,
 	input  logic       LenCtr_Clock,
 	input  logic       Env_Clock,
-	input  logic       odd_or_even,
+	input  logic       get_or_put,
 	input  logic       Enabled,
 	output logic [3:0] Sample,
 	output logic       IsNonZero
@@ -356,7 +356,7 @@ module TriangleChan (
 			endcase
 		end
 
-		if (reset) begin
+		if (cold_reset) begin
 			sample_latch <= 4'hF;
 			Period <= 0;
 			TimerCtr <= 0;
@@ -500,7 +500,7 @@ module DmcChan #(parameter [9:0] SSREG_INDEX_DMC1, parameter [9:0] SSREG_INDEX_D
 	output logic  [6:0] Sample,
 	output logic        dma_req,      // 1 when DMC wants DMA
 	output logic        enable,
-	// savestates              
+	// savestates
 	input       [63:0]  SaveStateBus_Din,
 	input       [ 9:0]  SaveStateBus_Adr,
 	input               SaveStateBus_wren,
@@ -508,18 +508,17 @@ module DmcChan #(parameter [9:0] SSREG_INDEX_DMC1, parameter [9:0] SSREG_INDEX_D
 	input               SaveStateBus_load,
 	output      [63:0]  SaveStateBus_Dout
 );
-
 	// Savestates
 	localparam SAVESTATE_MODULES    = 2;
 	wire [63:0] SaveStateBus_wired_or[0:SAVESTATE_MODULES-1];
 	assign SaveStateBus_Dout = SaveStateBus_wired_or[0] | SaveStateBus_wired_or[1];
 
 	wire [63:0] SS_DMC1;
-	wire [63:0] SS_DMC1_BACK;	
+	wire [63:0] SS_DMC1_BACK;
 	wire [63:0] SS_DMC2;
 	wire [63:0] SS_DMC2_BACK;
-	eReg_SavestateV #(SSREG_INDEX_DMC1, SSREG_DEFAULT_APU_DMC1) iREG_SAVESTATE_APU_DMC1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_DMC1_BACK, SS_DMC1);  
-	eReg_SavestateV #(SSREG_INDEX_DMC2, SSREG_DEFAULT_APU_DMC2) iREG_SAVESTATE_APU_DMC2 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[1], SS_DMC2_BACK, SS_DMC2);  
+	eReg_SavestateV #(SSREG_INDEX_DMC1, SSREG_DEFAULT_APU_DMC1) iREG_SAVESTATE_APU_DMC1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_DMC1_BACK, SS_DMC1);
+	eReg_SavestateV #(SSREG_INDEX_DMC2, SSREG_DEFAULT_APU_DMC2) iREG_SAVESTATE_APU_DMC2 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[1], SS_DMC2_BACK, SS_DMC2);
 
 	logic irq_enable;
 	logic loop;                 // Looping enabled
@@ -554,7 +553,7 @@ module DmcChan #(parameter [9:0] SSREG_INDEX_DMC1, parameter [9:0] SSREG_INDEX_D
 	};
 
 	assign Sample = dmc_volume_next[6:0];
-	assign dma_req = ~have_buffer & enable & enable_3;
+	assign dma_req = ~have_buffer & enable_3;
 	logic dmc_clock;
 
 	assign dma_address[15] = 1;
@@ -590,7 +589,7 @@ module DmcChan #(parameter [9:0] SSREG_INDEX_DMC1, parameter [9:0] SSREG_INDEX_D
 			endcase
 		end
 
-		if (aclk1_d) begin
+		if (aclk1_d) begin // Put cycle
 			enable_1 <= enable;
 			enable_2 <= enable_1;
 			dmc_lsfr <= {dmc_lsfr[7:0], (dmc_lsfr[8] ^ dmc_lsfr[4]) | ~|dmc_lsfr};
@@ -639,7 +638,7 @@ module DmcChan #(parameter [9:0] SSREG_INDEX_DMC1, parameter [9:0] SSREG_INDEX_D
 
 		// Volume adjustment is done on aclk1. Technically, the value written to 4011 is immediately
 		// applied, but won't "stick" if it conflicts with a lsfr clocked do-adjust.
-		if (aclk1) begin
+		if (aclk1) begin // Get cycle
 			enable_1 <= enable;
 			enable_3 <= enable_2;
 
@@ -650,7 +649,7 @@ module DmcChan #(parameter [9:0] SSREG_INDEX_DMC1, parameter [9:0] SSREG_INDEX_D
 			end
 		end
 
-	   if (reset) begin
+		if (reset) begin
 			irq                     <= SS_DMC1[    0]; // 0;
 			dmc_volume              <= SS_DMC1[ 8: 1]; // {7'h0, dmc_volume[0]};
 			dmc_volume_next         <= SS_DMC1[16: 9]; // {7'h0, dmc_volume[0]};
@@ -690,21 +689,21 @@ module DmcChan #(parameter [9:0] SSREG_INDEX_DMC1, parameter [9:0] SSREG_INDEX_D
 		end
 
 	end
-	
-	assign SS_DMC1_BACK[    0] = irq;            
-	assign SS_DMC1_BACK[ 8: 1] = dmc_volume;     
+
+	assign SS_DMC1_BACK[    0] = irq;
+	assign SS_DMC1_BACK[ 8: 1] = dmc_volume;
 	assign SS_DMC1_BACK[16: 9] = dmc_volume_next;
-	assign SS_DMC1_BACK[24:17] = sample_shift;   
+	assign SS_DMC1_BACK[24:17] = sample_shift;
 	assign SS_DMC1_BACK[36:25] = bytes_remaining;
-	assign SS_DMC1_BACK[39:37] = dmc_bits;       
-	assign SS_DMC1_BACK[47:40] = sample_buffer;  
-	assign SS_DMC1_BACK[   48] = have_buffer;    
-	assign SS_DMC1_BACK[   49] = enable;         
-	assign SS_DMC1_BACK[   50] = enable_1;       
-	assign SS_DMC1_BACK[   51] = enable_2;       
-	assign SS_DMC1_BACK[   52] = enable_3;       
+	assign SS_DMC1_BACK[39:37] = dmc_bits;
+	assign SS_DMC1_BACK[47:40] = sample_buffer;
+	assign SS_DMC1_BACK[   48] = have_buffer;
+	assign SS_DMC1_BACK[   49] = enable;
+	assign SS_DMC1_BACK[   50] = enable_1;
+	assign SS_DMC1_BACK[   51] = enable_2;
+	assign SS_DMC1_BACK[   52] = enable_3;
 	assign SS_DMC1_BACK[63:53] = 11'b0; // free to be used
-	
+
 	assign SS_DMC2_BACK[14: 0] = dma_address[14:0];
 	assign SS_DMC2_BACK[23:15] = dmc_lsfr;
 	assign SS_DMC2_BACK[   24] = loop;
@@ -715,7 +714,7 @@ module DmcChan #(parameter [9:0] SSREG_INDEX_DMC1, parameter [9:0] SSREG_INDEX_D
 	assign SS_DMC2_BACK[   46] = dmc_clock;
 	assign SS_DMC2_BACK[   47] = dmc_silence;
 	assign SS_DMC2_BACK[63:48] = 16'b0; // free to be used
-	
+
 endmodule
 
 module FrameCtr #(parameter [9:0] SSREG_INDEX_FCT) (
@@ -735,7 +734,7 @@ module FrameCtr #(parameter [9:0] SSREG_INDEX_FCT) (
 	output logic irq_flag,
 	output logic frame_half,
 	output logic frame_quarter,
-	// savestates              
+	// savestates
 	input       [63:0]  SaveStateBus_Din,
 	input       [ 9:0]  SaveStateBus_Adr,
 	input               SaveStateBus_wren,
@@ -746,8 +745,8 @@ module FrameCtr #(parameter [9:0] SSREG_INDEX_FCT) (
 
 	// Savestates
 	wire [63:0] SS_FCT;
-	wire [63:0] SS_FCT_BACK;	
-	eReg_SavestateV #(SSREG_INDEX_FCT, SSREG_DEFAULT_APU_FCT) iREG_SAVESTATE_APU_FCT (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_Dout, SS_FCT_BACK, SS_FCT);  
+	wire [63:0] SS_FCT_BACK;
+	eReg_SavestateV #(SSREG_INDEX_FCT, SSREG_DEFAULT_APU_FCT) iREG_SAVESTATE_APU_FCT (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_Dout, SS_FCT_BACK, SS_FCT);
 
 	// NTSC -- Confirmed
 	// Binary Frame Value         Decimal  Cycle
@@ -802,30 +801,33 @@ module FrameCtr #(parameter [9:0] SSREG_INDEX_FCT) (
 	assign frame_half = (frm_b | frm_d | frm_e | (w4017_2 & seq_mode));
 	assign frame_quarter = (frm_a | frm_b | frm_c | frm_d | frm_e | (w4017_2 & seq_mode));
 
-	always_ff @(posedge clk) begin : apu_block
+	logic frame_interrupt_clear_pending;
 
-		if (aclk1) begin
+	always_ff @(posedge clk) begin : apu_block
+		// The priority of all these statements is important in which takes precident
+		if (addr == 2'h1 && read)
+			FrameInterrupt <= 0;
+
+		if (set_irq) begin
+			FrameInterrupt <= 1;
+			frame_interrupt_buffer <= 1;
+		end
+
+		if (aclk1) begin // Get cycle
 			frame <= frame_reset_2 ? 15'h7FFF : {frame[13:0], ((frame[14] ^ frame[13]) | ~|frame)};
 			w4017_2 <= w4017_1;
 			w4017_1 <= 0;
 			FrameSeqMode_2 <= FrameSeqMode;
 			frame_reset_2 <= 0;
+			if (~FrameInterrupt) frame_interrupt_buffer <= 0;
 		end
 
 		if (aclk2 & frame_reset)
 			frame_reset_2 <= 1;
 
-		// Continously update the Frame IRQ state and read buffer
-		if (set_irq & ~frame_int_disabled) begin
-			FrameInterrupt <= 1;
-			frame_interrupt_buffer <= 1;
-		end else if (addr == 2'h1 && read)
+		if (frame_int_disabled) begin
 			FrameInterrupt <= 0;
-		else
-			frame_interrupt_buffer <= FrameInterrupt;
-
-		if (frame_int_disabled)
-			FrameInterrupt <= 0;
+		end
 
 		if (write_ce && addr == 3 && ~MMC5) begin  // Register $4017
 			FrameSeqMode <= din[7];
@@ -851,12 +853,12 @@ module FrameCtr #(parameter [9:0] SSREG_INDEX_FCT) (
 			end
 		end
 	end
-	
-	assign SS_FCT_BACK[14: 0] = frame;                 
-	assign SS_FCT_BACK[   15] = FrameInterrupt;        
+
+	assign SS_FCT_BACK[14: 0] = frame;
+	assign SS_FCT_BACK[   15] = FrameInterrupt;
 	assign SS_FCT_BACK[   16] = frame_interrupt_buffer;
-	assign SS_FCT_BACK[   17] = w4017_1;               
-	assign SS_FCT_BACK[   18] = w4017_2;               
+	assign SS_FCT_BACK[   17] = w4017_1;
+	assign SS_FCT_BACK[   18] = w4017_2;
 	assign SS_FCT_BACK[   19] = DisableFrameInterrupt;
 	assign SS_FCT_BACK[   20] = FrameSeqMode;
 	assign SS_FCT_BACK[   21] = FrameSeqMode_2;
@@ -881,14 +883,16 @@ module APU #(parameter [9:0] SSREG_INDEX_TOP, parameter [9:0] SSREG_INDEX_DMC1, 
 	input  logic        CS,
 	input  logic  [4:0] audio_channels, // Enabled audio channels
 	input  logic  [7:0] DmaData,        // Input data to DMC from memory.
-	input  logic        odd_or_even,
+	input  logic        get_or_put,
 	input  logic        DmaAck,         // 1 when DMC byte is on DmcData. DmcDmaRequested should go low.
 	output logic  [7:0] DOUT,           // Data from APU
 	output logic [15:0] Sample,
 	output logic        DmaReq,         // 1 when DMC wants DMA
 	output logic [15:0] DmaAddr,        // Address DMC wants to read
 	output logic        IRQ,            // IRQ asserted high == asserted
-	// savestates              
+	output logic        get_ce,         // Clock enable for a get cycle
+	output logic        put_ce,         // Clock enable for a put cycle
+	// savestates
 	input       [63:0]  SaveStateBus_Din,
 	input       [ 9:0]  SaveStateBus_Adr,
 	input               SaveStateBus_wren,
@@ -902,10 +906,10 @@ module APU #(parameter [9:0] SSREG_INDEX_TOP, parameter [9:0] SSREG_INDEX_DMC1, 
 	localparam SAVESTATE_MODULES    = 3;
 	wire [63:0] SaveStateBus_wired_or[0:SAVESTATE_MODULES-1];
 	assign SaveStateBus_Dout = SaveStateBus_wired_or[0] | SaveStateBus_wired_or[1] | SaveStateBus_wired_or[2];
-	
+
 	wire [63:0] SS_APU;
 	wire [63:0] SS_APU_BACK;
-	eReg_SavestateV #(SSREG_INDEX_TOP, SSREG_DEFAULT_APU_TOP) iREG_SAVESTATE_APU_TOP (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_APU_BACK, SS_APU);  
+	eReg_SavestateV #(SSREG_INDEX_TOP, SSREG_DEFAULT_APU_TOP) iREG_SAVESTATE_APU_TOP (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_APU_BACK, SS_APU);
 
 
 	logic [7:0] len_counter_lut[32];
@@ -939,10 +943,13 @@ module APU #(parameter [9:0] SSREG_INDEX_TOP, parameter [9:0] SSREG_INDEX_DMC1, 
 	// aclk2    -- Aligned with CPU phi2, also every other frame
 	// write    -- Happens on CPU phi2 (Not M2!). Most of these are latched by one of the above clocks.
 	logic aclk1, aclk2, aclk1_delayed, phi1;
-	assign aclk1 = ce & odd_or_even;          // Defined as the cpu tick when the frame counter increases
-	assign aclk2 = phi2_ce & ~odd_or_even;                   // Tick on odd cycles, not 50% duty cycle so it covers 2 cpu cycles
-	assign aclk1_delayed = ce & ~odd_or_even; // Ticks 1 cpu cycle after frame counter
+	assign aclk1 = ce & get_or_put;          // Defined as the cpu tick when the frame counter increases
+	assign aclk2 = phi2_ce & ~get_or_put;    // Tick on odd cycles, not 50% duty cycle so it covers 2 cpu cycles
+	assign aclk1_delayed = ce & ~get_or_put; // Ticks 1 cpu cycle after frame counter
 	assign phi1 = ce;
+
+	assign get_ce = aclk1;
+	assign put_ce = aclk1_delayed;
 
 	logic [4:0] Enabled;
 	logic [3:0] Sq1Sample,Sq2Sample,TriSample,NoiSample;
@@ -959,7 +966,7 @@ module APU #(parameter [9:0] SSREG_INDEX_TOP, parameter [9:0] SSREG_INDEX_DMC1, 
 	assign ApuMW1 = ADDR[4:2]==1; // SQ2
 	assign ApuMW2 = ADDR[4:2]==2; // TRI
 	assign ApuMW3 = ADDR[4:2]==3; // NOI
-	assign ApuMW4 = ADDR[4:2]>=4; // DMC
+	assign ApuMW4 = ADDR[4:2]==4 || ADDR[4:0]==5'b10101; // DMC
 	assign ApuMW5 = ADDR[4:2]==5; // Control registers
 
 	logic Sq1NonZero, Sq2NonZero, TriNonZero, NoiNonZero;
@@ -1018,7 +1025,7 @@ module APU #(parameter [9:0] SSREG_INDEX_TOP, parameter [9:0] SSREG_INDEX_DMC1, 
 		.lc_load      (lc_load),
 		.LenCtr_Clock (ClkL),
 		.Env_Clock    (ClkE),
-		.odd_or_even  (odd_or_even),
+		.get_or_put   (get_or_put),
 		.Enabled      (Enabled[0]),
 		.Sample       (Sq1Sample),
 		.IsNonZero    (Sq1NonZero)
@@ -1039,7 +1046,7 @@ module APU #(parameter [9:0] SSREG_INDEX_TOP, parameter [9:0] SSREG_INDEX_DMC1, 
 		.lc_load      (lc_load),
 		.LenCtr_Clock (ClkL),
 		.Env_Clock    (ClkE),
-		.odd_or_even  (odd_or_even),
+		.get_or_put   (get_or_put),
 		.Enabled      (Enabled[1]),
 		.Sample       (Sq2Sample),
 		.IsNonZero    (Sq2NonZero)
@@ -1102,7 +1109,7 @@ module APU #(parameter [9:0] SSREG_INDEX_TOP, parameter [9:0] SSREG_INDEX_DMC1, 
 		.dma_req     (DmaReq),
 		.enable      (IsDmcActive),
 		// savestates
-		.SaveStateBus_Din  (SaveStateBus_Din ), 
+		.SaveStateBus_Din  (SaveStateBus_Din ),
 		.SaveStateBus_Adr  (SaveStateBus_Adr ),
 		.SaveStateBus_wren (SaveStateBus_wren),
 		.SaveStateBus_rst  (SaveStateBus_rst ),
@@ -1139,7 +1146,7 @@ module APU #(parameter [9:0] SSREG_INDEX_TOP, parameter [9:0] SSREG_INDEX_DMC1, 
 		.frame_half   (frame_half),
 		.frame_quarter(frame_quarter),
 		// savestates
-		.SaveStateBus_Din  (SaveStateBus_Din ), 
+		.SaveStateBus_Din  (SaveStateBus_Din ),
 		.SaveStateBus_Adr  (SaveStateBus_Adr ),
 		.SaveStateBus_wren (SaveStateBus_wren),
 		.SaveStateBus_rst  (SaveStateBus_rst ),
