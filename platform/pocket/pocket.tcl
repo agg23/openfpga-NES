@@ -38,7 +38,7 @@ set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 # ==============================================================================
 # Signal Tap Assignments
 # ==============================================================================
-set_global_assignment -name ENABLE_SIGNALTAP ON
+set_global_assignment -name ENABLE_SIGNALTAP OFF
 
 # ==============================================================================
 # Pin & Location Assignments

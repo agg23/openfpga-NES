@@ -129,7 +129,7 @@ module save_state_controller (
   );
   defparam fifo_load.intended_device_family = "Cyclone V", fifo_load.lpm_numwords = 4096,
       fifo_load.lpm_showahead = "OFF", fifo_load.lpm_type = "dcfifo_mixed_widths",
-      fifo_load.lpm_width = 32, fifo_load.lpm_widthu = 12,
+      fifo_load.lpm_width = 32, fifo_load.lpm_widthu = 12, fifo_load.ram_block_type = "M10K",
       fifo_load.lpm_widthu_r = 11, fifo_load.lpm_width_r = 64, fifo_load.overflow_checking = "OFF",
       fifo_load.rdsync_delaypipe = 5, fifo_load.underflow_checking = "ON", fifo_load.use_eab = "ON",
       fifo_load.wrsync_delaypipe = 5, fifo_load.write_aclr_synch = "ON";
@@ -163,7 +163,7 @@ module save_state_controller (
   );
   defparam fifo_save.intended_device_family = "Cyclone V", fifo_save.lpm_numwords = 4,
       fifo_save.lpm_showahead = "OFF", fifo_save.lpm_type = "dcfifo_mixed_widths",
-      fifo_save.lpm_width = 64, fifo_save.lpm_widthu = 2, fifo_save.lpm_widthu_r = 3,
+      fifo_save.lpm_width = 64, fifo_save.lpm_widthu = 2, fifo_save.ram_block_type = "M10K", fifo_save.lpm_widthu_r = 3,
       fifo_save.lpm_width_r = 32, fifo_save.overflow_checking = "ON",
       fifo_save.rdsync_delaypipe = 5, fifo_save.underflow_checking = "ON", fifo_save.use_eab = "ON",
       fifo_save.wrsync_delaypipe = 5;

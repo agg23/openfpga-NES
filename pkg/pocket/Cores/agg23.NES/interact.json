@@ -11,6 +11,17 @@
         "value": 1
       },
       {
+        "name": "Enable Analogizer",
+        "id": 31,
+        "type": "check",
+        "enabled": true,
+        "address": "0x31C",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "value": 1
+      },
+      {
         "name": "Use Multitap",
         "id": 20,
         "type": "check",
@@ -26,6 +37,26 @@
         "id": 39,
         "type": "action",
         "enabled": false
+      },
+      {
+        "name": "Video Dejitter",
+        "id": 44,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x32C",
+        "defaultval": 0,
+        "options": [
+          {
+            "value": 0,
+            "name": "Enabled"
+          },
+          {
+            "value": 1,
+            "name": "Disabled"
+          }
+        ]
       },
       {
         "name": "Hide Overscan",
@@ -167,13 +198,26 @@
       {
         "name": "Use Zapper",
         "id": 81,
-        "type": "check",
+        "type": "list",
         "enabled": true,
-        "address": "0x304",
         "persist": true,
         "writeonly": true,
+        "address": "0x304",
         "defaultval": 0,
-        "value": 1
+        "options": [
+          {
+            "value": 0,
+            "name": "Off"
+          },
+          {
+            "value": 1,
+            "name": "Emulated Zapper (Stick)"
+          },
+          {
+            "value": 2,
+            "name": "SNAC Zapper"
+          }
+        ]
       },
       {
         "name": "D-Pad Aim Speed",

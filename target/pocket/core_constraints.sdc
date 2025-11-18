@@ -9,7 +9,8 @@ set_clock_groups -asynchronous \
  -group { clk_74a } \
  -group { clk_74b } \
  -group { ic|mp1|mf_pllbase_inst|altera_pll_i|*[0].*|divclk \
-          ic|mp1|mf_pllbase_inst|altera_pll_i|*[1].*|divclk } \
+          ic|mp1|mf_pllbase_inst|altera_pll_i|*[1].*|divclk \
+          ic|mp1|mf_pllbase_inst|altera_pll_i|*[4].*|divclk } \
  -group { ic|mp1|mf_pllbase_inst|altera_pll_i|*[2].*|divclk } \
  -group { ic|mp1|mf_pllbase_inst|altera_pll_i|*[3].*|divclk } \
  -group { ic|audio_mixer|audio_pll|mf_audio_pll_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk \
