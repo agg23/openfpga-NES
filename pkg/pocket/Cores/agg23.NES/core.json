@@ -3,14 +3,15 @@
     "magic": "APF_VER_1",
     "metadata": {
       "platform_ids": [
-        "nes"
+        "nes",
+        "analogizer"
       ],
       "shortname": "NES",
       "description": "Nintendo Entertainment System and Famicom. Nintendo's first home console",
       "author": "agg23",
       "url": "https://github.com/agg23/openFPGA-NES",
-      "version": "1.0.1",
-      "date_release": "2024-09-16"
+      "version": "1.0.3",
+      "date_release": "2025-03-22"
     },
     "framework": {
       "target_product": "Analogue Pocket",
@@ -22,14 +23,30 @@
       },
       "hardware": {
         "link_port": false,
-        "cartridge_adapter": -1
-      }
+        "cartridge_adapter": 0
+      },
+      "chip32_vm": "nes_loader.bin"
     },
     "cores": [
       {
-        "name": "default",
+        "name": "NTSC_SET1",
         "id": 0,
-        "filename": "nes.rev"
+        "filename": "NTSC_SET1.rev"
+      },
+      {
+        "name": "NTSC_SET2",
+        "id": 1,
+        "filename": "NTSC_SET2.rev"
+      },
+      {
+        "name": "PAL_SET1",
+        "id": 2,
+        "filename": "PAL_SET1.rev"
+      },
+      {
+        "name": "PAL_SET2",
+        "id": 3,
+        "filename": "PAL_SET2.rev"
       }
     ]
   }
