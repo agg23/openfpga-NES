@@ -188,7 +188,7 @@ wire unlock1_match = (prg_addr_15bit == 15'h5555);  // Bank 1, offset $1555
 wire unlock2_match = (prg_addr_15bit == 15'h2AAA);  // Bank 0, offset $2AAA
 wire flash_write = (write_state == STATE_CMD) &&
                    (prg_ain[15:14] == 2'b10) &&  // $8000-$BFFF only
-                   battery;
+                   prg_write;
 
 always @(posedge clk) begin
 	if (~enable) begin

@@ -298,6 +298,8 @@ assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000
 endmodule
 
 // This mapper also handles mapper 33,47,48,74,76,80,82,88,95,118,119,154,191,192,194,195,206 and 207.
+// The line commented with Warning 10027 throws a synthesis warning that is suppressed
+// altera message_off 10027
 module MMC3 (
 	input        clk,         // System clock
 	input        ce,          // M2 ~cpu_clk
@@ -762,7 +764,7 @@ end
 always @* begin
 	prg_bus_write = 1'b1;
 	if (!prg_write && mapper208 && prg_ain[15:11] == 5'b01011) begin // 5800
-		prg_dout = m268_reg[{1'b0,prg_ain[1:0]}];
+		prg_dout = m268_reg[{1'b0,prg_ain[1:0]}]; // Warning 10027 suppressed: index is correctly constrained to 0-3
 	end else begin
 		prg_dout = 8'hFF; // By default open bus.
 		prg_bus_write = 0;
@@ -851,7 +853,7 @@ eReg_SavestateV #(SSREG_INDEX_MAP3, 64'h0000000000000000) iREG_SAVESTATE_MAP3 (c
 assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000000;
 
 endmodule
-
+// altera message_on 10027
 
 // mapper 165
 module Mapper165(
