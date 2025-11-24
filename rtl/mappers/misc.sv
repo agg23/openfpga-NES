@@ -796,7 +796,7 @@ assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000
 
 endmodule
 
-// Mapper 42, used for hacked FDS games converted to cartridge form
+// Mapper 40 & 42, used for hacked FDS games converted to cartridge form
 module Mapper42(
 	input        clk,         // System clock
 	input        ce,          // M2 ~cpu_clk
@@ -833,6 +833,7 @@ assign flags_out_b  = enable ? flags_out : 16'hZ;
 assign audio_b      = enable ? {1'b0, audio_in[15:1]} : 16'hZ;
 
 wire [21:0] prg_aout, chr_aout;
+wire [7:0] mapper = flags[7:0];
 wire prg_allow;
 wire chr_allow;
 wire vram_a10;
@@ -856,38 +857,65 @@ if (~enable) begin
 	irq_counter <= 0;
 end else if (ce) begin
 	if (prg_write)
-		case(prg_ain & 16'he003)
-			16'h8000: chr_bank <= prg_din[3:0];
-			16'he000: prg_bank <= prg_din[3:0];
-			16'he001: mirroring <= prg_din[3];
-			16'he002: irq_enable <= prg_din[1];
+		case(mapper)
+			40: case(prg_ain & 16'he000)
+					16'h8000: irq_enable <= 0; 				//irq disable
+					16'ha000: irq_enable <= 1; 				//irq enable
+				//	16'hc000: outer_bank <= prg_din[5:0]	//outer bank register (submapper 1 only)
+					16'he000: prg_bank <= prg_din[2:0]; 	//prg bank register
+				endcase
+			default: case(prg_ain & 16'he003)
+					16'h8000: chr_bank <= prg_din[3:0];
+					16'he000: prg_bank <= prg_din[3:0];
+					16'he001: mirroring <= prg_din[3];
+					16'he002: irq_enable <= prg_din[1];
+				endcase
 		endcase
-
-	if (irq_enable)
-		irq_counter <= irq_counter + 15'd1;
-	else begin
-		irq <= 1'b0;	// ACK
-		irq_counter <= 0;
-	end
-
-	if (irq_counter == 15'h6000)
-		irq <= 1'b1;
+		if (irq_enable)
+			case(mapper)
+				40: irq_counter <= irq_counter + 13'd1;
+				default: irq_counter <= irq_counter + 15'd1;
+			endcase
+		else begin
+			irq_counter <= 0;
+		end
+		case(mapper) //IRQ will self-acknowledge when counter overflows
+			40: irq <= irq_counter[12];
+			default: irq <= &irq_counter[14:13];
+		endcase
 end
 
 always @* begin
-	// PRG bank selection
-	// 6000-7FFF: Selectable
-	// 8000-9FFF: bank #0Ch
-	// A000-BFFF: bank #0Dh
-	// C000-DFFF: bank #0Eh
-	// E000-FFFF: bank #0Fh
-	case(prg_ain[15:13])
-		3'b011: 	prg_sel = prg_bank;                // $6000-$7FFF
-		3'b100: 	prg_sel = 4'hC;
-		3'b101: 	prg_sel = 4'hD;
-		3'b110: 	prg_sel = 4'hE;
-		3'b111: 	prg_sel = 4'hF;
-		default: prg_sel = 0;
+	// PRG bank selections
+	case(mapper)
+		// Mapper 40
+		// 6000-7FFF: bank #6
+		// 8000-9FFF: bank #4
+		// A000-BFFF: bank #5
+		// C000-DFFF: Selectable
+		// E000-FFFF: bank #7	
+		40: case(prg_ain[15:13])
+				3'b011: 	prg_sel = 3'h6;
+				3'b100: 	prg_sel = 3'h4;
+				3'b101: 	prg_sel = 3'h5;
+				3'b110: 	prg_sel = prg_bank;
+				3'b111: 	prg_sel = 3'h7;
+				default: prg_sel = 0;
+			endcase
+		// Mapper 42
+		// 6000-7FFF: Selectable
+		// 8000-9FFF: bank #0Ch
+		// A000-BFFF: bank #0Dh
+		// C000-DFFF: bank #0Eh
+		// E000-FFFF: bank #0Fh	
+		default: 	case(prg_ain[15:13])
+						3'b011: 	prg_sel = prg_bank;                // $6000-$7FFF
+						3'b100: 	prg_sel = 4'hC;
+						3'b101: 	prg_sel = 4'hD;
+						3'b110: 	prg_sel = 4'hE;
+						3'b111: 	prg_sel = 4'hF;
+						default: prg_sel = 0;
+					endcase
 	endcase
 end
 
@@ -897,10 +925,135 @@ assign chr_aout = {5'b10_000, chr_bank, chr_ain[12:0]}; // 8kB banks
 assign prg_allow = (prg_ain >= 16'h6000) && !prg_write;
 assign chr_allow = flags[15];
 assign vram_ce = chr_ain[13];
-assign vram_a10 = mirroring ? chr_ain[10] : chr_ain[11];
+assign vram_a10 = mirroring ? chr_ain[11] : chr_ain[10];
 
 endmodule
 
+// Kaiser KS202 (142)
+module KS202(
+	input        clk,         // System clock
+	input        ce,          // M2 ~cpu_clk
+	input        enable,      // Mapper enabled
+	input [31:0] flags,       // Cart flags
+	input [15:0] prg_ain,     // prg address
+	inout [21:0] prg_aout_b,  // prg address out
+	input        prg_read,    // prg read
+	input        prg_write,   // prg write
+	input  [7:0] prg_din,     // prg data in
+	inout  [7:0] prg_dout_b,  // prg data out
+	inout        prg_allow_b, // Enable access to memory for the specified operation.
+	input [13:0] chr_ain,     // chr address in
+	inout [21:0] chr_aout_b,  // chr address out
+	input        chr_read,    // chr ram read
+	inout        chr_allow_b, // chr allow write
+	inout        vram_a10_b,  // Value for A10 address line
+	inout        vram_ce_b,   // True if the address should be routed to the internal 2kB VRAM.
+	inout        irq_b,       // IRQ
+	input [15:0] audio_in,    // Inverted audio from APU
+	inout [15:0] audio_b,     // Mixed audio output
+	inout [15:0] flags_out_b // flags {0, 0, 0, 0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout}
+);
+
+assign prg_aout_b   = enable ? prg_aout : 22'hZ;
+assign prg_dout_b   = enable ? 8'hFF : 8'hZ;
+assign prg_allow_b  = enable ? prg_allow : 1'hZ;
+assign chr_aout_b   = enable ? chr_aout : 22'hZ;
+assign chr_allow_b  = enable ? chr_allow : 1'hZ;
+assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
+assign vram_ce_b    = enable ? vram_ce : 1'hZ;
+assign irq_b        = enable ? irq : 1'hZ;
+assign flags_out_b  = enable ? flags_out : 16'hZ;
+assign audio_b      = enable ? {1'b0, audio_in[15:1]} : 16'hZ;
+
+wire [21:0] prg_aout, chr_aout;
+wire prg_allow;
+wire chr_allow;
+wire vram_a10;
+wire vram_ce;
+reg irq;
+reg [15:0] flags_out = 0;
+
+
+reg [3:0] prg_bank[3:0];
+reg [2:0] bank_select;
+reg [4:0] irq_enable;
+reg [15:0] irq_latch;
+reg [15:0] irq_counter;
+
+always @(posedge clk)
+if (~enable) begin
+	// Set value for mirroring
+	irq <= 0;
+	irq_enable <= 0;
+	irq_latch <= 0;
+	bank_select <= 0;
+	prg_bank[0] <= 0;
+	prg_bank[1] <= 1;
+	prg_bank[2] <= 2;
+	prg_bank[3] <= 3;	
+end else if (ce) begin
+	irq_enable[3] <= 1'b0;
+	if (prg_ain[15] & prg_write) begin
+		case (prg_ain[14:12])
+			3'b000:  irq_latch[3:0]   <= prg_din[3:0];
+			3'b001:  irq_latch[7:4]   <= prg_din[3:0];
+			3'b010:  irq_latch[11:8]  <= prg_din[3:0];
+			3'b011:  irq_latch[15:12] <= prg_din[3:0];
+			3'b100:  irq_enable[4:0]  <= {2'b11, prg_din[2:0]};
+			3'b101:  irq_enable[4:3]  <= 2'b01;
+			3'b110:  bank_select      <= prg_din[2:0];
+			3'b111:  
+				case (bank_select)
+					1: prg_bank[0] <= prg_din[3:0];
+					2: prg_bank[1] <= prg_din[3:0];
+					3: prg_bank[2] <= prg_din[3:0];
+					4: prg_bank[3] <= prg_din[3:0];	
+				endcase
+		endcase
+	end
+
+	if (irq_enable[1]) begin
+		irq_counter[7:0] <= irq_counter[7:0] + 8'd1;
+		if (irq_counter[7:0] == 8'hFF) begin
+			if (irq_enable[2]) begin
+				irq <= 1'b1;	// IRQ
+			end else begin
+				irq_counter[15:8] <= irq_counter[15:8] + 8'd1;
+				if (irq_counter[15:8] == 8'hFF) begin
+					irq <= 1'b1;	// IRQ
+				end
+			end
+		end
+	end
+
+	if (irq_enable[3]) begin
+		irq <= 1'b0;	// IRQ ACK
+		if (irq_enable[4])
+			irq_counter <= irq_latch;
+	end
+end
+
+reg [3:0] prgout;
+
+always @* begin
+	casez({prg_ain[15:13]})
+		3'b011: prgout = prg_bank[3];
+		3'b100: prgout = prg_bank[0];
+		3'b101: prgout = prg_bank[1];
+		3'b110: prgout = prg_bank[2];
+		3'b111: prgout = 4'b1111;
+		default: prgout = 4'bxxxx;
+	endcase
+end
+
+assign vram_ce = chr_ain[13];
+assign vram_a10 = flags[14] ? chr_ain[10] : chr_ain[11];
+assign prg_aout = {2'b00, prgout[3:0], prg_ain[12:0]};       // 8kB banks
+assign prg_allow = (prg_ain >= 16'h6000) && !prg_write;
+assign chr_allow = flags[15];
+assign chr_aout = {8'b10_0000_00, chr_ain[13:0]};
+
+endmodule
 
 // Mapper 65, IREM H3001
 module Mapper65(
@@ -1867,6 +2020,168 @@ assign vram_ce = chr_ain[13];
 assign vram_a10 = flags[14] ? chr_ain[10] : chr_ain[11];
 
 endmodule
+
+module Mapper156(
+	input        clk,         // System clock
+	input        ce,          // M2 ~cpu_clk
+	input        enable,      // Mapper enabled
+	input [31:0] flags,       // Cart flags
+	input [15:0] prg_ain,     // prg address
+	inout [21:0] prg_aout_b,  // prg address out
+	input        prg_read,    // prg read
+	input        prg_write,   // prg write
+	input  [7:0] prg_din,     // prg data in
+	inout  [7:0] prg_dout_b,  // prg data out
+	inout        prg_allow_b, // Enable access to memory for the specified operation.
+	input [13:0] chr_ain,     // chr address in
+	inout [21:0] chr_aout_b,  // chr address out
+	input        chr_read,    // chr ram read
+	inout        chr_allow_b, // chr allow write
+	inout        vram_a10_b,  // Value for A10 address line
+	inout        vram_ce_b,   // True if the address should be routed to the internal 2kB VRAM.
+	inout        irq_b,       // IRQ
+	input [15:0] audio_in,    // Inverted audio from APU
+	inout [15:0] audio_b,     // Mixed audio output
+	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout}
+	// savestates              
+	input       [63:0]  SaveStateBus_Din,
+	input       [ 9:0]  SaveStateBus_Adr,
+	input               SaveStateBus_wren,
+	input               SaveStateBus_rst,
+	input               SaveStateBus_load,
+	output      [63:0]  SaveStateBus_Dout
+);
+
+assign prg_aout_b   = enable ? prg_aout : 22'hZ;
+assign prg_dout_b   = enable ? prg_dout : 8'hZ;
+assign prg_allow_b  = enable ? prg_allow : 1'hZ;
+assign chr_aout_b   = enable ? chr_aout : 22'hZ;
+assign chr_allow_b  = enable ? chr_allow : 1'hZ;
+assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
+assign vram_ce_b    = enable ? vram_ce : 1'hZ;
+assign irq_b        = enable ? 1'b0 : 1'hZ;
+assign flags_out_b  = enable ? flags_out : 16'hZ;
+assign audio_b      = enable ? {1'b0, audio_in[15:1]} : 16'hZ;
+
+wire [21:0] prg_aout, chr_aout;
+wire prg_allow;
+wire chr_allow;
+wire vram_a10;
+wire vram_ce;
+reg [15:0] flags_out = {12'h0, 1'b1, 3'b0};
+
+wire [7:0] prg_dout = 0;
+
+reg [7:0] prg_bank;
+reg [7:0] chr_bank_lo [7:0];
+reg [7:0] chr_bank_hi [7:0];
+reg [1:0] mirroring;
+
+always @(posedge clk)
+if (~enable) begin
+	chr_bank_lo[0] <= 0;
+	chr_bank_lo[1] <= 0;
+	chr_bank_lo[2] <= 0;
+	chr_bank_lo[3] <= 0;
+	chr_bank_lo[4] <= 0;
+	chr_bank_lo[5] <= 0;
+	chr_bank_lo[6] <= 0;
+	chr_bank_lo[7] <= 0;
+	chr_bank_hi[0] <= 0;
+	chr_bank_hi[1] <= 0;
+	chr_bank_hi[2] <= 0;
+	chr_bank_hi[3] <= 0;
+	chr_bank_hi[4] <= 0;
+	chr_bank_hi[5] <= 0;
+	chr_bank_hi[6] <= 0;
+	chr_bank_hi[7] <= 0;
+	prg_bank = 0;
+	mirroring <= 2'b0;
+end else if (SaveStateBus_load) begin
+	chr_bank_lo[0] <= SS_MAP1[ 7: 0];
+	chr_bank_lo[1] <= SS_MAP1[15: 8];
+	chr_bank_lo[2] <= SS_MAP1[23:16];
+	chr_bank_lo[3] <= SS_MAP1[31:24];
+	chr_bank_lo[4] <= SS_MAP1[39:32];
+	chr_bank_lo[5] <= SS_MAP1[47:40];
+	chr_bank_lo[6] <= SS_MAP1[55:48];
+	chr_bank_lo[7] <= SS_MAP1[63:56];
+	chr_bank_hi[0] <= SS_MAP2[ 7: 0];
+	chr_bank_hi[1] <= SS_MAP2[15: 8];
+	chr_bank_hi[2] <= SS_MAP2[23:16];
+	chr_bank_hi[3] <= SS_MAP2[31:24];
+	chr_bank_hi[4] <= SS_MAP2[39:32];
+	chr_bank_hi[5] <= SS_MAP2[47:40];
+	chr_bank_hi[6] <= SS_MAP2[55:48];
+	chr_bank_hi[7] <= SS_MAP2[63:56];
+	prg_bank       <= SS_MAP3[ 7: 0];
+	mirroring      <= SS_MAP3[ 9: 8];
+end else if (ce && prg_write) begin
+	if ((prg_ain[15:4] == 12'hC00) && (prg_ain[2] == 1'b0)) begin
+		chr_bank_lo[{prg_ain[3],prg_ain[1:0]}] <= prg_din;
+	end else if ((prg_ain[15:4] == 12'hC00) && (prg_ain[2] == 1'b1)) begin
+		chr_bank_hi[{prg_ain[3],prg_ain[1:0]}] <= prg_din;
+	end else if (prg_ain[15:0] == 16'hC010) begin
+		prg_bank <= prg_din;
+	end else if (prg_ain[15:0] == 16'hC014) begin
+		mirroring <= {1'b1,!prg_din[0]};
+	end
+end
+
+assign SS_MAP1_BACK[ 7: 0] = chr_bank_lo[0];
+assign SS_MAP1_BACK[15: 8] = chr_bank_lo[1];
+assign SS_MAP1_BACK[23:16] = chr_bank_lo[2];
+assign SS_MAP1_BACK[31:24] = chr_bank_lo[3];
+assign SS_MAP1_BACK[39:32] = chr_bank_lo[4];
+assign SS_MAP1_BACK[47:40] = chr_bank_lo[5];
+assign SS_MAP1_BACK[55:48] = chr_bank_lo[6];
+assign SS_MAP1_BACK[63:56] = chr_bank_lo[7];
+assign SS_MAP2_BACK[ 7: 0] = chr_bank_hi[0];
+assign SS_MAP2_BACK[15: 8] = chr_bank_hi[1];
+assign SS_MAP2_BACK[23:16] = chr_bank_hi[2];
+assign SS_MAP2_BACK[31:24] = chr_bank_hi[3];
+assign SS_MAP2_BACK[39:32] = chr_bank_hi[4];
+assign SS_MAP2_BACK[47:40] = chr_bank_hi[5];
+assign SS_MAP2_BACK[55:48] = chr_bank_hi[6];
+assign SS_MAP2_BACK[63:56] = chr_bank_hi[7];
+assign SS_MAP3_BACK[ 7: 0] = prg_bank;
+assign SS_MAP3_BACK[ 9: 8] = mirroring;
+assign SS_MAP3_BACK[63:10] = 54'b0; // free to be used
+
+// The CHR bank to load. Each increment here is 1kb.
+wire [7:0] chr_lo = chr_bank_lo[chr_ain[12:10]];
+wire [7:0] chr_hi = chr_bank_hi[chr_ain[12:10]];
+reg [9:0] chrsel;
+always @* begin
+	chrsel = {chr_hi[1:0],chr_lo[7:0]};
+end
+
+wire [7:0] prg_aout_tmp = (prg_ain[14] == 1'b1) ? 8'hFF : prg_bank ;
+wire prg_is_ram = (prg_ain[15:13] == 3'b011);
+assign prg_allow = prg_ain[15] && !prg_write || prg_is_ram;
+wire [21:0] prg_ram = {9'b11_1100_000, prg_ain[12:0]};
+assign prg_aout = prg_is_ram ? prg_ram : {1'b0, prg_aout_tmp[6:0], prg_ain[13:0]};
+
+assign chr_allow = flags[15];
+assign chr_aout = {2'b10, chrsel, chr_ain[9:0]};
+assign vram_ce = chr_ain[13];
+assign vram_a10 = mirroring[1] ? (mirroring[0] ? chr_ain[10] : chr_ain[11]) : 1'b0; // 10=V,11=H,0X=OSA
+
+// savestate
+localparam SAVESTATE_MODULES    = 3;
+wire [63:0] SaveStateBus_wired_or[0:SAVESTATE_MODULES-1];
+wire [63:0] SS_MAP1, SS_MAP2, SS_MAP3;
+wire [63:0] SS_MAP1_BACK, SS_MAP2_BACK, SS_MAP3_BACK;	
+wire [63:0] SaveStateBus_Dout_active = SaveStateBus_wired_or[0] | SaveStateBus_wired_or[1] | SaveStateBus_wired_or[2];
+	
+eReg_SavestateV #(SSREG_INDEX_MAP1, 64'h0000000000000000) iREG_SAVESTATE_MAP1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[0], SS_MAP1_BACK, SS_MAP1);  
+eReg_SavestateV #(SSREG_INDEX_MAP2, 64'h0000000000000000) iREG_SAVESTATE_MAP2 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[1], SS_MAP2_BACK, SS_MAP2);  
+eReg_SavestateV #(SSREG_INDEX_MAP3, 64'h0000000000000000) iREG_SAVESTATE_MAP3 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[2], SS_MAP3_BACK, SS_MAP3);  
+
+assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000000;
+
+endmodule
+
 // Combine with other mapper (15?)
 // #225 -  64-in-1
 // #255 -  110-in-1 - This runs with buggy menu selection.  It runs correctly as mapper 225.
@@ -2089,6 +2404,7 @@ module NSF(
 	inout [15:0] audio_b,     // Mixed audio output
 	output [5:0] exp_audioe,  // Expansion Enabled (0x0=None, 0x1=VRC6, 0x2=VRC7, 0x4=FDS, 0x8=MMC5, 0x10=N163, 0x20=SS5B
 	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout}
+	input        chr_write,   // CHR Write
 	input  [7:0] fds_din      // fds data in
 );
 
@@ -2118,6 +2434,7 @@ wire has_chr_dout;
 wire [7:0] chr_dout;
 
 wire [3:0] submapper = flags[24:21];
+wire IsNSF = submapper == 4'hF;
 reg [7:0] nsf_reg [15:0];
 reg [15:0] counter;
 reg [5:0] clk1MHz;
@@ -2501,13 +2818,12 @@ assign exp_strs = '{8'h56,8'h43,8'h36,8'h20,  // 0 = VC6
                     8'h53,8'h35,8'h42,8'h20,  // 5 = S5B
                     8'h41,8'h50,8'h55,8'h20}; //default = APU
 
-assign prg_aout = ((submapper == 4'hF) && ({prg_ain[15:1],1'b0} == 16'hFFFC)) ? {10'h0, prg_ain[11:0]} : {prg_bank, prg_ain[11:0]};
+assign prg_aout = ((IsNSF) && ({prg_ain[15:1],1'b0} == 16'hFFFC)) ? {10'h0, prg_ain[11:0]} : {prg_bank, prg_ain[11:0]};
 assign prg_allow = (((prg_ain[15] || ((prg_ain>=16'h4080) && (prg_ain<16'h4FFF))) && !prg_write) || (prg_ain[15:13]==3'b011)
                    || (prg_ain[15:10]==6'b010111 && prg_ain[9:4]!=6'b111111) || ((prg_ain>=16'h8000) && (prg_ain<16'hDFFF) && exp_audioe[2]));
 assign chr_allow = flags[15]; // CHR RAM always...
 
-wire       patt_bars = chr_ain[13:11] == 3'b00_1;     // 'h0800-'hfff bar pattern for pulse1,pulse2,triangle,noise,sample volume
-assign chr_aout = {9'b10_0000_000, chr_read && patt_bars ? {5'b0_0001,chr_ain[7:0]} : chr_ain[12:0]}; //replace 'h0800-'h0fff with 'h0100-'h01ff = bars location
+assign chr_aout = {9'b10_0000_000, chr_ain[12:0]};
 assign vram_ce = chr_ain[13] & !has_chr_dout;
 assign vram_a10 = flags[14] ? chr_ain[10] : chr_ain[11];
 
@@ -2536,9 +2852,7 @@ wire [4:0] oct_idx = {1'b0,oct_no[voi_tab_idx]} + {oct_no[voi_tab_idx],1'b0}; //
 wire [4:0] spot_chr = use_freq ? freq : oct_idx + {3'b000,spot[voi_tab_idx][4:3]}; // noise+sample=d0-15, tri=d0-24 (25-27->24), puls=d3-27 (28-30->27)
 wire [3:0] spot_vol = voi_off ? 4'h0 : voi_vol;
 wire       has_spot_chr = print_spot && (chr_ain[4:0] == spot_chr);
-wire       skip_vol = !print_midi && !print_oct && patt_bars && ((spot_vol[2:0]<=~chr_ain[2:0] && !(spot_vol[3] && !chr_ain[3])) || (!spot_vol[3] && chr_ain[3])); // skip middle volume bar if vol[2:0] is less than pixelrow[2:0]; skip outer volume bars if vol[3] is not set
 wire       spot_vol_row = !chr_ain[5];  // d18,20,22,24,26
-wire [4:0] spot_val = {spot_vol_row ? {4'b1000,use_freq ? 1'b1 : 1'b0}:5'h0}; // d18->10010, 20->10100, 22->10110, 24->11001, 25->11011: [4]=1 means bar pattern, [3:1]=voi_idx will be in chr_ain[10:8]->ignored, [0]=chr_ain[7] 0x0 = 0x800, 0x1 = 0x0880 pattern table address; will be adjusted to 0x100 and 0x180
 wire [4:0] note_val = spot[voi_tab_idx][4:0];
 wire       inc_note = (note_val == 5'd23) || (note_val == 5'd24);
 wire       inc_oct = (note_val > 5'd5);
@@ -2546,9 +2860,9 @@ wire [4:0] note_no = inc_note ? 5'd4 : (note_val + (note_val > 5'd14 ? 5'd9 : no
 wire [7:0] letter = {5'b0100_0,note_no[4:2]}; // A=$41,G=$47
 wire       sharp = note_no[1];    // #=$23
 
-wire cpu_ppu_write = prg_write && prg_ain[15:12]==4'h2; // 'h2000-2FFF
-assign has_chr_dout = !(cpu_ppu_write) && (print_reg || print_exp || print_spot || skip_vol || print_midi || print_oct || print_let || print_shp);
-assign chr_dout = skip_vol ? {8'h00} : print_exp ? exp_letter : print_let ? letter : print_shp ? 8'h23 : (print_spot && !print_oct) ? has_spot_chr ? {spot_val,use_freq?3'b000:spot[voi_tab_idx][2:0]} : {8'h20} : {4'h0, chr_ain[0] ? chr_num[3:0] : chr_num[7:4]};
+wire cpu_ppu_write = (prg_write && prg_ain[15:12]==4'h2) || chr_write; // Do not override if this is the cpu writing to the ppu. 'h2000-2FFF - writes may no longer overlap the cpu and ppu access?: using chr_write ; Alternatively could track rendering: never override if not rendering
+assign has_chr_dout = IsNSF && !(cpu_ppu_write) && (print_reg || print_exp || print_spot || print_midi || print_oct || print_let || print_shp);
+assign chr_dout = print_exp ? exp_letter : print_let ? letter : print_shp ? 8'h23 : (print_spot && !print_oct) ? has_spot_chr ? !spot_vol_row ? use_freq?8'h00:{5'h00,spot[voi_tab_idx][2:0]}:{use_freq?4'b0001:{1'b1,spot[voi_tab_idx][2:0]},spot_vol} : {8'h20} : {4'h0, chr_ain[0] ? chr_num[3:0] : chr_num[7:4]};
 
 endmodule
 

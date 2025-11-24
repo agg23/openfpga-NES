@@ -6,7 +6,7 @@ package regs_savestates;
 
 	parameter [9:0] SSREG_INDEX_PPU_1    = 10'd4;   parameter [63:0] SSREG_DEFAULT_PPU_1    = 64'h0000000000000000;
 	parameter [9:0] SSREG_INDEX_PPU_2    = 10'd5;   parameter [63:0] SSREG_DEFAULT_PPU_2    = 64'h0000000000000000;
-	parameter [9:0] SSREG_INDEX_CLOCKGEN = 10'd6;   parameter [63:0] SSREG_DEFAULT_CLOCKGEN = 64'h0000000000000152;
+	parameter [9:0] SSREG_INDEX_CLOCKGEN = 10'd6;   parameter [63:0] SSREG_DEFAULT_CLOCKGEN = 64'h0000000000000000;
 	parameter [9:0] SSREG_INDEX_PAL0     = 10'd7;   parameter [63:0] SSREG_DEFAULT_PAL0     = 64'h0008000900080000;
 	parameter [9:0] SSREG_INDEX_PAL1     = 10'd8;   parameter [63:0] SSREG_DEFAULT_PAL1     = 64'h203A040100100201;
 	parameter [9:0] SSREG_INDEX_PAL2     = 10'd9;   parameter [63:0] SSREG_DEFAULT_PAL2     = 64'h2C00003404080200;
