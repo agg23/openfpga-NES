@@ -1,0 +1,23 @@
+name: Sync Upstream
+on:
+  workflow_dispatch:
+  schedule:
+    # Run at midnight UTC daily
+    - cron: "0 0 * * *"
+
+jobs:
+  pr-upstream:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - uses: agg23/copybara-action@main
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: default
+          custom_config: .github/copy.bara.sky

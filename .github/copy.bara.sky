@@ -1,0 +1,51 @@
+upstream_url = "https://github.com/MiSTer-devel/NES_MiSTer.git"
+downstream_url = "https://github.com/agg23/openfpga-NES.git"
+
+core.workflow(
+    # Must be default to run automatically when Copybara runs
+    # This is actually set in the Github Actions config in this instance
+    name = "default",
+    
+    # ORIGIN: Where the code comes from
+    origin = git.origin(
+        url = upstream_url,
+        ref = "master",
+    ),
+
+    destination = git.github_pr_destination(
+        url = downstream_url,
+        destination_ref = "master",
+        pr_branch = "vendor/upstream-sync",
+        title = "Latest upstream",
+        
+        # Make incremental branches, updating the PR as necessary, and restarting once PR is merged
+        integrates = [], 
+    ),
+
+    # 1:1 commits
+    mode = "ITERATIVE",
+
+    # Pass through upstream author
+    authoring = authoring.pass_thru("Copybara <copybara@example.com>"),
+
+    # The files to keep from the source
+    origin_files = glob(["rtl/**"]),
+
+    # The files from the source that we keep 1:1 with the destination. Files that match this blob and aren't in the source are deleted.
+    # Files that don't match this blob are always kept on the destination
+    destination_files = glob(["rtl/upstream/**"], exclude = ["rtl/upstream/nes_mister.qip"]),
+
+    # Move source files to destination location
+    transformations = [
+        core.move("rtl", "rtl/upstream"),
+        # Copybara only wants to have one source of truth, so we must apply patches for the changes we make to upstream
+        # It also won't go up a directory ("../") for some reason
+        patch.apply(patches = [
+          "upstream_patches/cart.patch",
+          "upstream_patches/FDS.patch",
+          "upstream_patches/nes.patch",
+          "upstream_patches/zapper.patch",
+        ]),
+        metadata.add_header("[UPSTREAM] ", ignore_label_not_found=True, new_line=False),
+    ],
+)
