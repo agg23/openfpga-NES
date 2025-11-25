@@ -41,10 +41,10 @@ core.workflow(
         # Copybara only wants to have one source of truth, so we must apply patches for the changes we make to upstream
         # It also won't go up a directory ("../") for some reason
         patch.apply(patches = [
-          "/usr/src/app/.github/upstream_patches/cart.patch",
-          "/usr/src/app/.github/upstream_patches/FDS.patch",
-          "/usr/src/app/.github/upstream_patches/nes.patch",
-          "/usr/src/app/.github/upstream_patches/zapper.patch",
+          "upstream_patches/cart.patch",
+          "upstream_patches/FDS.patch",
+          "upstream_patches/nes.patch",
+          "upstream_patches/zapper.patch",
         ]),
         metadata.add_header("[UPSTREAM] ", ignore_label_not_found=True, new_line=False),
     ],

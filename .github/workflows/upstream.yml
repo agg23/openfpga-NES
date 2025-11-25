@@ -21,3 +21,4 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           workflow: default
           custom_config: .github/copy.bara.sky
+          copybara_options: "/usr/src/app/.github/copy.bara.sky"
