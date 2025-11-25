@@ -1,5 +1,5 @@
 ################################################################################
-# How to create a tag to launch the workflow
+# How to create a tag to build a proper release (tag will get integrated into build)
 # git tag -a "0.1.0" -m "Release v0.1.0"
 # git push origin --tags
 ################################################################################
@@ -8,8 +8,7 @@ name: Build/Release
 on:
   workflow_dispatch:
   push:
-    tags:
-      - "[0-9]+.[0-9]+.[0-9]+*"
+  pull_request:
 
 permissions:
   contents: write
@@ -75,7 +74,7 @@ jobs:
           pip3 install -r .github/publish/requirements.txt
           python3 .github/publish/create_folders.py
 
-      - name: Download artifacts
+      - name: "Download artifacts"
         uses: actions/download-artifact@v4
         with:
           path: staging/Cores/agg23.NES/
@@ -83,4 +82,13 @@ jobs:
 
       - name: "Release"
         run: |
-          python3 .github/publish/release.py
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            python3 .github/publish/release.py --norelease
+          else
+            python3 .github/publish/release.py
+          fi
+
+      - name: "Upload Actions artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          path: release/*.zip
