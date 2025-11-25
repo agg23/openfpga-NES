@@ -1,3 +1,5 @@
+// This is from upstream in NES.sv. It's been moved to its own file for use in the Pocket top
+
 // Module reads bytes and writes to proper address in ram.
 // Done is asserted when the whole game is loaded.
 // This parses iNES headers too.

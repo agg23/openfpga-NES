@@ -425,10 +425,10 @@ always @(posedge clk) begin
 		end
 
 		// The "in-frame" flag is cleared when 3 CPU cycles pass without a PPU read having occurred
-		if (ce) begin
+		if (~paused) begin
 			if (chr_read) begin
 				ppu_no_rd_read_cnt <= 0;
-			end else if (ppu_in_frame) begin
+			end else if (ce & ppu_in_frame) begin
 				ppu_no_rd_read_cnt <= ppu_no_rd_read_cnt + 1'b1;
 				if (ppu_no_rd_read_cnt == 2'd2) begin
 					ppu_in_frame <= 0;
@@ -646,7 +646,7 @@ always @* begin
 		//$write("In vertical split!\n");
 //		chr_aout = {2'b10, vsplit_bank, chr_ain[11:3], vscroll[2:0]}; // SL
 		chr_aout = {2'b10, vsplit_bank, chr_ain[11:3], chr_ain[2:0]}; // CL
-	end else if (ppu_in_frame && extended_ram_mode == 1 && is_bg_fetch && ppu_is_tile_addr) begin
+	end else if (ppu_in_frame && rendering_en && extended_ram_mode == 1 && is_bg_fetch && ppu_is_tile_addr) begin
 		//$write("In exram thingy!\n");
 		// Extended attribute mode. Replace the page with the page from exram.
 		chr_aout = {2'b10, upper_chr_bank_bits, last_read_exattr[5:0], chr_ain[11:0]};

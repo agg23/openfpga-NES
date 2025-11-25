@@ -78,21 +78,67 @@ reset ;-------
         sta $2001               ;screen off
         jsr pal_detect
 
-        ldx #8                  ;load CHR: 128 tiles = $800 bytes
+;        ldx #8                  ;load CHR: 128 tiles = $800 bytes
+;        ldy #$00
+;        sty $2006
+;        sty $2006
+;        lda #<chr
+;        sta 0
+;        lda #>chr
+;        sta 1
+;-       lda (0),y
+;        sta $2007
+;        iny
+;        bne -
+;        inc 1
+;        dex
+;        bpl -
+        ldx #3                  ;load CHR: 128 tiles = $800 bytes
+        lda #$80
+        sta 2
+        lda #$c0
+        sta 3
         ldy #$00
         sty $2006
         sty $2006
         lda #<chr
         sta 0
-        lda #>chr
+----    lda #>chr
         sta 1
--       lda (0),y
-        sta $2007
+-       lda #8
+        sta 4        
+--      lda (0),y
+        beq ++
+        cpx #0    ; requires pattern to be 0,other (0x3c),0xff, matches 0,mem2,mem3 for 0x100/2
+        bpl ++
+        cmp #$ff
+        beq +++
+        lda 2
+        bne ++
++++     lda 3
+++      sta $2007
         iny
+        dec 4
+        bne --
+        lda #8   ; requires compressed format that removes every second 8 bytes which were 0s
+        sta 4
+        lda #0
+---     sta $2007
+        dec 4
+        bne ---
+        cpy #0
         bne -
         inc 1
         dex
         bpl -
+        ldy #$80 ; requires pattern to be at chr+0x080
+        cpx #$ff
+        beq ----
+        lda 2
+        rol
+        ror 3
+        lsr 2
+        bne ----
 
         lda #$3f                ;set palette
         sta $2006
@@ -576,7 +622,7 @@ powerpak_bios_reset ;---------
     resetcode_end
 
 ;------------------------
-chr     .bin "font.chr"         ;ascii chr set
+chr     .bin "font_cmp.bin"         ;ascii chr set compressed
 
 notesLow
 		db $F1,$7F,$13,$AD,$4D,$F3,$9D,$4C,$00,$B8,$74,$34

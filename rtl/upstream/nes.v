@@ -88,11 +88,13 @@ module NES(
 	input         fds_eject,      // FDS Disk Swap Pause
 	input         fds_auto_eject,
 	input   [1:0] max_diskside,
+	input         fds_fast,
 	output  [1:0] diskside,
 
 	input   [4:0] audio_channels, // Enabled audio channels
 	input         ex_sprites,
 	input   [1:0] mask,
+	input 		  dejitter_timing,
 
 	// Access signals for the SDRAM.
 	output [24:0] cpumem_addr,
@@ -296,7 +298,7 @@ always @(posedge clk) begin
 	if (|faux_pixel_cnt)
 		faux_pixel_cnt <= faux_pixel_cnt - 1'b1;
 
-	if (((skip_pixel && ~corepause_active) || (skip_pixel_pause && corepause_active)) && (faux_pixel_cnt == 0)) begin
+	if ((((skip_pixel && ~corepause_active) || (skip_pixel_pause && corepause_active)) && (faux_pixel_cnt == 0)) && !dejitter_timing) begin
 		freeze_clocks <= 1'b1;
 		faux_pixel_cnt <= {div_ppu_n - 1'b1, 1'b0} + 1'b1;
 	end
@@ -611,7 +613,7 @@ wire [7:0] prg_dout_mapper, chr_from_ppu_mapper;
 wire has_chr_from_ppu_mapper;
 wire [15:0] sample_ext;
 
-assign save_written = (mapper_flags[7:0] == 8'h14) ? (prg_linaddr[21:18] == 4'b1111 && prg_write) : (prg_addr[15:13] == 3'b011 && prg_write) | bram_write;
+assign save_written = (mapper_flags[7:0] == 8'h14) ? (prg_linaddr[21:18] == 4'b1111 && prg_write && prg_allow) : (prg_addr[15:13] == 3'b011 && prg_write) | bram_write;
 
 cart_top multi_mapper (
 	// FPGA specific
@@ -662,6 +664,7 @@ cart_top multi_mapper (
 	// User input/FDS controls
 	.fds_eject         (fds_eject),               // Used to trigger FDS disk changes
 	.fds_busy          (fds_busy),                // Used to trigger FDS disk changes
+	.fds_fast          (fds_fast),
 	.diskside          (diskside),
 	.max_diskside      (max_diskside),
 	.fds_auto_eject    (fds_auto_eject),
