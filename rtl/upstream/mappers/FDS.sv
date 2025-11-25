@@ -620,7 +620,7 @@ end
 
 wire [15:0] audio_exp_f;
 
-IIR_filter #(
+iir_filter #(
 	.coeff_x   (2.15/1.140404269e+03),
 	.coeff_x0  (1),
 	.coeff_x1  (0),

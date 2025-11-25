@@ -153,6 +153,8 @@ module NES(
 	input  [63:0] SaveStateExt_Dout,
 	output        SaveStateExt_load,
 
+	output savestate_busy,
+
 	output [63:0] SAVE_out_Din,  	// data read from savestate
 	input  [63:0] SAVE_out_Dout, 	// data written to savestate
 	output [25:0] SAVE_out_Adr,  	// all addresses are DWORD addresses!
@@ -777,7 +779,6 @@ wire reset_delay;
 wire savestate_savestate;
 wire savestate_loadstate;
 wire [31:0] savestate_address;
-wire savestate_busy;  
 
 wire [63:0] SS_TOP;
 wire [63:0] SS_TOP_BACK;	
@@ -861,7 +862,7 @@ savestates savestates (
 	.bus_out_done           (SAVE_out_done)  
 );
 
-statemanager #(58720256, 33554432) statemanager (
+statemanager #(0, 33554432) statemanager (
 	.clk                 (clk),
 	.reset               (reset_nes),
 	
