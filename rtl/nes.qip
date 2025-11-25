@@ -1,3 +1,4 @@
 set_global_assignment -name QIP_FILE                  [file join $::quartus(qip_path) "upstream/nes_mister.qip"]
 set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "button_turbo.sv"]
+set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "gameloader.sv"]
 set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "nes_top.sv"]
