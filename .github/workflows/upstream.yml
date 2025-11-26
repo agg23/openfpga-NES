@@ -16,12 +16,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Show directory contents
-        run: ls -la
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          echo "https://user:${{ secrets.GITHUB_TOKEN }}@github.com" > /home/runner/.git-credentials
+          git config --global credential.helper store
 
-      - uses: agg23/copybara-action@main
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-          workflow: default
-          custom_config: .github/copy.bara.sky
-          copybara_options: "/usr/src/app/.github/copy.bara.sky"
+      - name: "Copybara"
+        run: |
+          /usr/bin/docker run \
+          -v "$(pwd)":/usr/src/app \
+          -v /home/runner/.ssh/known_hosts:/root/.ssh/known_hosts \
+          -v /home/runner/.gitconfig:/root/.gitconfig \
+          -v /home/runner/.git-credentials:/root/.git-credentials \
+          ghcr.io/anipos/copybara-docker-image \
+          --ignore-noop migrate /usr/src/app/.github/copy.bara.sky
