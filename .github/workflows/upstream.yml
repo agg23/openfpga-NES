@@ -26,6 +26,8 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          echo "https://user:${{ secrets.GITHUB_TOKEN }}@github.com" > /home/runner/.git-credentials
+          git config --global credential.helper store
 
       - name: "Copybara"
         run: |
