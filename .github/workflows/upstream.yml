@@ -19,6 +19,9 @@ jobs:
       - name: Show directory contents
         run: ls -la
 
+      - name: pwd
+        run: pwd
+
       - uses: agg23/copybara-action@main
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
