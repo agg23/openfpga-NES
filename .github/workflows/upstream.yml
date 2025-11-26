@@ -22,9 +22,19 @@ jobs:
       - name: pwd
         run: pwd
 
-      - uses: agg23/copybara-action@main
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-          workflow: default
-          custom_config: .github/copy.bara.sky
-          copybara_options: "migrate /usr/src/app/.github/copy.bara.sky"
+      - name: "Copybara"
+        run: |
+          /usr/bin/docker run \
+          -v "$(pwd)":/usr/src/app \
+          -v /home/runner/.ssh/known_hosts:/root/.ssh/known_hosts \
+          -v /home/runner/.gitconfig:/root/.gitconfig \
+          -v /home/runner/.git-credentials:/root/.git-credentials \
+          anipos/copybara-docker-image \
+          copybara --ignore-noop migrate /usr/src/app/.github/copy.bara.sky
+
+      # - uses: agg23/copybara-action@main
+      #   with:
+      #     access_token: ${{ secrets.GITHUB_TOKEN }}
+      #     workflow: default
+      #     custom_config: .github/copy.bara.sky
+      #     copybara_options: "migrate /usr/src/app/.github/copy.bara.sky"
