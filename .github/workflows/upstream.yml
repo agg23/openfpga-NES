@@ -16,12 +16,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Show directory contents
-        run: ls -la
-
-      - name: pwd
-        run: pwd
-
       - name: Configure Git
         run: |
           git config --global user.name "github-actions[bot]"
@@ -38,10 +32,3 @@ jobs:
           -v /home/runner/.git-credentials:/root/.git-credentials \
           ghcr.io/anipos/copybara-docker-image \
           --ignore-noop migrate /usr/src/app/.github/copy.bara.sky
-
-      # - uses: agg23/copybara-action@main
-      #   with:
-      #     access_token: ${{ secrets.GITHUB_TOKEN }}
-      #     workflow: default
-      #     custom_config: .github/copy.bara.sky
-      #     copybara_options: "migrate /usr/src/app/.github/copy.bara.sky"
