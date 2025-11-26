@@ -30,7 +30,7 @@ jobs:
           -v /home/runner/.gitconfig:/root/.gitconfig \
           -v /home/runner/.git-credentials:/root/.git-credentials \
           ghcr.io/anipos/copybara-docker-image \
-          copybara --ignore-noop migrate /usr/src/app/.github/copy.bara.sky
+          --ignore-noop migrate /usr/src/app/.github/copy.bara.sky
 
       # - uses: agg23/copybara-action@main
       #   with:
