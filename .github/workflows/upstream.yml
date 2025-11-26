@@ -22,11 +22,17 @@ jobs:
       - name: pwd
         run: pwd
 
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: "Copybara"
         run: |
           /usr/bin/docker run \
           -v "$(pwd)":/usr/src/app \
           -v /home/runner/.ssh/known_hosts:/root/.ssh/known_hosts \
+          -v /home/runner/.gitconfig:/root/.gitconfig \
           -v /home/runner/.git-credentials:/root/.git-credentials \
           ghcr.io/anipos/copybara-docker-image \
           --ignore-noop migrate /usr/src/app/.github/copy.bara.sky
