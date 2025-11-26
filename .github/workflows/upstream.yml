@@ -27,7 +27,6 @@ jobs:
           /usr/bin/docker run \
           -v "$(pwd)":/usr/src/app \
           -v /home/runner/.ssh/known_hosts:/root/.ssh/known_hosts \
-          -v /home/runner/.gitconfig:/root/.gitconfig \
           -v /home/runner/.git-credentials:/root/.git-credentials \
           ghcr.io/anipos/copybara-docker-image \
           --ignore-noop migrate /usr/src/app/.github/copy.bara.sky
