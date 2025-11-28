@@ -227,7 +227,7 @@ index 3e84d39..7113c4e 100644
  
  //*****************************************************************************//
  // Name   : Mapper 31                                                          //
-@@ -2204,38 +2204,38 @@ MapperFDS mapfds(
+@@ -2204,40 +2204,40 @@ MapperFDS mapfds(
  // Games  : Famicompo Pico 2014, NSF 1.0                                       //
  //*****************************************************************************//
  wire [5:0] exp_audioe;
@@ -261,6 +261,8 @@ index 3e84d39..7113c4e 100644
 -					 audio_in),
 -	.exp_audioe (exp_audioe),  // Expansion Enabled (0x0=None, 0x1=VRC6, 0x2=VRC7, 0x4=FDS, 0x8=MMC5, 0x10=N163, 0x20=SS5B
 -	.audio_b    (audio_out_b),
+-	// Special ports
+-	.chr_write  (chr_write),
 -	.fds_din    (fds_data)
 -);
 +// NSF nsfplayer(
@@ -293,6 +295,8 @@ index 3e84d39..7113c4e 100644
 +// 					 audio_in),
 +// 	.exp_audioe (exp_audioe),  // Expansion Enabled (0x0=None, 0x1=VRC6, 0x2=VRC7, 0x4=FDS, 0x8=MMC5, 0x10=N163, 0x20=SS5B
 +// 	.audio_b    (audio_out_b),
++// 	// Special ports
++// 	.chr_write  (chr_write),
 +// 	.fds_din    (fds_data)
 +// );
  
