@@ -372,6 +372,11 @@ wire prg_is_ram;
 reg [6:0] irq_reg;
 assign irq = mapper48 ? irq_reg[3] & irq_enable : irq_reg[0];
 reg [7:0] m268_reg [5:0];
+reg [7:0] m45_reg [3:0];  // Mapper 45 outer bank registers
+reg [2:0] m45_index;      // Mapper 45 register index (0-3, wraps)
+wire m45_locked = m45_reg[3][6]; // Mapper 45 lock bit (D6, per Nintendulator)
+reg [7:0] m52_reg;        // Mapper 52 outer bank register
+wire m52_locked = m52_reg[7]; // Mapper 52 lock bit (D7)
 
 // The alternative behavior has slightly different IRQ counter semantics.
 wire mmc3_alt_behavior = acclaim;
@@ -404,7 +409,9 @@ wire MMC6 = ((flags[7:0] == 4) && (flags[24:21] == 1)); // mapper 4, submapper 1
 wire acclaim = ((flags[7:0] == 4) && (flags[24:21] == 3)); // Acclaim mapper
 wire mapper268 = ({flags[20:17],flags[7:0]} == 268); // Coolboy/Mindkids; Note: if mapper 268-256=12 was in this driver, it would need to check upper mapper bits
 wire mapper268_5k = (flags[24:21] == 1);
-wire oversized = mapper268 || (flags[10:9] == 3); // If prg size in header is >= 1MB (prg_size==6 or 7) must be some way to access it. Allow oversize mmc3
+wire mapper45 = (flags[7:0] == 45);    // Super 1000000-in-1 multicart
+wire mapper52 = (flags[7:0] == 52);    // Mario Party 7-in-1 multicart
+wire oversized = mapper268 || mapper45 || mapper52 || (flags[10:9] == 3); // If prg size in header is >= 1MB (prg_size==6 or 7) must be some way to access it. Allow oversize mmc3
 wire gnrom;
 wire lockout;
 wire gnrom_lock;
@@ -447,6 +454,9 @@ if (~enable) begin
 	mapper37_multicart <= 3'b000;
 	mapper189_prgsel <= 4'b1011; // mapper 208 requires 0xX011
 	{m268_reg[0],m268_reg[1],m268_reg[2],m268_reg[3],m268_reg[4],m268_reg[5]} <= 0;
+	{m45_reg[0],m45_reg[1],m45_reg[2],m45_reg[3]} <= {8'h00, 8'h00, 8'h0F, 8'h00}; // reg[2]=0x0F per NRS
+	m45_index <= 0;
+	m52_reg <= 0;
 end else if (SaveStateBus_load) begin
 	irq_reg            <= SS_MAP1[ 6: 0];
 	bank_select        <= SS_MAP1[ 9: 7];
@@ -619,6 +629,19 @@ end else begin
 		// $5800-5FFF: Prot index
 		if (prg_write && prg_ain[15:11] == 5'b01011 && mapper208)
 			m268_reg[{1'b0,prg_ain[1:0]}] <= prg_din ^ {1'b0,prot[3],1'b0,prot[2:1],2'b00,prot[0]};
+
+		// Mapper 45: All writes to $6000-$7FFF update outer bank registers sequentially
+		// Per Nintendulator: no even/odd distinction, just write to next register
+		if (prg_write && prg_ain[15:13] == 3'b011 && mapper45 && !m45_locked) begin
+			m45_reg[m45_index[1:0]] <= prg_din;
+			m45_index <= m45_index + 1'd1;
+		end
+
+		// Mapper 52: Write to $6000-$7FFF sets outer bank register (once until reset)
+		// D[7]=lock, D[6]=CHR mode, D[5:4]=CHR bank, D[3]=PRG mode, D[2:0]=PRG bank
+		if (prg_write && prg_ain[15:13] == 3'b011 && mapper52 && !m52_locked) begin
+			m52_reg <= prg_din;
+		end
 	end
 
 	if (m2_inv) begin // Inverted M2
@@ -794,7 +817,32 @@ assign map268c[10] = (weird_mode && chr_ain[10]) ? 1'b0 : (use_chr_ain_12 || !we
 
 wire m268_chr_ram = {map268c[17:11],1'b1} == m268_reg[4];
 
-wire [21:0] prg_aout_tmp = {1'b0, mapper268 ? map268p[20:13] : prgsel, prg_ain[12:0]};
+// Mapper 45 outer bank address calculation
+// CHR: (chrsel & CHR_AND) | CHR_OR, plus high bits from reg[2]
+wire [5:0] m45_prg_and = ~m45_reg[3][5:0];  // PRG-AND mask (inverted in register)
+wire [7:0] m45_chr_and = 8'hFF >> (4'hF - m45_reg[2][3:0]); // CHR-AND mask
+wire [7:0] m45_chr_or = m45_reg[0]; // CHR A10-A17
+
+// PRG final: upper bits from reg1[7:6], lower bits masked/OR'd
+wire [7:0] m45_prg_final = {m45_reg[1][7:6], (prgsel[5:0] & m45_prg_and) | m45_reg[1][5:0]};
+// CHR final: (chrsel & AND) | OR
+wire [7:0] m45_chr_final = (chrsel[7:0] & m45_chr_and) | m45_chr_or;
+
+// Mapper 52 outer bank address calculation (per Nintendulator)
+// PRG: bit3=0: 256KB outer (5-bit mask), bit3=1: 128KB outer (4-bit mask)
+// CHR: bit6=0: 256KB outer (8-bit mask), bit6=1: 128KB outer (7-bit mask)
+// PRGbank << 4: bits go to positions [6:4], CHRbank << 7: bits go to positions [9:7]
+wire [4:0] m52_prg_and = m52_reg[3] ? 5'b01111 : 5'b11111;
+// PRG OR: bit3=1: {bits 2:0} << 4 = positions 6:4; bit3=0: {bits 2:1, 0} << 4 = positions 6:5
+wire [7:0] m52_prg_or = m52_reg[3] ? {1'b0, m52_reg[2:0], 4'b0000} : {1'b0, m52_reg[2:1], 5'b00000};
+wire [7:0] m52_chr_and = m52_reg[6] ? 8'b01111111 : 8'b11111111;
+// CHR OR: {bit5, bit2, [bit4]} << 7 = positions 9:7 (bit4 only when bit6=1)
+wire [9:0] m52_chr_or = m52_reg[6] ? {m52_reg[5], m52_reg[2], m52_reg[4], 7'b0000000} : {m52_reg[5], m52_reg[2], 8'b00000000};
+
+wire [7:0] m52_prg_final = (prgsel[4:0] & m52_prg_and) | m52_prg_or;
+wire [9:0] m52_chr_final = (chrsel[7:0] & m52_chr_and) | m52_chr_or;
+
+wire [21:0] prg_aout_tmp = {1'b0, mapper268 ? map268p[20:13] : mapper45 ? m45_prg_final : mapper52 ? m52_prg_final : prgsel, prg_ain[12:0]};
 
 wire ram_enable_a = !MMC6 ? (ram_enable[prg_ain[12:11]])
 						:   (ram6_enabled && ram6_enable && prg_ain[12] == 1'b1 && prg_ain[9] == 1'b0)
@@ -824,6 +872,9 @@ assign chr_aout =
 		(mapper195 & chr_ram_cs)             ? {10'b11_1111_1111,  chrsel[1:0], chr_ain[9:0]} :   // 4kb CHR-RAM
 		(m268_chr_ram)                       ? {11'b11_1111_1111_1,            chr_ain[10:0]} :   // 2kb CHR-RAM
 		(mapper268)                          ? {4'b10_00,              map268c, chr_ain[9:0]} :   // Mapper 268 override
+		(mapper45 & flags[15])               ? {9'b11_1111_111, chr_ain[12:0]} : // Mapper 45 unbanked 8KB CHR-RAM
+		(mapper45)                           ? {2'b10, m45_reg[2][5:4], m45_chr_final, chr_ain[9:0]} : // Mapper 45 CHR-ROM
+		(mapper52)                           ? {2'b10,         m52_chr_final, chr_ain[9:0]} : // Mapper 52 CHR override
 		                                       {3'b10_0,                chrsel, chr_ain[9:0]};    // Standard MMC3 CHR-ROM/RAM
 
 wire ram_a13 = mapper268 && m268_reg[3][5] && (prg_ain[15:12] == 4'h5);
