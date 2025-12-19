@@ -1450,6 +1450,136 @@ assign vram_ce = chr_ain[13];
 endmodule
 
 
+// 487 - AVE NINA-08 multicart
+// 30-in-1 multicart supporting NINA-03 and Color Dreams games
+module Mapper487(
+	input        clk,         // System clock
+	input        ce,          // M2 ~cpu_clk
+	input        enable,      // Mapper enabled
+	input [31:0] flags,       // Cart flags
+	input [15:0] prg_ain,     // prg address
+	inout [21:0] prg_aout_b,  // prg address out
+	input        prg_read,    // prg read
+	input        prg_write,   // prg write
+	input  [7:0] prg_din,     // prg data in
+	inout  [7:0] prg_dout_b,  // prg data out
+	inout        prg_allow_b, // Enable access to memory for the specified operation.
+	input [13:0] chr_ain,     // chr address in
+	inout [21:0] chr_aout_b,  // chr address out
+	input        chr_read,    // chr ram read
+	inout        chr_allow_b, // chr allow write
+	inout        vram_a10_b,  // Value for A10 address line
+	inout        vram_ce_b,   // True if the address should be routed to the internal 2kB VRAM.
+	inout        irq_b,       // IRQ
+	input [15:0] audio_in,    // Inverted audio from APU
+	inout [15:0] audio_b,     // Mixed audio output
+	inout [15:0] flags_out_b, // flags {0, 0, 0, 0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout}
+	// savestates
+	input       [63:0]  SaveStateBus_Din,
+	input       [ 9:0]  SaveStateBus_Adr,
+	input               SaveStateBus_wren,
+	input               SaveStateBus_rst,
+	input               SaveStateBus_load,
+	output      [63:0]  SaveStateBus_Dout
+);
+
+assign prg_aout_b   = enable ? prg_aout : 22'hZ;
+assign prg_dout_b   = enable ? 8'hFF : 8'hZ;
+assign prg_allow_b  = enable ? prg_allow : 1'hZ;
+assign chr_aout_b   = enable ? chr_aout : 22'hZ;
+assign chr_allow_b  = enable ? chr_allow : 1'hZ;
+assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
+assign vram_ce_b    = enable ? vram_ce : 1'hZ;
+assign irq_b        = enable ? 1'b0 : 1'hZ;
+assign flags_out_b  = enable ? flags_out : 16'hZ;
+assign audio_b      = enable ? {1'b0, audio_in[15:1]} : 16'hZ;
+
+wire [21:0] prg_aout, chr_aout;
+wire prg_allow;
+wire chr_allow;
+wire vram_a10;
+wire vram_ce;
+wire [15:0] flags_out = {12'h0, 1'b1, 3'b00};
+
+// Outer Bank Register ($4180)
+// Bit 0 (b): PRG/CHR A15 when M=0
+// Bits 5-1: PRG/CHR bank high bits
+// Bit 5 (C): Also determines Color Dreams mode (0x20)
+// Bit 6 (M): Inner bank size (0=32KB, 1=64KB)
+// Bit 7 (N): Nametable arrangement (mirroring)
+reg [7:0] outer_bank;
+wire outer_b = outer_bank[0];
+wire chip_sel = outer_bank[5];   // C: 0=NINA-03, 1=Color Dreams
+wire inner_64k = outer_bank[6];  // M: 0=32KB, 1=64KB
+wire mirroring = outer_bank[7];  // N: mirroring
+
+// Inner Bank Register (shared for both NINA-03 and Color Dreams modes)
+// NINA-03 ($4100-$417F): bits 0-1=CHR A14..A13, bit 2=CHR A15 (M=1), bit 3=PRG A15 (M=1)
+// Color Dreams ($8000-$FFFF): data bits reorganized as {D0, D6:D4} -> inner
+reg [3:0] inner_bank;
+
+always @(posedge clk)
+if (~enable) begin
+	outer_bank <= 8'h00;
+	inner_bank <= 4'h0;
+end else if (SaveStateBus_load) begin
+	outer_bank <= SS_MAP1[7:0];
+	inner_bank <= SS_MAP1[11:8];
+end else if (ce && prg_write) begin
+	// $4xxx-$5xxx range with bit 8 set
+	if (prg_ain[15:13] == 3'b010 && prg_ain[8]) begin
+		if (prg_ain[7]) begin
+			// Outer bank register - bit 7 set
+			outer_bank <= prg_din;
+		end else if (!chip_sel) begin
+			// NINA-03 register - bit 7 clear, C=0
+			inner_bank <= prg_din[3:0];
+		end
+	end
+	// Color Dreams register at $8000-$FFFF (when C=1)
+	// Bit reorganization: (val << 3 & 8) | (val >> 4 & 7) = {D0, D6:D4}
+	else if (prg_ain[15] && chip_sel) begin
+		inner_bank <= {prg_din[0], prg_din[6:4]};
+	end
+end
+
+assign SS_MAP1_BACK[7:0] = outer_bank;
+assign SS_MAP1_BACK[11:8] = inner_bank;
+assign SS_MAP1_BACK[63:12] = 52'b0;
+
+// PRG banking logic
+// prg = (M ? inner[3] : outer[0]) | (outer & 0x3E)
+// if (prg & 0x30) prg -= 0x10
+wire prg_a15 = inner_64k ? inner_bank[3] : outer_b;
+wire [5:0] prg_raw = {outer_bank[5:1], prg_a15};
+wire [5:0] prg_bank = (prg_raw[5] | prg_raw[4]) ? (prg_raw - 6'd16) : prg_raw;
+
+// CHR banking logic
+// chr = (inner & 0x03) | (M ? (inner & 0x04) : (outer << 2 & 4)) | (outer << 2 & 0xF8)
+// if (chr & 0xC0) chr -= 0x40
+wire chr_a15 = inner_64k ? inner_bank[2] : outer_b;
+wire [7:0] chr_raw = {outer_bank[5:1], chr_a15, inner_bank[1:0]};
+wire [7:0] chr_bank = (chr_raw[7] | chr_raw[6]) ? (chr_raw - 8'd64) : chr_raw;
+
+assign prg_aout = {1'b0, prg_bank, prg_ain[14:0]};
+assign prg_allow = prg_ain[15] && !prg_write;
+assign chr_aout = {1'b1, chr_bank, chr_ain[12:0]};
+assign chr_allow = flags[15];
+assign vram_ce = chr_ain[13];
+assign vram_a10 = mirroring ? chr_ain[11] : chr_ain[10]; // 1=horiz, 0=vert
+
+// savestate
+localparam SSREG_INDEX_MAP1 = 8'd1;
+wire [63:0] SS_MAP1;
+wire [63:0] SS_MAP1_BACK;
+wire [63:0] SaveStateBus_Dout_active;
+eReg_SavestateV #(SSREG_INDEX_MAP1, 64'h0000000000000000) iREG_SAVESTATE_MAP1 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_Dout_active, SS_MAP1_BACK, SS_MAP1);
+
+assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000000;
+
+endmodule
+
+
 module Mapper234(
 	input        clk,         // System clock
 	input        ce,          // M2 ~cpu_clk
@@ -1981,7 +2111,7 @@ always @(posedge clk) begin
 						'h5300: security[3] <= prg_din;
 					endcase
 				end
-			end else if (prg_read) begin // Security stuff as Mesen does it
+			end else if (prg_read) begin
 				prg_bus_write <= 1'b1;
 				case (prg_ain & 16'h7700)
 					'h5100: prg_dout <= security[0] | security[1] | security[3] | (security[2] ^ 8'hFF);
@@ -2179,6 +2309,78 @@ eReg_SavestateV #(SSREG_INDEX_MAP2, 64'h0000000000000000) iREG_SAVESTATE_MAP2 (c
 eReg_SavestateV #(SSREG_INDEX_MAP3, 64'h0000000000000000) iREG_SAVESTATE_MAP3 (clk, SaveStateBus_Din, SaveStateBus_Adr, SaveStateBus_wren, SaveStateBus_rst, SaveStateBus_wired_or[2], SS_MAP3_BACK, SS_MAP3);  
 
 assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000000;
+
+endmodule
+
+// #200 - 36-in-1 multicart (address latch based)
+// Simple NROM-128 multicart, 16KB PRG mirrored, 8KB CHR
+module Mapper200(
+	input        clk,         // System clock
+	input        ce,          // M2 ~cpu_clk
+	input        enable,      // Mapper enabled
+	input [31:0] flags,       // Cart flags
+	input [15:0] prg_ain,     // prg address
+	inout [21:0] prg_aout_b,  // prg address out
+	input        prg_read,    // prg read
+	input        prg_write,   // prg write
+	input  [7:0] prg_din,     // prg data in
+	inout  [7:0] prg_dout_b,  // prg data out
+	inout        prg_allow_b, // Enable access to memory for the specified operation.
+	input [13:0] chr_ain,     // chr address in
+	inout [21:0] chr_aout_b,  // chr address out
+	input        chr_read,    // chr ram read
+	inout        chr_allow_b, // chr allow write
+	inout        vram_a10_b,  // Value for A10 address line
+	inout        vram_ce_b,   // True if the address should be routed to the internal 2kB VRAM.
+	inout        irq_b,       // IRQ
+	input [15:0] audio_in,    // Inverted audio from APU
+	inout [15:0] audio_b,     // Mixed audio output
+	inout [15:0] flags_out_b  // flags {0, 0, 0, 0, has_savestate, prg_conflict, prg_bus_write, has_chr_dout}
+);
+
+assign prg_aout_b   = enable ? prg_aout : 22'hZ;
+assign prg_dout_b   = enable ? 8'hFF : 8'hZ;
+assign prg_allow_b  = enable ? prg_allow : 1'hZ;
+assign chr_aout_b   = enable ? chr_aout : 22'hZ;
+assign chr_allow_b  = enable ? chr_allow : 1'hZ;
+assign vram_a10_b   = enable ? vram_a10 : 1'hZ;
+assign vram_ce_b    = enable ? vram_ce : 1'hZ;
+assign irq_b        = enable ? 1'b0 : 1'hZ;
+assign flags_out_b  = enable ? flags_out : 16'hZ;
+assign audio_b      = enable ? {1'b0, audio_in[15:1]} : 16'hZ;
+
+wire [21:0] prg_aout, chr_aout;
+wire prg_allow;
+wire chr_allow;
+wire vram_a10;
+wire vram_ce;
+wire [15:0] flags_out = 0;
+
+// Address latch - directly from the bus address during writes to $8000-$FFFF
+// A~[1... .... .... bBBB]
+// BBB = PRG A16..A14 and CHR A15..A13 (bits 2:0)
+// b = PRG A17, CHR A16, and mirroring (bit 3): 0=vertical, 1=horizontal
+reg [3:0] bank;
+
+always @(posedge clk) begin
+	if (~enable) begin
+		bank <= 0;
+	end else if (ce && prg_write && prg_ain[15]) begin
+		bank <= prg_ain[3:0];
+	end
+end
+
+// PRG: 16KB bank at $8000, mirrored at $C000 (NROM-128 style)
+assign prg_aout = {4'b00_00, bank, prg_ain[13:0]};
+assign prg_allow = prg_ain[15] && !prg_write;
+
+// CHR: 8KB bank
+assign chr_aout = {5'b10_000, bank, chr_ain[12:0]};
+assign chr_allow = flags[15];
+
+// Mirroring: bit 3 controls H/V
+assign vram_ce = chr_ain[13];
+assign vram_a10 = bank[3] ? chr_ain[11] : chr_ain[10]; // 1=horizontal, 0=vertical
 
 endmodule
 

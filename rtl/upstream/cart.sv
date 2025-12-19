@@ -11,8 +11,8 @@
 // SDRAM Locations for various RAM types:
 // PRG       = 0....
 // CHR       = 10...
-// CHR-VRAM  = 1100
-// CPU-RAM   = 1110
+// CHR-VRAM  = 11101
+// CPU-RAM   = 11100
 // CARTRAM   = 1111
 
 module cart_top (
@@ -314,15 +314,16 @@ MMC2 mmc2(
 
 //*****************************************************************************//
 // Name   : MMC3                                                               //
-// Mappers: 4, 33, 37, 47, 48, 74, 76, 80, 82, 88, 95, 112, 118, 119, 154, 189,//
-//          191, 192, 194, 195, 196, 205, 206, 207, 208, 268                   //
+// Mappers: 4, 33, 37, 45, 47, 48, 52, 74, 76, 80, 82, 88, 95, 112, 118, 119,  //
+//          154, 189, 191, 192, 194, 195, 196, 205, 206, 207, 208, 268         //
 // Status : Working -- Blaarg IRQ timing test fails, but may be submapper      //
 // Notes  : While currently working well, this mapper could use a full review. //
 // Games  : Crystalis, Battletoads                                             //
 //*****************************************************************************//
 wire mmc3_en = me[118] | me[119] | me[47] | me[206] | me[112] | me[88] | me[154] | me[95]
 	| me[76] | me[80] | me[82] | me[207] | me[48] | me[33] | me[37] | me[74] | me[191]
-	| me[192] | me[194] | me[195] | me[196] | me[4] | me[189] | me[268] | me[205] | me[208];
+	| me[192] | me[194] | me[195] | me[196] | me[4] | me[189] | me[268] | me[205] | me[208]
+	| me[45] | me[52];
 
 MMC3 mmc3 (
 	.clk        (clk),
@@ -1382,6 +1383,44 @@ Mapper228 map228(
 );
 
 //*****************************************************************************//
+// Name   : AVE NINA-08                                                        //
+// Mappers: 487                                                                //
+// Status : Working                                                            //
+// Notes  : 30-in-1 multicart supporting NINA-03 and Color Dreams games        //
+// Games  : (Unreleased Maxivision 30-in-1 multicart)                          //
+//*****************************************************************************//
+Mapper487 map487(
+	.clk        (clk),
+	.ce         (ce),
+	.enable     (me[487]),
+	.flags      (flags),
+	.prg_ain    (prg_ain),
+	.prg_aout_b (prg_addr_b),
+	.prg_read   (prg_read),
+	.prg_write  (prg_write),
+	.prg_din    (prg_din),
+	.prg_dout_b (prg_dout_b),
+	.prg_allow_b(prg_allow_b),
+	.chr_ain    (chr_ain),
+	.chr_aout_b (chr_addr_b),
+	.chr_read   (chr_read),
+	.chr_allow_b(chr_allow_b),
+	.vram_a10_b (vram_a10_b),
+	.vram_ce_b  (vram_ce_b),
+	.irq_b      (irq_b),
+	.flags_out_b(flags_out_b),
+	.audio_in   (audio_in),
+	.audio_b    (audio_out_b),
+	// savestates
+	.SaveStateBus_Din  (SaveStateBus_Din ),
+	.SaveStateBus_Adr  (SaveStateBus_Adr ),
+	.SaveStateBus_wren (SaveStateBus_wren),
+	.SaveStateBus_rst  (SaveStateBus_rst ),
+	.SaveStateBus_load (SaveStateBus_load ),
+	.SaveStateBus_Dout (SaveStateBus_wired_or[39])
+);
+
+//*****************************************************************************//
 // Name   : Maxi 15                                                            //
 // Mappers: 234                                                                //
 // Status : Needs Evaluation                                                   //
@@ -2143,7 +2182,36 @@ Mapper225 map225(
 	.audio_b    (audio_out_b)
 );
 
-
+//*****************************************************************************//
+// Name   : Mapper 200                                                         //
+// Mappers: 200                                                                //
+// Status : Working                                                            //
+// Notes  : Simple address-latch multicart (NROM-128 style)                    //
+// Games  : 36-in-1                                                            //
+//*****************************************************************************//
+Mapper200 map200(
+	.clk        (clk),
+	.ce         (ce),
+	.enable     (me[200]),
+	.flags      (flags),
+	.prg_ain    (prg_ain),
+	.prg_aout_b (prg_addr_b),
+	.prg_read   (prg_read),
+	.prg_write  (prg_write),
+	.prg_din    (prg_din),
+	.prg_dout_b (prg_dout_b),
+	.prg_allow_b(prg_allow_b),
+	.chr_ain    (chr_ain),
+	.chr_aout_b (chr_addr_b),
+	.chr_read   (chr_read),
+	.chr_allow_b(chr_allow_b),
+	.vram_a10_b (vram_a10_b),
+	.vram_ce_b  (vram_ce_b),
+	.irq_b      (irq_b),
+	.flags_out_b(flags_out_b),
+	.audio_in   (audio_in),
+	.audio_b    (audio_out_b)
+);
 
 //*****************************************************************************//
 // Name   : Mapper 413                                                         //
@@ -2432,23 +2500,23 @@ always @* begin
 
 
 	// Remap the CHR address into VRAM, if needed.
-	chr_aout = vram_ce ? {11'b11_0000_0000_0, vram_a10, chr_ain[9:0]} : chr_aout;
+	chr_aout = vram_ce ? {11'b11_1010_0000_0, vram_a10, chr_ain[9:0]} : chr_aout;
 	prg_aout = (prg_ain < 'h2000) ? {11'b11_1000_0000_0, prg_ain[10:0]} : prg_aout;
 	prg_allow = prg_allow || (prg_ain < 'h2000);
 end
 
 // savestates
-localparam SAVESTATE_MODULES    = 39;
+localparam SAVESTATE_MODULES    = 40;
 wire [63:0] SaveStateBus_wired_or[0:SAVESTATE_MODULES-1];
 
-assign SaveStateBus_Dout  = SaveStateBus_wired_or[ 0] | SaveStateBus_wired_or[ 1] | SaveStateBus_wired_or[ 2] | SaveStateBus_wired_or[ 3] | SaveStateBus_wired_or[ 4] | 
+assign SaveStateBus_Dout  = SaveStateBus_wired_or[ 0] | SaveStateBus_wired_or[ 1] | SaveStateBus_wired_or[ 2] | SaveStateBus_wired_or[ 3] | SaveStateBus_wired_or[ 4] |
 									 SaveStateBus_wired_or[ 5] | SaveStateBus_wired_or[ 6] | SaveStateBus_wired_or[ 7] | SaveStateBus_wired_or[ 8] | SaveStateBus_wired_or[ 9] |
 									 SaveStateBus_wired_or[10] | SaveStateBus_wired_or[11] | SaveStateBus_wired_or[12] | SaveStateBus_wired_or[13] | SaveStateBus_wired_or[14] |
 									 SaveStateBus_wired_or[15] | SaveStateBus_wired_or[16] | SaveStateBus_wired_or[17] | SaveStateBus_wired_or[18] | SaveStateBus_wired_or[19] |
 									 SaveStateBus_wired_or[20] | SaveStateBus_wired_or[21] | SaveStateBus_wired_or[22] | SaveStateBus_wired_or[23] | SaveStateBus_wired_or[24] |
 									 SaveStateBus_wired_or[25] | SaveStateBus_wired_or[26] | SaveStateBus_wired_or[27] | SaveStateBus_wired_or[28] | SaveStateBus_wired_or[29] |
 									 SaveStateBus_wired_or[30] | SaveStateBus_wired_or[31] | SaveStateBus_wired_or[32] | SaveStateBus_wired_or[33] | SaveStateBus_wired_or[34] |
-									 SaveStateBus_wired_or[35] | SaveStateBus_wired_or[36] | SaveStateBus_wired_or[37] | SaveStateBus_wired_or[38];
+									 SaveStateBus_wired_or[35] | SaveStateBus_wired_or[36] | SaveStateBus_wired_or[37] | SaveStateBus_wired_or[38] | SaveStateBus_wired_or[39];
 
 localparam SAVESTATERAM_MODULES    = 4;
 wire [7:0] SaveStateRAM_wired_or[0:SAVESTATERAM_MODULES-1];
