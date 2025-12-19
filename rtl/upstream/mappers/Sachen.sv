@@ -61,6 +61,7 @@ wire mapper139 = (flags[7:0] == 139);
 wire mapper141 = (flags[7:0] == 141);
 wire mapper150 = (flags[7:0] == 150);
 wire mapper243 = (flags[7:0] == 243);
+wire has_chr_ram = flags[15];
 
 reg [2:0] register;
 reg [2:0] prg_bank;
@@ -85,15 +86,12 @@ end else if (ce && prg_write) begin
 		register <= prg_din[2:0];
 	end else if ({prg_ain[15:14], prg_ain[8], prg_ain[0]} == 4'b0111) begin
 		case (register)
-			0: begin 
-			   chr_bank_0 <= prg_din[2:0];  // Select 2 KB CHR bank at PPU $0000-$07FF;
-				if (mapper243) {prg_bank, chr_bank_2[0], chr_bank_p[1:0], chr_bank_o[0]} = 7'b000_0011;
-				end
+			0: chr_bank_0 <= prg_din[2:0];  // Select 2 KB CHR bank at PPU $0000-$07FF;
 			1: chr_bank_1 <= prg_din[2:0];  // Select 2 KB CHR bank at PPU $0800-$0FFF;
 			2: begin
-			   chr_bank_2 <= prg_din[2:0];  // Select 2 KB CHR bank at PPU $1000-$17FF;
-				if (mapper150) prg_bank = {2'b00, prg_din[0]};
-				end
+			   		chr_bank_2 <= prg_din[2:0];  // Select 2 KB CHR bank at PPU $1000-$17FF;
+					if (mapper150) prg_bank = {2'b00, prg_din[0]};
+			   end
 			3: chr_bank_3 <= prg_din[2:0];  // Select 2 KB CHR bank at PPU $1800-$1FFF;
 			4: chr_bank_o <= prg_din[2:0];  // Outer CHR bank
 			5: prg_bank   <= prg_din[2:0];  // Select 32 KB PRG ROM bank at $8000-$FFFF;
@@ -138,13 +136,14 @@ always @* begin
 	else if (mapper138)
 		chrsel = {2'b11, chr_banko, chr_bank, chr_ain[10]};
 	else if (mapper141)
-		chrsel = {1'b1, chr_banko, chr_bank, chr_ain[11:10]};
+		chrsel = has_chr_ram	? {6'b100000, chr_ain[12:10]} // Q boy
+								: {1'b1, chr_banko, chr_bank, chr_ain[11:10]};
 	else if (mapper139)
 		chrsel = {chr_banko, chr_bank, chr_ain[12:10]};
 	else if (mapper150)
 		chrsel = {2'b00, chr_bank_2[0], chr_bank_o[0], chr_bank_p[1:0], chr_ain[12:10]};
 	else if (mapper243)
-		chrsel = {2'b00, chr_bank_2[0], chr_bank_p[1:0], chr_bank_o[0], chr_ain[12:10]};
+		chrsel = {2'b00, chr_bank_p[1:0], chr_bank_o[0], chr_bank_2[0], chr_ain[12:10]};
 	else
 		chrsel = 9'h000;
 end
@@ -160,7 +159,7 @@ always @* begin
 end
 
 assign prg_aout = {4'b00_00, prg_bank, prg_ain[14:0]};
-assign chr_allow = flags[15];
+assign chr_allow = has_chr_ram;
 assign chr_aout = {3'b10_0, chrsel, chr_ain[9:0]};
 assign vram_ce = chr_ain[13];
 //assign vram_a10 = ; //done above
