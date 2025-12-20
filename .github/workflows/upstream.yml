@@ -15,12 +15,13 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          token: ${{ secrets.CUSTOM_GH_TOKEN }}
 
       - name: Configure Git
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          echo "https://user:${{ secrets.GITHUB_TOKEN }}@github.com" > /home/runner/.git-credentials
+          echo "https://user:${{ secrets.CUSTOM_GH_TOKEN }}@github.com" > /home/runner/.git-credentials
           git config --global credential.helper store
 
       - name: "Copybara"
