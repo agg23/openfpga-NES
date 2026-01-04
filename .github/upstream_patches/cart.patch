@@ -2,7 +2,76 @@ diff --git a/rtl/upstream/cart.sv b/rtl/upstream/cart.sv
 index 3e84d39..7113c4e 100644
 --- a/rtl/upstream/cart.sv
 +++ b/rtl/upstream/cart.sv
-@@ -1861,36 +1861,36 @@ Mapper164 map164(
+@@ -1453,38 +1453,38 @@ Mapper246 map246(
+ // Notes  : Consider merging with MMC3                                         //
+ // Games  : Rolling Thunder, Klax, Skull and Crossbones, Alien Syndrome (158)  //
+ //*****************************************************************************//
+-Rambo1 rambo1(
+-	.clk        (clk),
+-	.ce         (ce),
+-	.enable     (me[64] | me[158]),
+-	.flags      (flags),
+-	.prg_ain    (prg_ain),
+-	.prg_aout_b (prg_addr_b),
+-	.prg_read   (prg_read),
+-	.prg_write  (prg_write),
+-	.prg_din    (prg_din),
+-	.prg_dout_b (prg_dout_b),
+-	.prg_allow_b(prg_allow_b),
+-	.chr_ain    (chr_ain),
+-	.chr_aout_b (chr_addr_b),
+-	.chr_read   (chr_read),
+-	.chr_allow_b(chr_allow_b),
+-	.vram_a10_b (vram_a10_b),
+-	.vram_ce_b  (vram_ce_b),
+-	.irq_b      (irq_b),
+-	.flags_out_b(flags_out_b),
+-	.audio_in   (audio_in),
+-	.audio_b    (audio_out_b),
+-	// Special ports
+-	.chr_ain_o  (chr_ain_orig),
+-	// savestates
+-	.SaveStateBus_Din  (SaveStateBus_Din ), 
+-	.SaveStateBus_Adr  (SaveStateBus_Adr ),
+-	.SaveStateBus_wren (SaveStateBus_wren),
+-	.SaveStateBus_rst  (SaveStateBus_rst ),
+-	.SaveStateBus_load (SaveStateBus_load ),
+-	.SaveStateBus_Dout (SaveStateBus_wired_or[24])
+-);
++// Rambo1 rambo1(
++// 	.clk        (clk),
++// 	.ce         (ce),
++// 	.enable     (me[64] | me[158]),
++// 	.flags      (flags),
++// 	.prg_ain    (prg_ain),
++// 	.prg_aout_b (prg_addr_b),
++// 	.prg_read   (prg_read),
++// 	.prg_write  (prg_write),
++// 	.prg_din    (prg_din),
++// 	.prg_dout_b (prg_dout_b),
++// 	.prg_allow_b(prg_allow_b),
++// 	.chr_ain    (chr_ain),
++// 	.chr_aout_b (chr_addr_b),
++// 	.chr_read   (chr_read),
++// 	.chr_allow_b(chr_allow_b),
++// 	.vram_a10_b (vram_a10_b),
++// 	.vram_ce_b  (vram_ce_b),
++// 	.irq_b      (irq_b),
++// 	.flags_out_b(flags_out_b),
++// 	.audio_in   (audio_in),
++// 	.audio_b    (audio_out_b),
++// 	// Special ports
++// 	.chr_ain_o  (chr_ain_orig),
++// 	// savestates
++// 	.SaveStateBus_Din  (SaveStateBus_Din ), 
++// 	.SaveStateBus_Adr  (SaveStateBus_Adr ),
++// 	.SaveStateBus_wren (SaveStateBus_wren),
++// 	.SaveStateBus_rst  (SaveStateBus_rst ),
++// 	.SaveStateBus_load (SaveStateBus_load ),
++// 	.SaveStateBus_Dout (SaveStateBus_wired_or[24])
++// );
++ 
++@@ -1861,36 +1861,36 @@ Mapper164 map164(
  // Games  : Metal Force (K), Buzz and Waldog (K), General's Son (K),           //
  //          Koko Adventure (K)                                                 //
  //*****************************************************************************//
