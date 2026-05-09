@@ -2182,7 +2182,7 @@ assign SaveStateBus_Dout = enable ? SaveStateBus_Dout_active : 64'h0000000000000
 endmodule
 
 // #200 - 36-in-1 multicart (address latch based)
-// Simple NROM-128 multicart, 16KB PRG mirrored, 8KB CHR
+// #212 - BMC Super HiK 100-in-1 / pirate multicart (address latch based)
 module Mapper200(
 	input        clk,         // System clock
 	input        ce,          // M2 ~cpu_clk
@@ -2225,26 +2225,46 @@ wire vram_a10;
 wire vram_ce;
 wire [15:0] flags_out = 0;
 
+wire mapper212 = (flags[7:0] == 212);
+
 // Address latch - directly from the bus address during writes to $8000-$FFFF
 // A~[1... .... .... bBBB]
 // BBB = PRG A16..A14 and CHR A15..A13 (bits 2:0)
 // b = PRG A17, CHR A16, and mirroring (bit 3): 0=vertical, 1=horizontal
-reg [3:0] bank;
+reg [4:0] bank;
 
 always @(posedge clk) begin
 	if (~enable) begin
-		bank <= 0;
+		bank <= 5'b0;
 	end else if (ce && prg_write && prg_ain[15]) begin
-		bank <= prg_ain[3:0];
+		bank <= {prg_ain[14], prg_ain[3:0]};
 	end
 end
 
-// PRG: 16KB bank at $8000, mirrored at $C000 (NROM-128 style)
-assign prg_aout = {4'b00_00, bank, prg_ain[13:0]};
+reg [3:0] prg_bank;
+always @* begin
+	if (mapper212) begin
+		if (bank[4]) begin
+			// bit 14 = 1: 32KB mode, BB selects a 32KB bank, prg_ain[14] picks the half
+			prg_bank = {bank[2:1], prg_ain[14]};
+		end else begin
+			// bit 14 = 0: 16KB mode, BBb mirrored across $8000-$FFFF
+			prg_bank = {1'b0, bank[2:0]};
+		end
+	end else begin
+		// Mapper 200: 4-bit bank, NROM-128 mirror
+		prg_bank = bank[3:0];
+	end
+end
+
+assign prg_aout  = {4'b00_00, prg_bank, prg_ain[13:0]};
 assign prg_allow = prg_ain[15] && !prg_write;
 
 // CHR: 8KB bank
-assign chr_aout = {5'b10_000, bank, chr_ain[12:0]};
+//   Mapper 200: 4-bit bank (up to 128KB)
+//   Mapper 212: 3-bit bank (up to 64KB)
+wire [3:0] chr_bank = mapper212 ? {1'b0, bank[2:0]} : bank[3:0];
+assign chr_aout  = {5'b10_000, chr_bank, chr_ain[12:0]};
 assign chr_allow = flags[15];
 
 // Mirroring: bit 3 controls H/V
