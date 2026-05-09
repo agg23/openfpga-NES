@@ -2146,7 +2146,7 @@ Mapper225 map225(
 
 //*****************************************************************************//
 // Name   : Mapper 200                                                         //
-// Mappers: 200                                                                //
+// Mappers: 200, 212                                                           //
 // Status : Working                                                            //
 // Notes  : Simple address-latch multicart (NROM-128 style)                    //
 // Games  : 36-in-1                                                            //
@@ -2154,7 +2154,7 @@ Mapper225 map225(
 Mapper200 map200(
 	.clk        (clk),
 	.ce         (ce),
-	.enable     (me[200]),
+	.enable     (me[200] | me[212]),
 	.flags      (flags),
 	.prg_ain    (prg_ain),
 	.prg_aout_b (prg_addr_b),
