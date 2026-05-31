@@ -2,7 +2,7 @@ diff --git a/rtl/upstream/cart.sv b/rtl/upstream/cart.sv
 index 3e84d39..7113c4e 100644
 --- a/rtl/upstream/cart.sv
 +++ b/rtl/upstream/cart.sv
-@@ -1453,38 +1453,38 @@ Mapper246 map246(
+@@ -1453,36 +1453,36 @@ Mapper246 map246(
  // Notes  : Consider merging with MMC3                                         //
  // Games  : Rolling Thunder, Klax, Skull and Crossbones, Alien Syndrome (158)  //
  //*****************************************************************************//
@@ -70,8 +70,8 @@ index 3e84d39..7113c4e 100644
 +// 	.SaveStateBus_load (SaveStateBus_load ),
 +// 	.SaveStateBus_Dout (SaveStateBus_wired_or[24])
 +// );
-+ 
-+@@ -1861,36 +1861,36 @@ Mapper164 map164(
+ 
+@@ -1861,36 +1861,36 @@ Mapper164 map164(
  // Games  : Metal Force (K), Buzz and Waldog (K), General's Son (K),           //
  //          Koko Adventure (K)                                                 //
  //*****************************************************************************//
