@@ -72,7 +72,7 @@ architecture arch of savestates is
       (16#000000#,     256),  -- OAM      -> internal
       (16#000000#,    8192),  -- MAPPER   -> internal
       (16#200000#, 1048576),  -- CHR      -> sdram
-      (16#300000#,    2048),  -- CHR-VRAM -> sdram
+      (16#3A0000#,    2048),  -- CHR-VRAM -> sdram
       (16#380000#,    2048),  -- CPU-RAM  -> sdram
       (16#3C0000#,  262144)   -- CARTRAM  -> sdram 
    );
