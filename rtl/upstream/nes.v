@@ -79,6 +79,7 @@ module NES(
 	input         pausecore,
 	output        corepaused,
 	input   [1:0] sys_type,
+	input   [7:0] vs_dip_switches,
 	output  [1:0] nes_div,
 	input  [63:0] mapper_flags,
 	output [15:0] sample,         // sample generated from APU
@@ -212,6 +213,12 @@ assign apu_ce = cpu_ce;
 
 wire [7:0] from_data_bus;
 wire [7:0] cpu_dout;
+reg  [7:0] open_bus_data;
+
+wire vs_mode = (sys_type == 2'b11);
+wire [7:0] joypad1_read_data;
+wire [7:0] joypad2_read_data;
+wire fds_eject_cart;
 
 // odd or even apu cycle, AKA div_apu or apu_/clk2. This is actually not 50% duty cycle. It is high for 18
 // master cycles and low for 6 master cycles. It is considered active when low or "even".
@@ -454,8 +461,8 @@ wire [15:0] apu_dma_addr;
 
 // Determine the values on the bus outgoing from the CPU chip (after DMA / APU)
 wire [15:0] addr = dma_aout_enable ? dma_aout  : cpu_addr;
-wire [7:0] dma_data_bus = (joypad1_cs && dma_aout_enable) ? {from_data_bus[7:5], joypad1_data[4:0]} :
-	(joypad2_cs && dma_aout_enable) ? {from_data_bus[7:5], joypad2_data[4:0]} :
+wire [7:0] dma_data_bus = (joypad1_cs && dma_aout_enable) ? joypad1_read_data :
+	(joypad2_cs && dma_aout_enable) ? joypad2_read_data :
 	from_data_bus;
 wire [7:0]  dbus = dma_aout_enable ? dma_data_to_ram : cpu_dout;
 wire mr_int      = dma_aout_enable ? dma_read  : cpu_rnw;
@@ -550,6 +557,27 @@ wire [15:0] audio_mappers = (audio_en == 2'd1) ? 16'd0 : sample_inverted;
 wire joypad1_cs = apu_cs && addr[4:0] == 5'h16;
 wire joypad2_cs = apu_cs && addr[4:0] == 5'h17;
 
+VsCoinInput vs_coin_input
+(
+	.clk(clk),
+	.reset(reset),
+	.enable(vs_mode),
+	.ppu_ce(ppu_ce),
+	.vblank(vblank),
+	.coin_button(fds_eject),
+	.dip_switches(vs_dip_switches),
+	.protection_type(mapper_flags[52:49]),
+	.controller_strobe(joy_out[0]),
+	.controller_read(joypad_clock),
+	.joypad1_data_in(joypad1_data),
+	.joypad2_data_in(joypad2_data),
+	.open_bus_in(open_bus_data[7:5]),
+	.joypad1_data_out(joypad1_read_data),
+	.joypad2_data_out(joypad2_read_data),
+	.fds_eject_out(fds_eject_cart),
+	.coin_active()
+);
+
 reg [2:0] joy_out;
 reg [2:0] joy_latch;
 always @(posedge clk) begin
@@ -593,6 +621,7 @@ PPU ppu(
 	.ce               (ppu_ce),
 	.reset            (reset),
 	.sys_type         (sys_type),
+	.vs_ppu_type      (mapper_flags[48:45]),
 	.debug_dots       (debug_dots),
 	.color            (color),
 	.din              (dbus),
@@ -662,6 +691,7 @@ cart_top multi_mapper (
 	// FPGA specific
 	.clk               (clk),
 	.reset             (reset_noSS),
+	.vs_mode           (vs_mode),
 	.flags             (mapper_flags),            // iNES header data (use 0 while loading)
 	.paused            (freeze_clocks),
 	// Cart pins (slightly abstracted)
@@ -707,7 +737,7 @@ cart_top multi_mapper (
 	.prg_conflict_d0   (prg_conflict_d0),         // Simulate bus conflicts for Mapper 144
 	.has_flashsaves    (has_flashsaves),          // Homebrew mapper that saves to PRG-ROM in flash memory
 	// User input/FDS controls
-	.fds_eject         (fds_eject),               // Used to trigger FDS disk changes
+	.fds_eject         (fds_eject_cart),          // FDS button is a coin input in Vs. mode
 	.fds_busy          (fds_busy),                // Used to trigger FDS disk changes
 	.fds_fast          (fds_fast),
 	.diskside          (diskside),
@@ -728,6 +758,26 @@ cart_top multi_mapper (
 	.Savestate_MAPRAMWrEn     (Savestate_MAPRAMWrEn),
 	.Savestate_MAPRAMWriteData(Savestate_MAPRAMWriteData),
 	.Savestate_MAPRAMReadData (Savestate_MAPRAMReadData)
+);
+
+wire [7:0] vs_protection_data;
+wire       vs_protection_data_valid;
+wire [4:0] vs_protection_state;
+
+VsProtection vs_protection
+(
+	.clk(clk),
+	.reset(reset),
+	.load(loading_savestate),
+	.enable(vs_mode),
+	.protection_type(mapper_flags[52:49]),
+	.ce(cart_ce && !reset),
+	.read(prg_read),
+	.address(prg_addr),
+	.state_in(SS_TOP[21:17]),
+	.state_out(vs_protection_state),
+	.data_valid(vs_protection_data_valid),
+	.data(vs_protection_data)
 );
 
 wire genie_ovr;
@@ -761,8 +811,6 @@ assign ppumem_read  = chr_read;
 assign ppumem_write = chr_write && (chr_allow || vram_ce);
 assign ppumem_dout  = chr_from_ppu;
 
-reg [7:0] open_bus_data;
-
 always @(posedge clk) begin
 	if (loading_savestate) begin
 		open_bus_data <= SS_TOP[8:1];
@@ -780,11 +828,13 @@ always @* begin
 	if (reset) begin
 		external_data_bus = SS_TOP[16:9]; // 0;
 	end else if (joypad1_cs && ~dma_aout_enable) begin   // Joypad1 Read
-		external_data_bus = {open_bus_data[7:5], joypad1_data};
+		external_data_bus = joypad1_read_data;
 	end else if (joypad2_cs && ~dma_aout_enable) begin   // Joypad2 Read
-		external_data_bus = {open_bus_data[7:5], joypad2_data};
+		external_data_bus = joypad2_read_data;
 	end else if (ppu_cs) begin                          // PPU Read
 		external_data_bus = ppu_dout;
+	end else if (vs_protection_data_valid) begin        // Vs. CPU protection device
+		external_data_bus = vs_protection_data;
 	end else if (prg_allow) begin                       // PRG Read
 		external_data_bus = cpumem_din;
 	end else if (prg_bus_write) begin                   // PRG/CPU Write
@@ -796,7 +846,8 @@ end
 
 assign SS_TOP_BACK[ 8: 1] = open_bus_data;
 assign SS_TOP_BACK[16: 9] = external_data_bus;
-assign SS_TOP_BACK[63:17] = 47'b0; // free to be used
+assign SS_TOP_BACK[21:17] = vs_protection_state;
+assign SS_TOP_BACK[63:22] = 42'b0; // free to be used
 
 
 /**********************************************************/
@@ -926,5 +977,181 @@ statemanager #(0, 33554432) statemanager (
 );
 
 assign sleep_savestate = sleep_rewind | sleep_savestates;
+
+endmodule
+
+
+module VsProtection
+(
+	input        clk,
+	input        reset,
+	input        load,
+	input        enable,
+	input  [3:0] protection_type,
+	input        ce,
+	input        read,
+	input [15:0] address,
+	input  [4:0] state_in,
+	output [4:0] state_out,
+	output       data_valid,
+	output reg [7:0] data
+);
+
+reg [4:0] protection_state;
+
+wire chip127_enable = enable && (protection_type == 4'd1);
+wire chip128_enable = enable && (protection_type == 4'd2);
+wire xevious_enable = enable && (protection_type == 4'd3);
+wire protection_enable = chip127_enable || chip128_enable || xevious_enable;
+
+// Chip 127 ignores A11. Chip 128 fully decodes only $5E00/$5E01.
+wire chip127_address = (address[15:12] == 4'h5) && (address[10:1] == 10'h300);
+wire chip128_address = (address[15:1] == 15'h2F00);
+wire sequence_address = (chip127_enable && chip127_address) ||
+	(chip128_enable && chip128_address);
+wire sequence_reset = read && sequence_address && !address[0];
+wire sequence_read = read && sequence_address && address[0];
+
+wire xevious_toggle = xevious_enable && read && (address == 16'h54FF);
+wire xevious_data_valid = xevious_enable && read &&
+	((address == 16'h54FF) || (address == 16'h5678) ||
+	 (address == 16'h578F) || (address == 16'h5567));
+
+assign state_out = protection_state;
+assign data_valid = sequence_reset || sequence_read || xevious_data_valid;
+
+always @(posedge clk) begin
+	if(reset || !protection_enable)
+		protection_state <= 5'd0;
+	else if(load)
+		protection_state <= state_in;
+	else if(ce && sequence_reset)
+		protection_state <= 5'd0;
+	else if(ce && sequence_read)
+		protection_state <= protection_state + 5'd1;
+	else if(ce && xevious_toggle)
+		protection_state <= {4'd0, !protection_state[0]};
+end
+
+always @* begin
+	case(protection_state)
+		5'h00: data = 8'hFF;
+		5'h01: data = chip128_enable ? 8'hBF : 8'hFD;
+		5'h02: data = chip128_enable ? 8'hB7 : 8'hF5;
+		5'h03: data = chip128_enable ? 8'h97 : 8'hF4;
+		5'h04: data = chip128_enable ? 8'h97 : 8'hB4;
+		5'h05: data = chip128_enable ? 8'h17 : 8'hB4;
+		5'h06: data = chip128_enable ? 8'h57 : 8'hA6;
+		5'h07: data = chip128_enable ? 8'h4F : 8'h2E;
+		5'h08: data = chip128_enable ? 8'h6F : 8'h2F;
+		5'h09: data = chip128_enable ? 8'h6B : 8'h6F;
+		5'h0A: data = chip128_enable ? 8'hEB : 8'h6F;
+		5'h0B: data = chip128_enable ? 8'hA9 : 8'h7D;
+		5'h0C: data = chip128_enable ? 8'hB1 : 8'hD5;
+		5'h0D: data = chip128_enable ? 8'h90 : 8'hD4;
+		5'h0E: data = 8'h94;
+		5'h0F: data = chip128_enable ? 8'h14 : 8'h94;
+		5'h10: data = chip128_enable ? 8'h56 : 8'h86;
+		5'h11: data = chip128_enable ? 8'h4E : 8'h2E;
+		5'h12: data = chip128_enable ? 8'h6F : 8'h2F;
+		5'h13: data = chip128_enable ? 8'h6B : 8'h6F;
+		5'h14: data = chip128_enable ? 8'hEB : 8'h6B;
+		5'h15: data = chip128_enable ? 8'hA9 : 8'h79;
+		5'h16: data = chip128_enable ? 8'hB1 : 8'hD1;
+		5'h17: data = chip128_enable ? 8'h90 : 8'hD0;
+		5'h18: data = chip128_enable ? 8'hD4 : 8'h92;
+		5'h19: data = chip128_enable ? 8'h5C : 8'h92;
+		5'h1A: data = chip128_enable ? 8'h3E : 8'h8D;
+		5'h1B: data = chip128_enable ? 8'h26 : 8'h65;
+		5'h1C: data = chip128_enable ? 8'h87 : 8'h64;
+		5'h1D: data = chip128_enable ? 8'h83 : 8'h34;
+		5'h1E: data = chip128_enable ? 8'h13 : 8'hB0;
+		5'h1F: data = chip128_enable ? 8'h00 : 8'hA2;
+	endcase
+
+	if(sequence_reset)
+		data = 8'h00;
+	else if(xevious_enable) begin
+		case(address)
+			16'h54FF: data = 8'h05;
+			16'h5678: data = protection_state[0] ? 8'h01 : 8'h00;
+			16'h578F: data = protection_state[0] ? 8'h89 : 8'hD1;
+			16'h5567: data = protection_state[0] ? 8'h37 : 8'h3E;
+			default: data = 8'h00;
+		endcase
+	end
+end
+
+endmodule
+
+
+module VsCoinInput
+(
+	input        clk,
+	input        reset,
+	input        enable,
+	input        ppu_ce,
+	input        vblank,
+	input        coin_button,
+	input  [7:0] dip_switches,
+	input  [3:0] protection_type,
+	input        controller_strobe,
+	input  [1:0] controller_read,
+	input  [4:0] joypad1_data_in,
+	input  [4:0] joypad2_data_in,
+	input  [2:0] open_bus_in,
+	output [7:0] joypad1_data_out,
+	output [7:0] joypad2_data_out,
+	output       fds_eject_out,
+	output       coin_active
+);
+
+reg       coin_button_d;
+reg       vblank_d;
+reg [2:0] coin_frames;
+reg [2:0] joypad1_index;
+reg [2:0] joypad2_index;
+reg [1:0] controller_read_d;
+
+assign coin_active = |coin_frames;
+wire force_start = enable && ((protection_type == 4'd4) || (protection_type == 4'd6));
+wire joypad1_serial = (force_start && (joypad1_index == 3'd3)) ? 1'b1 : joypad1_data_in[0];
+wire joypad2_serial = (force_start && (joypad2_index == 3'd3)) ? 1'b1 : joypad2_data_in[0];
+
+assign joypad1_data_out = enable ? {2'b00, coin_active, dip_switches[1:0], 2'b00, joypad1_serial} :
+	{open_bus_in, joypad1_data_in};
+assign joypad2_data_out = enable ? {dip_switches[7:2], 1'b0, joypad2_serial} :
+	{open_bus_in, joypad2_data_in};
+assign fds_eject_out = coin_button && !enable;
+
+always @(posedge clk) begin
+	if(reset || !enable) begin
+		coin_button_d <= coin_button;
+		vblank_d <= vblank;
+		coin_frames <= 3'd0;
+		joypad1_index <= 3'd0;
+		joypad2_index <= 3'd0;
+		controller_read_d <= controller_read;
+	end else begin
+		coin_button_d <= coin_button;
+		if(ppu_ce) vblank_d <= vblank;
+		controller_read_d <= controller_read;
+
+		if(controller_strobe) begin
+			joypad1_index <= 3'd0;
+			joypad2_index <= 3'd0;
+		end else begin
+			if(!controller_read[0] && controller_read_d[0] && !(&joypad1_index))
+				joypad1_index <= joypad1_index + 3'd1;
+			if(!controller_read[1] && controller_read_d[1] && !(&joypad2_index))
+				joypad2_index <= joypad2_index + 3'd1;
+		end
+
+		if(coin_button && !coin_button_d && !coin_active)
+			coin_frames <= 3'd4;
+		else if(ppu_ce && vblank && !vblank_d && coin_active)
+			coin_frames <= coin_frames - 3'd1;
+	end
+end
 
 endmodule

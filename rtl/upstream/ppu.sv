@@ -214,7 +214,8 @@ always_comb begin
 			vblank_start_sl = 9'd241;
 			vblank_end_sl   = 9'd260;
 			vsync_start_sl  = 9'd244;
-			skip_en         = 1'b1;
+			// Consumer 2C02 skips a rendered odd-frame dot; Vs. RGB PPUs do not.
+			skip_en         = (sys_type == 2'b00);
 		end
 
 		2'b01: begin       // PAL
@@ -1230,6 +1231,65 @@ end
 endmodule
 
 
+module vs_edge_mask_color
+(
+	input        enable,
+	input  [3:0] ppu_type,
+	output reg [5:0] color_out
+);
+
+always @* begin
+	color_out = 6'h0E;
+
+	if(enable) begin
+		case(ppu_type)
+			4'd2: color_out = 6'h1A; // RP2C04-0001 -> ordered black $2E
+			4'd3: color_out = 6'h00; // RP2C04-0002 -> ordered black $2E
+			4'd4: color_out = 6'h09; // RP2C04-0003 -> ordered black $2E
+			4'd5: color_out = 6'h04; // RP2C04-0004 -> ordered black $2E
+			default: color_out = 6'h0E;
+		endcase
+	end
+end
+
+endmodule
+
+
+// RC2C05 CPU-register protection. The four official Vs. variants exchange
+// PPUCTRL/PPUMASK and drive a fixed subtype signature on PPUSTATUS.
+module vs_ppu_register_decode
+(
+	input        enable,
+	input  [3:0] ppu_type,
+	input  [2:0] cpu_ain,
+	input  [2:0] status_flags,
+	input  [4:0] status_open_bus,
+	output [2:0] ppu_ain,
+	output reg [7:0] status_data
+);
+
+wire is_2c05 = enable && ppu_type[3] && !ppu_type[2];
+
+assign ppu_ain = (is_2c05 && (cpu_ain[2:1] == 2'b00)) ?
+	{2'b00, !cpu_ain[0]} : cpu_ain;
+
+always @* begin
+	status_data = {status_flags, status_open_bus};
+
+	if(is_2c05) begin
+		case(ppu_type)
+			4'd8:  status_data = {status_flags, 5'h1B};
+			4'd9:  status_data = {status_flags[2:1], 6'h3D};
+			4'd10: status_data = {status_flags, 5'h1C};
+			4'd11: status_data = {status_flags, 5'h1B};
+			default: status_data = {status_flags, status_open_bus};
+		endcase
+	end
+end
+
+endmodule
+
+
 module PPU(
 	input         clk,
 	input         cs,
@@ -1240,6 +1300,7 @@ module PPU(
 	input         reset,            // input clock  21.48 MHz / 4. 1 clock cycle = 1 pixel
 	input         cold_reset,       // power cycle
 	inout   [1:0] sys_type,         // System type. 0 = NTSC 1 = PAL 2 = Dendy 3 = Vs.
+	input   [3:0] vs_ppu_type,      // NES 2.0 Vs. RGB PPU type
 	output  [5:0] color,            // output color value, one pixel outputted every clock
 	input   [7:0] din,              // input data from bus
 	output  [7:0] dout,             // output data to CPU
@@ -1280,6 +1341,11 @@ module PPU(
 	input  [7:0]  Savestate_OAMWriteData,
 	output [7:0]  Savestate_OAMReadData
 );
+
+wire pal_system = (sys_type == 2'b01);
+wire pal_or_dendy = pal_system || (sys_type == 2'b10);
+wire [2:0] ppu_ain;
+wire [7:0] ppu_status_data;
 
 // Savestates
 localparam SAVESTATE_MODULES    = 6;
@@ -1407,7 +1473,7 @@ VramAddressGen vram0(
 	.reset         (reset),
 	.clear         (clear),
 	.is_rendering  (is_rendering),
-	.ain           (ain),
+	.ain           (ppu_ain),
 	.din           (ppu_dbus),
 	.read          (read),
 	.write         (write),
@@ -1460,7 +1526,7 @@ wire [3:0] bg_pixel = {bg_pixel_noblank[3:2], show_bg_on_pixel ? bg_pixel_noblan
 wire [31:0] oam_bus_ex;
 wire masked_sprites;
 
-wire [8:0] scanline_nopr = is_pre_render_line ? (~|sys_type ? 9'd261 : 9'd311) : scanline;
+wire [8:0] scanline_nopr = is_pre_render_line ? (pal_or_dendy ? 9'd311 : 9'd261) : scanline;
 
 OAMEval spriteeval (
 	.clk               (clk),
@@ -1474,15 +1540,15 @@ OAMEval spriteeval (
 	.clear_signal      (clear_signal),
 	.oam_bus           (oam_bus),
 	.oam_bus_ex        (oam_bus_ex),
-	.oam_addr_write    (write && (ain == 3)),
-	.oam_data_write    (write && (ain == 4)),
+	.oam_addr_write    (write && (ppu_ain == 3)),
+	.oam_data_write    (write && (ppu_ain == 4)),
 	.oam_din           (ppu_dbus),
 	.in_range          (in_range),
 	.overflow          (sprite_overflow),
 	.sprite0           (obj0_on_line),
 	.is_vbe            (is_vbe_sl),
 	.is_pre_render     (is_pre_render_line),
-	.PAL               (sys_type[0]),
+	.PAL               (pal_system),
 	.masked_sprites    (masked_sprites),
 	 // savestates
 	.SaveStateBus_Din       (SaveStateBus_Din        ),
@@ -1764,48 +1830,68 @@ PaletteRam palette_ram(
 reg [4:0] write_2007_delayed;
 reg [4:0] read_2007_delayed;
 
-wire write_2001 = (write && ain == 1);
+wire write_2001 = (write && ppu_ain == 1);
 wire pal_mask = ~|scanline || cycle < 3 || cycle > 254;
 wire auto_mask = (mask == 2'b11) && ~object_clip && ~playfield_clip;
 wire mask_left = ~out_of_clip && ((|mask && ~&mask) || auto_mask);
 wire mask_right = cycle > 248 && mask == 2'b10;
 
 // PAL/Dendy masks scanline 0 and 2 pixels on each side with black.
-wire mask_pal = (|sys_type && pal_mask);
+wire mask_pal = pal_or_dendy && pal_mask;
 wire in_draw_range = ~(cycle >= 271 && cycle <= 328) && ~vblank;
 wire grayscale_bit = write_2001 ? ppu_dbus[0] : grayscale;
 wire not_grayscale = ((in_draw_range || (vram_r_ppudata && is_pal_address))) && ~grayscale_bit;
+wire [5:0] edge_mask_color;
+
+vs_edge_mask_color edge_mask_color_lut
+(
+	.enable(sys_type == 2'b11),
+	.ppu_type(vs_ppu_type),
+	.color_out(edge_mask_color)
+);
 
 debug_dots debug_d(
 	.enable     (debug_dots),
 	.color      (color0),
 	.custom1    (0),
 	.custom2    (spr0_hit),
-	.w2000      (write && ain == 0),
-	.w2001      (write && ain == 1),
-	.r2002      (read && ain == 2),
-	.w2003      (write && ain == 3),
-	.r2004      (read && ain == 4),
-	.w2004      (write && ain == 4),
-	.w2005      (write && ain == 5),
-	.w2006      (write && ain == 6),
-	.r2007      (read && ain == 7),
-	.w2007      (write && ain == 7),
+	.w2000      (write && ppu_ain == 0),
+	.w2001      (write && ppu_ain == 1),
+	.r2002      (read && ppu_ain == 2),
+	.w2003      (write && ppu_ain == 3),
+	.r2004      (read && ppu_ain == 4),
+	.w2004      (write && ppu_ain == 4),
+	.w2005      (write && ppu_ain == 5),
+	.w2006      (write && ppu_ain == 6),
+	.r2007      (read && ppu_ain == 7),
+	.w2007      (write && ppu_ain == 7),
 	.new_color  (color)
 );
 
 wire [5:0] color0 = (not_grayscale ? color_pipe[0] : {color_pipe[0][5:4], 4'b0});
-wire [5:0] color1 = (mask_right | mask_left | mask_pal) ? 6'h0E : color2;
+wire [5:0] color1 = (mask_right | mask_left | mask_pal) ? edge_mask_color : color2;
 
-wire clear_nmi = (clear_signal | (read && ain == 2));
+wire clear_nmi = (clear_signal | (read && ppu_ain == 2));
 wire set_nmi = entering_vblank & ~clear_nmi;
+
+vs_ppu_register_decode vs_register_decode
+(
+	.enable(sys_type == 2'b11),
+	.ppu_type(vs_ppu_type),
+	.cpu_ain(ain),
+	.status_flags({nmi_occured, (spr0_hit || sprite0_hit_bg) & ~clear_signal,
+			sprite_overflow & ~clear_signal}),
+	.status_open_bus(latched_dout[4:0]),
+	.ppu_ain(ppu_ain),
+	.status_data(ppu_status_data)
+);
 
 wire [7:0] ppu_dbus =
 	write ? din :
 	read ? (
-		(ain == 2) ? {nmi_occured, (spr0_hit || sprite0_hit_bg) & ~clear_signal, sprite_overflow & ~clear_signal, latched_dout[4:0]} : // PPUSTATUS
-		(ain == 4) ? oam_bus : // OAMDATA
-		(ain == 7) ? (is_pal_address ? {latched_dout[7:6], (grayscale ? {color1[5:4], 4'b0000} : color1)} : vram_latch) : // PPUDATA
+		(ppu_ain == 2) ? ppu_status_data : // PPUSTATUS
+		(ppu_ain == 4) ? oam_bus : // OAMDATA
+		(ppu_ain == 7) ? (is_pal_address ? {latched_dout[7:6], (grayscale ? {color1[5:4], 4'b0000} : color1)} : vram_latch) : // PPUDATA
 		latched_dout) :
 	latched_dout;
 
@@ -1847,7 +1933,7 @@ always @(posedge clk) begin
 		eo_sr <= {eo_sr[1:0], enable_objects};
 		eb_sr <= {eb_sr[1:0], enable_playfield};
 		if (write) begin
-			case (ain)
+			case (ppu_ain)
 				0: begin // PPU Control Register 1
 					// t:....BA.. ........ = d:......BA
 					obj_patt <= ppu_dbus[3];
@@ -1862,7 +1948,7 @@ always @(posedge clk) begin
 					object_clip <= ppu_dbus[2];
 					enable_playfield <= ppu_dbus[3];
 					enable_objects <= ppu_dbus[4];
-					emph_reg <= |sys_type ? {ppu_dbus[7], ppu_dbus[5], ppu_dbus[6]} : ppu_dbus[7:5];
+					emph_reg <= pal_or_dendy ? {ppu_dbus[7], ppu_dbus[5], ppu_dbus[6]} : ppu_dbus[7:5];
 				end
 			endcase
 			if (clear) begin
@@ -1926,8 +2012,8 @@ always @(posedge clk) begin
 		// 2007 reads/writes are very special. They wait for the read to end, then
 		// enter a shift register that is high for 2 cycles 2 full cycle after the end
 		// to 3 full cycles after the end.
-		read_2007_delayed <= {read_2007_delayed[3:0], (read && (ain == 7))};
-		write_2007_delayed <= {write_2007_delayed[3:0], (write && (ain == 7))};
+		read_2007_delayed <= {read_2007_delayed[3:0], (read && (ppu_ain == 7))};
+		write_2007_delayed <= {write_2007_delayed[3:0], (write && (ppu_ain == 7))};
 
 		color_pipe <= '{color1, color_pipe[0], color_pipe[1], color_pipe[2]};
 
@@ -1945,7 +2031,7 @@ always @(posedge clk) begin
 	end
 
 	if (read) begin
-		case (ain)
+		case (ppu_ain)
 			2: begin
 				refresh_high <= 1'b1;
 			end

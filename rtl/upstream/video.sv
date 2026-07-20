@@ -14,6 +14,7 @@ module video
 	input  [2:0] emphasis,
 	input  [1:0] reticle,
 	input  [1:0] sys_type,
+	input  [3:0] vs_ppu_type,
 	input        pal_video,
 	input        nes_hblank,
 	input        nes_hsync,
@@ -50,7 +51,19 @@ wire hblank_out = hblank_reg | nes_hblank;
 wire vblank_out = vblank_reg | nes_vblank;
 
 reg pix_ce;
-wire [5:0] color_ef = reticle[0] ? (reticle[1] ? 6'h21 : 6'h15) : color;
+wire       vs_mode = (sys_type == 2'b11);
+wire [5:0] color_source = reticle[0] ? (reticle[1] ? 6'h21 : 6'h15) : color;
+wire [5:0] color_ef;
+wire [3:0] vs_color_math;
+
+vs_palette_lut vs_palette_lut
+(
+	.enable(vs_mode && !reticle[0]),
+	.ppu_type(vs_ppu_type),
+	.color_in(color_source),
+	.palette_index(color_ef),
+	.color_math(vs_color_math)
+);
 
 always @(posedge clk) begin
 	pix_ce   <= ~cnt[1] & ~cnt[0];
@@ -129,22 +142,33 @@ spram #(.addr_width(6), .data_width(24), .mem_name("pal"), .mem_init_file("rtl/t
 	.q(mem_data)
 );
 
-reg [23:0] pixel;
+reg  [23:0] palette_pixel;
+wire [23:0] adjusted_palette_pixel;
+reg  [23:0] pixel;
 
 reg hbl, vbl;
 
+always_comb begin
+	case (palette)
+		0:       palette_pixel = pal_kitrinx_lut[color_ef][23:0];
+		1:       palette_pixel = pal_smooth_lut[color_ef][23:0];
+		2:       palette_pixel = pal_wavebeam_lut[color_ef][23:0];
+		3:       palette_pixel = pal_sonycxa_lut[color_ef][23:0];
+		4:       palette_pixel = pal_pc10_lut[color_ef][23:0];
+		5:       palette_pixel = mem_data;
+		default: palette_pixel = pal_kitrinx_lut[color_ef][23:0];
+	endcase
+end
+
+vs_palette_math vs_palette_math
+(
+	.color_in(palette_pixel),
+	.color_math(vs_color_math),
+	.color_out(adjusted_palette_pixel)
+);
+
 always @(posedge clk) begin
-	if(pix_ce) begin
-		case (palette)
-			0: pixel <= pal_kitrinx_lut[color_ef][23:0];
-			1: pixel <= pal_smooth_lut[color_ef][23:0];
-			2: pixel <= pal_wavebeam_lut[color_ef][23:0];
-			3: pixel <= pal_sonycxa_lut[color_ef][23:0];
-			4: pixel <= pal_pc10_lut[color_ef][23:0];
-			5: pixel <= mem_data;
-			default:pixel <= pal_kitrinx_lut[color_ef][23:0];
-		endcase
-	end
+	if(pix_ce) pixel <= adjusted_palette_pixel;
 end
 
 wire disengaged = reset || hold_reset;
@@ -301,5 +325,142 @@ end
 assign R = ro;
 assign G = go;
 assign B = bo;
+
+endmodule
+
+
+module vs_palette_lut
+(
+	input        enable,
+	input  [3:0] ppu_type,
+	input  [5:0] color_in,
+	output reg [5:0] palette_index,
+	output reg [3:0] color_math
+);
+
+wire [5:0] lut_2c04_0001[64] = '{
+	6'h35, 6'h23, 6'h16, 6'h22, 6'h1C, 6'h09, 6'h1D, 6'h15, 6'h20, 6'h00, 6'h27, 6'h05, 6'h04, 6'h28, 6'h08, 6'h20,
+	6'h21, 6'h3E, 6'h1F, 6'h29, 6'h3C, 6'h32, 6'h36, 6'h12, 6'h3F, 6'h2B, 6'h2E, 6'h1E, 6'h3D, 6'h2D, 6'h24, 6'h01,
+	6'h0E, 6'h31, 6'h33, 6'h2A, 6'h2C, 6'h0C, 6'h1B, 6'h14, 6'h2E, 6'h07, 6'h34, 6'h06, 6'h13, 6'h02, 6'h26, 6'h2E,
+	6'h2E, 6'h19, 6'h10, 6'h0A, 6'h39, 6'h03, 6'h37, 6'h17, 6'h0F, 6'h11, 6'h0B, 6'h0D, 6'h38, 6'h25, 6'h18, 6'h3A
+};
+
+wire [5:0] lut_2c04_0002[64] = '{
+	6'h2E, 6'h27, 6'h18, 6'h39, 6'h3A, 6'h25, 6'h1C, 6'h31, 6'h16, 6'h13, 6'h38, 6'h34, 6'h20, 6'h23, 6'h3C, 6'h0B,
+	6'h0F, 6'h21, 6'h06, 6'h3D, 6'h1B, 6'h29, 6'h1E, 6'h22, 6'h1D, 6'h24, 6'h0E, 6'h2B, 6'h32, 6'h08, 6'h2E, 6'h03,
+	6'h04, 6'h36, 6'h26, 6'h33, 6'h11, 6'h1F, 6'h10, 6'h02, 6'h14, 6'h3F, 6'h00, 6'h09, 6'h12, 6'h2E, 6'h28, 6'h20,
+	6'h3E, 6'h0D, 6'h2A, 6'h17, 6'h0C, 6'h01, 6'h15, 6'h19, 6'h2E, 6'h2C, 6'h07, 6'h37, 6'h35, 6'h05, 6'h0A, 6'h2D
+};
+
+wire [5:0] lut_2c04_0003[64] = '{
+	6'h14, 6'h25, 6'h3A, 6'h10, 6'h0B, 6'h20, 6'h31, 6'h09, 6'h01, 6'h2E, 6'h36, 6'h08, 6'h15, 6'h3D, 6'h3E, 6'h3C,
+	6'h22, 6'h1C, 6'h05, 6'h12, 6'h19, 6'h18, 6'h17, 6'h1B, 6'h00, 6'h03, 6'h2E, 6'h02, 6'h16, 6'h06, 6'h34, 6'h35,
+	6'h23, 6'h0F, 6'h0E, 6'h37, 6'h0D, 6'h27, 6'h26, 6'h20, 6'h29, 6'h04, 6'h21, 6'h24, 6'h11, 6'h2D, 6'h2E, 6'h1F,
+	6'h2C, 6'h1E, 6'h39, 6'h33, 6'h07, 6'h2A, 6'h28, 6'h1D, 6'h0A, 6'h2E, 6'h32, 6'h38, 6'h13, 6'h2B, 6'h3F, 6'h0C
+};
+
+wire [5:0] lut_2c04_0004[64] = '{
+	6'h18, 6'h03, 6'h1C, 6'h28, 6'h2E, 6'h35, 6'h01, 6'h17, 6'h10, 6'h1F, 6'h2A, 6'h0E, 6'h36, 6'h37, 6'h0B, 6'h39,
+	6'h25, 6'h1E, 6'h12, 6'h34, 6'h2E, 6'h1D, 6'h06, 6'h26, 6'h3E, 6'h1B, 6'h22, 6'h19, 6'h04, 6'h2E, 6'h3A, 6'h21,
+	6'h05, 6'h0A, 6'h07, 6'h02, 6'h13, 6'h14, 6'h00, 6'h15, 6'h0C, 6'h3D, 6'h11, 6'h0F, 6'h0D, 6'h38, 6'h2D, 6'h24,
+	6'h33, 6'h20, 6'h08, 6'h16, 6'h3F, 6'h2B, 6'h20, 6'h3C, 6'h2E, 6'h27, 6'h23, 6'h31, 6'h29, 6'h32, 6'h2C, 6'h09
+};
+
+reg [5:0] ordered_index;
+reg       is_2c04;
+
+always_comb begin
+	ordered_index = color_in;
+	is_2c04 = 1'b0;
+
+	if(enable) begin
+		case(ppu_type)
+			4'd2: begin
+				ordered_index = lut_2c04_0001[color_in];
+				is_2c04 = 1'b1;
+			end
+			4'd3: begin
+				ordered_index = lut_2c04_0002[color_in];
+				is_2c04 = 1'b1;
+			end
+			4'd4: begin
+				ordered_index = lut_2c04_0003[color_in];
+				is_2c04 = 1'b1;
+			end
+			4'd5: begin
+				ordered_index = lut_2c04_0004[color_in];
+				is_2c04 = 1'b1;
+			end
+			default: begin
+				ordered_index = color_in;
+				is_2c04 = 1'b0;
+			end
+		endcase
+	end
+
+	palette_index = ordered_index;
+	color_math = 4'd0;
+
+	if(enable && is_2c04) begin
+		case(ordered_index)
+			6'h0D: begin palette_index = 6'h00; color_math = 4'd1;  end // Ordered RGB 111
+			6'h0E: begin palette_index = 6'h02; color_math = 4'd4;  end // Ordered RGB 003
+			6'h0F: begin palette_index = 6'h0B; color_math = 4'd5;  end // Ordered RGB 020
+			6'h1D: begin palette_index = 6'h00; color_math = 4'd2;  end // Ordered RGB 222
+			6'h1E: begin palette_index = 6'h04; color_math = 4'd6;  end // Ordered RGB 200
+			6'h1F: begin palette_index = 6'h08; color_math = 4'd7;  end // Ordered RGB 310
+			6'h2D: begin palette_index = 6'h10; color_math = 4'd2;  end // Ordered RGB 444
+			6'h37: begin palette_index = 6'h37; color_math = 4'd8;  end // Ordered RGB 770
+			6'h3D: begin palette_index = 6'h20; color_math = 4'd3;  end // Ordered RGB 666
+			6'h3E: begin palette_index = 6'h32; color_math = 4'd9;  end // Ordered RGB 653
+			6'h3F: begin palette_index = 6'h37; color_math = 4'd10; end // Ordered RGB 760
+			default: begin palette_index = ordered_index; color_math = 4'd0; end
+		endcase
+	end else if(enable && (ordered_index[3:2] == 2'b11) && (ordered_index[1:0] != 2'b00)) begin
+		// The identity-ordered 2C03/2C05 PPUs make every xD-xF entry black.
+		palette_index = 6'h0F;
+	end
+end
+
+endmodule
+
+
+module vs_palette_math
+(
+	input  [23:0] color_in,
+	input   [3:0] color_math,
+	output reg [23:0] color_out
+);
+
+wire [7:0] red   = color_in[23:16];
+wire [7:0] green = color_in[15:8];
+wire [7:0] blue  = color_in[7:0];
+
+wire [7:0] red_quarter   = {2'b00, red[7:2]};
+wire [7:0] green_quarter = {2'b00, green[7:2]};
+wire [7:0] blue_quarter  = {2'b00, blue[7:2]};
+wire [7:0] red_eighth    = {3'b000, red[7:3]};
+wire [7:0] green_eighth  = {3'b000, green[7:3]};
+wire [7:0] blue_eighth   = {3'b000, blue[7:3]};
+wire [7:0] red_half      = {1'b0, red[7:1]};
+wire [7:0] green_half    = {1'b0, green[7:1]};
+wire [7:0] blue_half     = {1'b0, blue[7:1]};
+
+// Recipes are selected only for ordered 2C04 colors absent from a standard palette.
+always_comb begin
+	case(color_math)
+		4'd1:  color_out = {red_quarter, green_quarter, blue_quarter};
+		4'd2:  color_out = {red - red_quarter, green - green_quarter, blue - blue_quarter};
+		4'd3:  color_out = {red - red_eighth, green - green_eighth, blue - blue_eighth};
+		4'd4:  color_out = {8'd0, 8'd0, blue_half};
+		4'd5:  color_out = {8'd0, green_half, 8'd0};
+		4'd6:  color_out = {red_half, 8'd0, 8'd0};
+		4'd7:  color_out = {red, green_half, 8'd0};
+		4'd8:  color_out = {red, green, 8'd0};
+		4'd9:  color_out = {red, green - green_quarter, blue_half};
+		4'd10: color_out = {red, green - green_eighth, 8'd0};
+		default: color_out = color_in;
+	endcase
+end
 
 endmodule

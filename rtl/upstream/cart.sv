@@ -21,6 +21,7 @@ module cart_top (
 	input             cpu_ce,         // CPU Phi1 clock (several mappers use m2 inverted)
 	input             paused,         // This indicates the core is paused so anything using the master clock won't get messed up
 	input             reset,
+	input             vs_mode,        // Vs. motherboard memory configuration
 	input      [63:0] flags,          // Misc flags from ines header {prg_size(3), chr_size(3), mapper(8)}
 	input      [15:0] prg_ain,        // Better known as "CPU Address in"
 	output reg [24:0] prg_aout,       // PRG Input / Output Address Lines ([25:22] extended Lines [Misc ROM])
@@ -86,6 +87,14 @@ tri1 [7:0] prg_dout_b, chr_dout_b;
 
 wire [13:0] chr_ain = chr_ex ? chr_ain_ex : chr_ain_orig;
 wire [2:0] prg_aoute_m413;
+
+// These memories are on the Vs. CPU board rather than any individual ROM
+// board. The CPU RAM has only eleven address inputs and therefore repeats four
+// times through $6000-$7FFF. All four nametable pages are physically present.
+wire vs_prg_ram = vs_mode && (prg_ain[15:13] == 3'b011);
+wire vs_nametable_ram = vs_mode && chr_ain[13];
+wire [21:0] vs_prg_ram_addr = {9'b11_1100_000, 2'b00, prg_ain[10:0]};
+wire [21:0] vs_nametable_ram_addr = {10'b11_1111_1100, chr_ain[11:0]};
 
 // This mapper used to be default if no other mapper was found
 // It seems MMC0 is handled by map28. Does it have any purpose?
@@ -1181,6 +1190,45 @@ Mapper89 map89(
 	.SaveStateBus_rst  (SaveStateBus_rst ),
 	.SaveStateBus_load (SaveStateBus_load ),
 	.SaveStateBus_Dout (SaveStateBus_wired_or[34])
+);
+
+//*****************************************************************************//
+// Name   : Nintendo Vs. System ROM board                                     //
+// Mappers: 99                                                                //
+// Status : Mapper-only support; wider Vs. platform support is separate        //
+// Notes  : OUT2 CHR select, Gumshoe PRG select, and absent-socket open bus    //
+// Games  : Vs. Super Mario Bros., Gumshoe                                    //
+//*****************************************************************************//
+Mapper99 map99(
+	.clk        (clk),
+	.ce         (ce),
+	.enable     (me[99]),
+	.flags      (flags),
+	.prg_ain    (prg_ain),
+	.prg_aout_b (prg_addr_b),
+	.prg_read   (prg_read),
+	.prg_write  (prg_write),
+	.prg_din    (prg_din),
+	.prg_dout_b (prg_dout_b),
+	.prg_allow_b(prg_allow_b),
+	.chr_ain    (chr_ain),
+	.chr_aout_b (chr_addr_b),
+	.chr_read   (chr_read),
+	.chr_dout_b (chr_dout_b),
+	.chr_allow_b(chr_allow_b),
+	.vram_a10_b (vram_a10_b),
+	.vram_ce_b  (vram_ce_b),
+	.irq_b      (irq_b),
+	.flags_out_b(flags_out_b),
+	.audio_in   (audio_in),
+	.audio_b    (audio_out_b),
+	// Savestates
+	.SaveStateBus_Din  (SaveStateBus_Din),
+	.SaveStateBus_Adr  (SaveStateBus_Adr),
+	.SaveStateBus_wren (SaveStateBus_wren),
+	.SaveStateBus_rst  (SaveStateBus_rst),
+	.SaveStateBus_load (SaveStateBus_load),
+	.SaveStateBus_Dout (SaveStateBus_wired_or[40])
 );
 
 //*****************************************************************************//
@@ -2503,10 +2551,28 @@ always @* begin
 	chr_aout = vram_ce ? {11'b11_1010_0000_0, vram_a10, chr_ain[9:0]} : chr_aout;
 	prg_aout = (prg_ain < 'h2000) ? {11'b11_1000_0000_0, prg_ain[10:0]} : prg_aout;
 	prg_allow = prg_allow || (prg_ain < 'h2000);
+
+	// The motherboard memories take priority over mapper-local RAM and
+	// nametable wiring only while Vs. mode is selected. Explicitly suppress
+	// mapper bus overrides so reads come from the selected SDRAM regions.
+	if (vs_prg_ram) begin
+		prg_aout = {3'b000, vs_prg_ram_addr};
+		prg_allow = 1'b1;
+		prg_bus_write = 1'b0;
+		prg_conflict = 1'b0;
+		prg_conflict_d0 = 1'b0;
+	end
+
+	if (vs_nametable_ram) begin
+		chr_aout = vs_nametable_ram_addr;
+		chr_allow = 1'b1;
+		vram_ce = 1'b0;
+		has_chr_dout = 1'b0;
+	end
 end
 
 // savestates
-localparam SAVESTATE_MODULES    = 40;
+localparam SAVESTATE_MODULES    = 41;
 wire [63:0] SaveStateBus_wired_or[0:SAVESTATE_MODULES-1];
 
 assign SaveStateBus_Dout  = SaveStateBus_wired_or[ 0] | SaveStateBus_wired_or[ 1] | SaveStateBus_wired_or[ 2] | SaveStateBus_wired_or[ 3] | SaveStateBus_wired_or[ 4] |
@@ -2516,7 +2582,8 @@ assign SaveStateBus_Dout  = SaveStateBus_wired_or[ 0] | SaveStateBus_wired_or[ 1
 									  SaveStateBus_wired_or[20] | SaveStateBus_wired_or[21] | SaveStateBus_wired_or[22] | SaveStateBus_wired_or[23] | SaveStateBus_wired_or[24] |
 									  SaveStateBus_wired_or[25] | SaveStateBus_wired_or[26] | SaveStateBus_wired_or[27] | SaveStateBus_wired_or[28] | SaveStateBus_wired_or[29] |
 									  SaveStateBus_wired_or[30] | SaveStateBus_wired_or[31] | SaveStateBus_wired_or[32] | SaveStateBus_wired_or[33] | SaveStateBus_wired_or[34] |
-									  SaveStateBus_wired_or[35] | SaveStateBus_wired_or[36] | SaveStateBus_wired_or[37] | SaveStateBus_wired_or[38] | SaveStateBus_wired_or[39];
+									  SaveStateBus_wired_or[35] | SaveStateBus_wired_or[36] | SaveStateBus_wired_or[37] | SaveStateBus_wired_or[38] | SaveStateBus_wired_or[39] |
+									  SaveStateBus_wired_or[40];
 
 localparam SAVESTATERAM_MODULES    = 4;
 wire [7:0] SaveStateRAM_wired_or[0:SAVESTATERAM_MODULES-1];
