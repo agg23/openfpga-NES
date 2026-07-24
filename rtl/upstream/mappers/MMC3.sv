@@ -877,9 +877,15 @@ assign chr_aout =
 		(mapper52)                           ? {2'b10,         m52_chr_final, chr_ain[9:0]} : // Mapper 52 CHR override
 		                                       {3'b10_0,                chrsel, chr_ain[9:0]};    // Standard MMC3 CHR-ROM/RAM
 
-wire ram_a13 = mapper268 && m268_reg[3][5] && (prg_ain[15:12] == 4'h5);
-assign prg_is_ram = (ram_a13 || (prg_ain[15:13] == 3'b011) && ((prg_ain[12:8] == 5'b1_1111) | ~internal_128)) //(>= 'h6000 && < 'h8000) && (==7Fxx or external_ram)
-					&& ram_enable_a && !(ram_protect_a && prg_write);
+// Waixing FS303 (mapper 195) has 4KB of PRG-RAM at $5000-$5FFF, always
+// enabled and writable regardless of the MMC3 WRAM enable/protect bits.
+// Waixing originals/translations (e.g. Kyattou Ninden Teyandee (Ch))
+// use it as work RAM and freeze without it.
+wire ram_a13_195 = mapper195 && (prg_ain[15:12] == 4'h5);
+wire ram_a13 = (mapper268 && m268_reg[3][5] && (prg_ain[15:12] == 4'h5)) || ram_a13_195;
+assign prg_is_ram = ram_a13_195
+					|| ((ram_a13 || (prg_ain[15:13] == 3'b011) && ((prg_ain[12:8] == 5'b1_1111) | ~internal_128)) //(>= 'h6000 && < 'h8000) && (==7Fxx or external_ram)
+					&& ram_enable_a && !(ram_protect_a && prg_write));
 assign prg_allow = prg_ain[15] && !prg_write || (prg_is_ram && !mapper47 && !mapper208);
 wire [21:0] prg_ram = {8'b11_1100_00, ram_a13, internal_128 ? 6'b000000 : MMC6 ? {3'b000, prg_ain[9:7]} : prg_ain[12:7], prg_ain[6:0]};
 assign prg_aout = prg_is_ram  && !mapper47 && !mapper208 && !DxROM && !mapper95 && !mapper88 ? prg_ram : prg_aout_tmp;
