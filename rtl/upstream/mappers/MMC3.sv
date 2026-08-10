@@ -433,6 +433,7 @@ wire internal_128 = mapper80 || mapper207;
 wire prg_reg_odd = (~mapper196) ? prg_ain[0] : ( |prg_ain[3:2] | (prg_ain[1] & ~prg_ain[14]) );
 wire [3:0] prota = (m268_reg[4][6] ^ m268_reg[4][3]) ? {m268_reg[4][1:0],m268_reg[4][4],m268_reg[4][7]} : 4'hF; // m208 4'hF = 0x59
 wire [3:0] prot = (m268_reg[4][3]) ? ~prota : prota;
+wire no_prot = mapper112;
 
 always @(posedge clk)
 if (~enable) begin
@@ -443,7 +444,7 @@ if (~enable) begin
 	mirroring <= flags[14];
 	{irq_enable, irq_reload} <= 0;
 	{irq_latch, counter} <= 0;
-	ram_enable <= {4{mapper112}};
+	ram_enable <= 0;
 	ram_protect <= 0;
 	{chr_bank_0, chr_bank_1} <= 0;
 	{chr_bank_2, chr_bank_3, chr_bank_4, chr_bank_5} <= 0;
@@ -885,7 +886,7 @@ wire ram_a13_195 = mapper195 && (prg_ain[15:12] == 4'h5);
 wire ram_a13 = (mapper268 && m268_reg[3][5] && (prg_ain[15:12] == 4'h5)) || ram_a13_195;
 assign prg_is_ram = ram_a13_195
 					|| ((ram_a13 || (prg_ain[15:13] == 3'b011) && ((prg_ain[12:8] == 5'b1_1111) | ~internal_128)) //(>= 'h6000 && < 'h8000) && (==7Fxx or external_ram)
-					&& ram_enable_a && !(ram_protect_a && prg_write));
+					&& ((ram_enable_a && !(ram_protect_a && prg_write)) || no_prot)); // better slacks if set ram_enable and ram_protect registers for no_prot?
 assign prg_allow = prg_ain[15] && !prg_write || (prg_is_ram && !mapper47 && !mapper208);
 wire [21:0] prg_ram = {8'b11_1100_00, ram_a13, internal_128 ? 6'b000000 : MMC6 ? {3'b000, prg_ain[9:7]} : prg_ain[12:7], prg_ain[6:0]};
 assign prg_aout = prg_is_ram  && !mapper47 && !mapper208 && !DxROM && !mapper95 && !mapper88 ? prg_ram : prg_aout_tmp;
