@@ -214,6 +214,7 @@ assign apu_ce = cpu_ce;
 wire [7:0] from_data_bus;
 wire [7:0] cpu_dout;
 reg  [7:0] open_bus_data;
+reg  [7:0] internal_bus_data;
 
 wire vs_mode = (sys_type == 2'b11);
 wire [7:0] joypad1_read_data;
@@ -420,7 +421,7 @@ wire cpu_Instrnew;
 // If the external bus is driven, electrically it will overwhelm the internal bus of register
 // 4015's output.
 wire apu_reg_cs = (apu_cs && addr[4:0] == 5'h15);
-wire [7:0] apu_reg_value = {apu_dout[7:6], from_data_bus[5], apu_dout[4:0]}; // Fill in the undriven bit with bus.
+wire [7:0] apu_reg_value = {apu_dout[7:6], internal_bus_data[5], apu_dout[4:0]}; // Fill in the undriven bit with bus.
 wire [7:0] internal_data_bus = (apu_reg_cs ? apu_reg_value : from_data_bus);
 
 T65 cpu(
@@ -571,7 +572,7 @@ VsCoinInput vs_coin_input
 	.controller_read(joypad_clock),
 	.joypad1_data_in(joypad1_data),
 	.joypad2_data_in(joypad2_data),
-	.open_bus_in(open_bus_data[7:5]),
+	.open_bus_in(ext_bus_driven[7:5]),
 	.joypad1_data_out(joypad1_read_data),
 	.joypad2_data_out(joypad2_read_data),
 	.fds_eject_out(fds_eject_cart),
@@ -814,40 +815,43 @@ assign ppumem_dout  = chr_from_ppu;
 always @(posedge clk) begin
 	if (loading_savestate) begin
 		open_bus_data <= SS_TOP[8:1];
+		internal_bus_data <= SS_TOP[29:22];
 	end else begin
-		if (!cpu_ce)
+		if (!cpu_ce) begin
 			open_bus_data <= mw_int ? dbus : dma_data_bus;
+			internal_bus_data <= mw_int ? dbus : internal_data_bus;
+		end
 	end
 end
 
 assign from_data_bus = genie_ovr ? genie_data : external_data_bus;
 
-reg [7:0] external_data_bus;
+reg [7:0] ext_bus_driven;
+
+wire [7:0] external_data_bus = (joypad1_cs && ~dma_aout_enable) ? joypad1_read_data :
+	(joypad2_cs && ~dma_aout_enable) ? joypad2_read_data : ext_bus_driven;
 
 always @* begin
 	if (reset) begin
-		external_data_bus = SS_TOP[16:9]; // 0;
-	end else if (joypad1_cs && ~dma_aout_enable) begin   // Joypad1 Read
-		external_data_bus = joypad1_read_data;
-	end else if (joypad2_cs && ~dma_aout_enable) begin   // Joypad2 Read
-		external_data_bus = joypad2_read_data;
+		ext_bus_driven = SS_TOP[16:9]; // 0;
 	end else if (ppu_cs) begin                          // PPU Read
-		external_data_bus = ppu_dout;
+		ext_bus_driven = ppu_dout;
 	end else if (vs_protection_data_valid) begin        // Vs. CPU protection device
-		external_data_bus = vs_protection_data;
+		ext_bus_driven = vs_protection_data;
 	end else if (prg_allow) begin                       // PRG Read
-		external_data_bus = cpumem_din;
+		ext_bus_driven = cpumem_din;
 	end else if (prg_bus_write) begin                   // PRG/CPU Write
-		external_data_bus = prg_dout_mapper;
+		ext_bus_driven = prg_dout_mapper;
 	end else begin                                      // Open Bus
-		external_data_bus = open_bus_data;
+		ext_bus_driven = open_bus_data;
 	end
 end
 
 assign SS_TOP_BACK[ 8: 1] = open_bus_data;
-assign SS_TOP_BACK[16: 9] = external_data_bus;
+assign SS_TOP_BACK[16: 9] = ext_bus_driven;
 assign SS_TOP_BACK[21:17] = vs_protection_state;
-assign SS_TOP_BACK[63:22] = 42'b0; // free to be used
+assign SS_TOP_BACK[29:22] = internal_bus_data;
+assign SS_TOP_BACK[63:30] = 34'b0; // free to be used
 
 
 /**********************************************************/

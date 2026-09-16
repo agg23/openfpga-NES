@@ -58,7 +58,7 @@ wire write_2006b = write_shift[1];
 
 wire inc_horizontal = (cycle[2:0] == 7 && ((cycle <= 255) || (cycle >= 320 && cycle <= 335)) && is_rendering);
 wire inc_vertical = (cycle == 255) && is_rendering;
-wire copy_hscroll = ((cycle == 256) && is_rendering) || write_2006b;
+wire copy_hscroll = ((cycle == 257) && is_rendering) || write_2006b;
 wire copy_vscroll = ((cycle >= 279 && cycle <= 303) && is_pre_render && is_rendering) || write_2006b;
 
 wire  [14:0] vram_t_mask;
@@ -409,8 +409,11 @@ wire [26:0] load_out7, load_out6, load_out5, load_out4, load_out3, load_out2, lo
 wire [4:0] bits7, bits6, bits5, bits4, bits3, bits2, bits1, bits0,
 	bits15, bits14, bits13, bits12, bits11, bits10, bits9, bits8;
 
+wire [26:0] load_head    = rendering ? load_in    : load_out0;
+wire [26:0] load_head_ex = rendering ? load_in_ex : load_out8;
+
 // Extra sprites
-Sprite sprite15(clk, ce, enable, counting, rendering, load_ex, load_in_ex, load_out15, bits15);
+Sprite sprite15(clk, ce, enable, counting, rendering, load_ex, load_head_ex, load_out15, bits15);
 Sprite sprite14(clk, ce, enable, counting, rendering, load_ex, load_out15, load_out14, bits14);
 Sprite sprite13(clk, ce, enable, counting, rendering, load_ex, load_out14, load_out13, bits13);
 Sprite sprite12(clk, ce, enable, counting, rendering, load_ex, load_out13, load_out12, bits12);
@@ -420,7 +423,7 @@ Sprite sprite9( clk, ce, enable, counting, rendering, load_ex, load_out10, load_
 Sprite sprite8( clk, ce, enable, counting, rendering, load_ex, load_out9,  load_out8,  bits8);
 
 // Basic Sprites
-Sprite sprite7( clk, ce, enable, counting, rendering, load, load_in,    load_out7,  bits7);
+Sprite sprite7( clk, ce, enable, counting, rendering, load, load_head,  load_out7,  bits7);
 Sprite sprite6( clk, ce, enable, counting, rendering, load, load_out7,  load_out6,  bits6);
 Sprite sprite5( clk, ce, enable, counting, rendering, load, load_out6,  load_out5,  bits5);
 Sprite sprite4( clk, ce, enable, counting, rendering, load, load_out5,  load_out4,  bits4);
@@ -640,7 +643,7 @@ end else if (ce) begin
 	old_rendering <= rendering;
 	old_using_secondary <= using_secondary;
 
-	if (((old_rendering != rendering) || corrupting_write) && ~PAL) begin
+	if (((~old_rendering && rendering) || corrupting_write) && ~PAL) begin
 		if ((old_using_secondary != using_secondary) || corrupting_write) begin
 			oam[{oam_row_cur, 3'b000}] <= oam[{oam_row_last, 3'b000}];
 			oam[{oam_row_cur, 3'b001}] <= oam[{oam_row_last, 3'b001}];
@@ -744,11 +747,7 @@ end else if (ce) begin
 						if (in_range && ~n_ovr) begin
 							{n_ovr, oam_addr} <= {1'b0, oam_addr} + 9'd1;
 						end else begin
-							if (oam_secondary_ovr & ~n_ovr) begin // Same buggy increment as y if secondary oam is full
-								{n_ovr, oam_addr} <= {1'b0, oam_addr} + 9'd5;
-							end else begin
-								{n_ovr, oam_addr} <= ({1'b0, oam_addr} + 9'd1) & 9'h1FC;
-							end
+							{n_ovr, oam_addr} <= ({1'b0, oam_addr} + 9'd1) & 9'h1FC;
 						end
 
 						// Some kludgy stuff for extra sprite evaluation
@@ -798,7 +797,7 @@ end else if (ce) begin
 				};
 			end
 		end else begin // STATE_REFRESH
-			oam_data <= oam_temp[0];
+			oam_data <= oam_temp[oam_secondary_addr];
 		end
 	end else begin
 		oam_data <= oam[oam_read_addr]; // Keep it available in case it's read
@@ -1420,6 +1419,7 @@ reg enable_playfield, enable_objects;
 // except skip_dot calculation.
 reg [2:0] re_sr, eo_sr, eb_sr; // rendering enable shift register
 wire rendering_enabled = re_sr[1];
+wire eval_rendering = re_sr[0];
 wire rendering_regs = enable_objects | enable_playfield;
 assign render_ena_out = rendering_regs;
 
@@ -1478,7 +1478,7 @@ VramAddressGen vram0(
 	.read          (read),
 	.write         (write),
 	.is_pre_render (is_pre_render_line),
-	.trigger_2007  (vram_w_ppudata_d || vram_r_ppudata_d),
+	.trigger_2007  (vram_w_ppudata || vram_r_ppudata),
 	.cycle         (cycle),
 	.vram          (vram),
 	.fine_x_scroll (fine_x_scroll),
@@ -1533,7 +1533,7 @@ OAMEval spriteeval (
 	.ce                (ce),
 	.reset             (reset),
 	.end_of_line       (end_of_line),
-	.rendering_enabled (rendering_enabled),
+	.rendering_enabled (eval_rendering),
 	.obj_size          (obj_size1),
 	.scanline          (scanline_nopr),
 	.cycle             (cycle),
@@ -1660,7 +1660,7 @@ always @(posedge clk) begin
 		if (!sprite_sr[2])
 			sprite_sr <= {sprite_sr[2:0], 1'b0};
 		if (cycle == 339 && in_rendering_frame)
-			sprite_sr <= {3'b000, rendering_regs};
+			sprite_sr <= {3'b000, re_sr[2]};
 		if (cycle == 256)
 			sprite_sr <= {4'b0000};
 		if (clear_signal) begin
@@ -1745,12 +1745,10 @@ always_comb begin
 end
 
 // Read from VRAM, either when user requested a manual read, or when we're generating pixels.
-wire vram_r_ppudata = read_2007_delayed[2];
-wire vram_r_ppudata_d = read_2007_delayed[3];
-wire vram_w_ppudata = write_2007_delayed[2];
-wire vram_w_ppudata_d = write_2007_delayed[3];
+wire vram_r_ppudata = read_2007_delayed[4];
+wire vram_w_ppudata = write_2007_delayed[3];
 
-wire ALE = (is_rendering_d && ~read_cycle) | (read_2007_delayed[1] || write_2007_delayed[1]);
+wire ALE = (is_rendering_d && ~read_cycle) | (read_2007_delayed[2] || write_2007_delayed[2]);
 
 wire [7:0] vram_din = vram_r ? vram_dbus_in : (vram_w ? vram_dout : (ALE ? vram_a[7:0] : vram_dbus_in));
 
@@ -1762,12 +1760,10 @@ assign vram_w = ~vram_r && vram_w_ppudata && !is_pal_address; // R&W at the same
 // Value currently being written to video ram
 assign vram_dout = ALE ? vram_a[7:0] : ppu_dbus;
 
-// One cycle after vram_r was asserted, the value
-// is available on the bus.
-reg vram_read_delayed;
+reg [7:0] vram_pins;
 
 assign SS_PPU_BACK[21:14] = vram_latch;
-assign SS_PPU_BACK[   22] = vram_read_delayed;
+assign SS_PPU_BACK[   22] = 1'b0; // free to be used
 assign SS_PPU_BACK[57:50] = vram_a_byte;
 
 // For any future person who wants to understand what is going on here: the NES PPU multiplexes the
@@ -1777,12 +1773,11 @@ assign SS_PPU_BACK[57:50] = vram_a_byte;
 // cleanliness, but if you ever wanted to add real hardware compatible pins, you'd change this here.
 assign vram_addr = {vram_a[13:8], ALE ? vram_latch_value : vram_a_byte};
 
-wire [7:0] vram_latch_value = /*vram_r ? vram_din :*/ vram_a[7:0]; // This breaks stuff if uncommented.
+wire [7:0] vram_latch_value = vram_r ? vram_pins : vram_a[7:0];
 
 always @(posedge clk) begin
 	if (SaveStateBus_load) begin
 		vram_latch        <= SS_PPU[21:14];
-		vram_read_delayed <= SS_PPU[   22];
 		vram_a_byte       <= SS_PPU[57:50];
 	end else if (ce) begin
 		// If it so happens that ALE and vram_r are both asserted at the same time due to a poorly
@@ -1791,9 +1786,9 @@ always @(posedge clk) begin
 		// 8 bits of the address.
 		if (ALE) // Simulate the external latch
 			vram_a_byte <= vram_latch_value;
-		if (vram_read_delayed)
+		if (vram_r_ppudata)
 			vram_latch <= vram_din;
-		vram_read_delayed <= vram_r_ppudata;
+		vram_pins <= vram_din;
 	end
 end
 
