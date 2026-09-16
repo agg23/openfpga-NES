@@ -150,6 +150,9 @@ module NES(
 	output        hblank,
 	output        vsync,
 	output        vblank,
+	// Composite video at the RCA jack, two samples per clock.
+	output signed [23:0] composite_a,
+	output signed [23:0] composite_b,
 
 	output [24:0] Savestate_SDRAMAddr,
 	output        Savestate_SDRAMRdEn,
@@ -614,6 +617,8 @@ wire [8:0] scanline_ppu;
 assign cycle = use_fake_h ? 9'd340 : (corepause_active) ? cycle_paused : ppu_cycle;
 assign scanline = (corepause_active) ? scanline_paused : scanline_ppu;
 
+wire signed [23:0] ppu_pin_a, ppu_pin_b;
+
 PPU ppu(
 	.clk              (clk),
 	.cs               (addr[15:13] == 3'b001 && phi2),
@@ -650,6 +655,8 @@ PPU ppu(
 	.vblank           (vblank),
 	.hsync            (hsync),
 	.vsync            (vsync),
+	.composite_a      (ppu_pin_a),
+	.composite_b      (ppu_pin_b),
 	// savestates
 	.SaveStateBus_Din       (SaveStateBus_Din        ),
 	.SaveStateBus_Adr       (SaveStateBus_Adr        ),
@@ -662,6 +669,17 @@ PPU ppu(
 	.Savestate_OAMWrEn      (Savestate_OAMWrEn       ),
 	.Savestate_OAMWriteData (Savestate_OAMWriteData  ),
 	.Savestate_OAMReadData  (Savestate_OAMReadData   )
+);
+
+// Motherboard and RF module analog path from pin 21 to the RCA jack.
+
+composite_board composite_board(
+	.clk              (clk),
+	.reset            (reset_noSS),
+	.pin_a            (ppu_pin_a),
+	.pin_b            (ppu_pin_b),
+	.rca_a            (composite_a),
+	.rca_b            (composite_b)
 );
 
 
