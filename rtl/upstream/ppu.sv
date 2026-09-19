@@ -189,6 +189,9 @@ module ClockGen #(parameter USE_SAVESTATE = 0) (
 	output reg vsync,
 	output reg hblank,
 	output reg vblank,
+	output wire video_sync,
+	output wire video_burst,
+	output wire video_picture_n,
 	// savestates
 	input [63:0]  SaveStateBus_Din,
 	input [ 9:0]  SaveStateBus_Adr,
@@ -282,6 +285,22 @@ endgenerate
 
 wire hsync_period = (cycle >= 278 && cycle <= 302);
 wire hblank_period = (cycle >= 269 && cycle <= 326);
+
+reg video_front, video_burst_inhibit;
+reg [3:0] video_timing;
+
+// Transfer the timing windows to the output phase.
+always @(posedge clk) if (ce && !reset) begin
+	video_timing <= {hsync, vsync, hblank, vblank};
+	if (cycle == 9'd256) video_front <= 1'b0;
+	if (cycle == 9'd279) video_front <= 1'b1;
+	if (cycle == 9'd308) video_burst_inhibit <= 1'b0;
+	if (cycle == 9'd323) video_burst_inhibit <= 1'b1;
+end
+
+assign video_sync = video_front & (video_timing[3] | video_timing[2]);
+assign video_burst = ~(video_sync | video_burst_inhibit);
+assign video_picture_n = video_timing[1] | video_timing[0];
 
 // Set if the current line is line 0..239
 always @(posedge clk) if (reset) begin
@@ -1291,6 +1310,9 @@ endmodule
 
 module PPU(
 	input         clk,
+	// Pin 21 voltage, Q2.21 volts, one sample per half master cycle: a then b.
+	output signed [23:0] composite_a,
+	output signed [23:0] composite_b,
 	input         cs,
 	input         RWn,
 	input         rst_behavior,
@@ -1433,6 +1455,8 @@ wire clear_signal = is_pre_render_line;
 wire [13:0] vram_a;
 reg [7:0] vram_a_byte;
 
+wire video_sync, video_burst, video_picture_n;
+
 ClockGen clock(
 	.clk                 (clk),
 	.ce                  (ce),
@@ -1454,6 +1478,9 @@ ClockGen clock(
 	.vsync               (vsync),
 	.hblank              (hblank),
 	.vblank              (vblank),
+	.video_sync          (video_sync),
+	.video_burst         (video_burst),
+	.video_picture_n     (video_picture_n),
 	// savestates
 	.SaveStateBus_Din  (SaveStateBus_Din ),
 	.SaveStateBus_Adr  (SaveStateBus_Adr ),
@@ -2072,4 +2099,268 @@ end
 
 assign dout = latched_dout;
 
+////////// COMPOSITE VIDEO GENERATION //////////
+// Most of this is in functions because the real system does it on both posedge and negedge of the
+// master clock. We don't really want to use negedges, so we just calculate the current and next
+// values on the posedge at the same time and output both, so the video clock can consume them at
+// its faster rate.
+
+reg [1:0] video_ce_sr;
+always @(posedge clk) video_ce_sr <= {video_ce_sr[0], ce};
+wire video_pclk0 = video_ce_sr[0] | video_ce_sr[1];
+wire video_pclk1 = ~video_pclk0;
+
+// One dot delay
+reg [5:0] video_palette;
+always @(posedge clk) if (ce) video_palette <= color2;
+
+wire [5:0] video_phase, video_phase_n_a, video_phase_n_b;
+wire [11:0] video_dac_select_a, video_dac_select_b;
+wire video_tint;
+
+ppu_video_phase video_carrier(
+	.clk              (clk),
+	.reset            (reset),
+	.phase            (video_phase),
+	.phase_n_a        (video_phase_n_a),
+	.phase_n_b        (video_phase_n_b)
+);
+
+ppu_video_color video_color(
+	.clk              (clk),
+	.pclk0            (video_pclk0),
+	.pclk1            (video_pclk1),
+	.palette          (video_palette),
+	.monochrome       (grayscale_bit),
+	.palette_read_n   (~(vram_r_ppudata && is_pal_address)),
+	.sync             (video_sync),
+	.burst            (video_burst),
+	.picture_n        (video_picture_n),
+	.emphasis_n       (~emphasis),
+	.phase            (video_phase),
+	.phase_n_a        (video_phase_n_a),
+	.phase_n_b        (video_phase_n_b),
+	.dac_select_a     (video_dac_select_a),
+	.dac_select_b     (video_dac_select_b),
+	.tint             (video_tint)
+);
+
+ppu_video_dac video_dac(
+	.clk              (clk),
+	.reset            (reset),
+	.dac_select_a     (video_dac_select_a),
+	.dac_select_b     (video_dac_select_b),
+	.tint             (video_tint),
+	.voltage_a        (composite_a),
+	.voltage_b        (composite_b)
+);
+
 endmodule  // PPU
+
+module ppu_video_phase (
+	input wire clk,
+	input wire reset,
+	output wire [5:0] phase,
+	output wire [5:0] phase_n_a,
+	output wire [5:0] phase_n_b
+);
+
+reg [5:0] ring;          // first set, loads on the master high edge
+reg [5:0] second_prev;   // what the second set showed last cycle
+
+wire [5:0] carrier = ~(ring | {6{reset}});
+
+wire [5:0] second = {~(carrier[5] | (carrier[4] & ~carrier[3])), ~carrier[4:0]};
+
+always @(posedge clk) begin
+	second_prev <= second;
+	ring <= {carrier[3], second[5], second[4:1]};
+end
+
+assign phase = carrier;
+assign phase_n_a = second_prev;
+assign phase_n_b = second;
+
+endmodule
+
+module ppu_video_color (
+	input wire clk,
+	input wire pclk0,
+	input wire pclk1,
+	input wire [5:0] palette,
+	input wire monochrome,
+	input wire palette_read_n,
+	input wire sync,
+	input wire burst,
+	input wire picture_n,
+	input wire [2:0] emphasis_n,
+	input wire [5:0] phase,
+	input wire [5:0] phase_n_a,
+	input wire [5:0] phase_n_b,
+	output wire [11:0] dac_select_a,
+	output wire [11:0] dac_select_b,
+	output wire tint
+);
+
+wire hue_pass = ~(monochrome | (palette_read_n & picture_n));
+wire [3:0] hue_in = palette[3:0] & {4{hue_pass}};
+wire [1:0] luma_in = palette[5:4];
+
+reg [3:0] hue_p1_q, hue_p2_q, hue_p3_q;
+reg [1:0] luma_p1_q, luma_p2_q, luma_p3_q;
+reg burst_q, sync_q, pixel_q;
+
+wire [3:0] hue_p1  = pclk1 ? hue_in  : hue_p1_q;
+wire [1:0] luma_p1 = pclk1 ? luma_in : luma_p1_q;
+wire [3:0] hue_p2  = pclk0 ? hue_p1  : hue_p2_q;
+wire [1:0] luma_p2 = pclk0 ? luma_p1 : luma_p2_q;
+wire [3:0] hue_p3  = pclk1 ? hue_p2  : hue_p3_q;
+wire [1:0] luma_p3 = pclk1 ? luma_p2 : luma_p3_q;
+wire burst_l = pclk1 ? burst : burst_q;
+wire sync_l  = pclk1 ? sync  : sync_q;
+
+wire [3:0] hue = {hue_p3[3] | burst_l, hue_p3[2:0]};
+
+// Hues 14 and 15 are forced black; anything else in the picture is a pixel,
+// and a dot that is neither pixel, sync nor burst sits at blanking.
+wire forced_black = hue[3] & hue[2] & hue[1];
+wire pixel_in = ~(forced_black | picture_n);
+wire pixel = pclk1 ? pixel_in : pixel_q;
+wire blank = ~(sync_l | burst_l | pixel);
+
+wire [3:0] luma_on;
+assign luma_on[0] = pixel & (luma_p3 == 2'd0);
+assign luma_on[1] = pixel & (luma_p3 == 2'd1);
+assign luma_on[2] = pixel & (luma_p3 == 2'd2);
+assign luma_on[3] = pixel & (luma_p3 == 2'd3);
+
+// Emphasis dims the picture while the matching carrier is low.
+assign tint = pixel & ((~emphasis_n[2] & ~phase[3]) |
+					   (~emphasis_n[1] & ~phase[1]) |
+					   (~emphasis_n[0] & ~phase[5]));
+
+function automatic carrier_low(input [3:0] h, input [5:0] ph, input [5:0] ph_n);
+	case (h)
+		4'd0:    carrier_low = 1'b0;
+		4'd1:    carrier_low = ph_n[3];
+		4'd2:    carrier_low = ph[0];
+		4'd3:    carrier_low = ph_n[4];
+		4'd4:    carrier_low = ph[1];
+		4'd5:    carrier_low = ph_n[5];
+		4'd6:    carrier_low = ph[2];
+		4'd7:    carrier_low = ph_n[0];
+		4'd8:    carrier_low = ph[3];
+		4'd9:    carrier_low = ph_n[1];
+		4'd10:   carrier_low = ph[4];
+		4'd11:   carrier_low = ph_n[2];
+		4'd12:   carrier_low = ph[5];
+		default: carrier_low = 1'b1;
+	endcase
+endfunction
+
+function automatic [11:0] switches(input low, input [3:0] lum, input bst, input blk, input syn);
+	switches = {lum[3] & ~low, lum[3] & low,
+				lum[2] & ~low, lum[2] & low,
+				lum[1] & ~low, lum[1] & low,
+				lum[0] & ~low, lum[0] & low,
+				bst & ~low,    bst & low,
+				blk, syn};
+endfunction
+
+wire low_a = carrier_low(hue, phase, phase_n_a);
+wire low_b = carrier_low(hue, phase, phase_n_b);
+
+assign dac_select_a = switches(low_a, luma_on, burst_l, blank, sync_l);
+assign dac_select_b = switches(low_b, luma_on, burst_l, blank, sync_l);
+
+always @(posedge clk) begin
+	if (pclk1) begin
+		hue_p1_q  <= hue_in;
+		luma_p1_q <= luma_in;
+		hue_p3_q  <= hue_p2;
+		luma_p3_q <= luma_p2;
+		burst_q   <= burst;
+		sync_q    <= sync;
+		pixel_q   <= pixel_in;
+	end
+	if (pclk0) begin
+		hue_p2_q  <= hue_p1;
+		luma_p2_q <= luma_p1;
+	end
+end
+
+endmodule
+
+module ppu_video_dac (
+	input wire clk,
+	input wire reset,
+	input wire [11:0] dac_select_a,
+	input wire [11:0] dac_select_b,
+	input wire tint,
+	output reg signed [23:0] voltage_a,
+	output reg signed [23:0] voltage_b
+);
+
+function automatic [35:0] tap(input [11:0] sel, input tinted);
+	case (sel)
+		12'h001: tap = {24'sd0,                                 12'd2787}; // sync low
+		12'h002: tap = {24'sd1101005,                           12'd1830}; // blank
+		12'h004: tap = {24'sd629146,                            12'd2128}; // burst low
+		12'h008: tap = {24'sd1763705,                           12'd1560}; // burst high
+		12'h010: tap = {tinted ? 24'sd557842  : 24'sd767558,    12'd2028}; // luma 0 low
+		12'h020: tap = {tinted ? 24'sd1730150 : 24'sd2287993,   12'd1419}; // luma 0 high
+		12'h040: tap = {tinted ? 24'sd819986  : 24'sd1101005,   12'd1830}; // luma 1 low
+		12'h080: tap = {tinted ? 24'sd2376073 : 24'sd3145728,   12'd1271}; // luma 1 high
+		12'h100: tap = {tinted ? 24'sd1537212 : 24'sd2025849,   12'd1484}; // luma 2 low
+		12'h200: tap = {tinted ? 24'sd3074425 : 24'sd4070572,   12'd1185}; // luma 2 high
+		12'h400: tap = {tinted ? 24'sd2445279 : 24'sd3267363,   12'd1256}; // luma 3 low
+		12'h800: tap = {tinted ? 24'sd3074425 : 24'sd4070572,   12'd1185}; // luma 3 high
+		default: tap = 36'd0;
+	endcase
+endfunction
+
+function automatic onehot(input [11:0] sel);
+	onehot = (sel != 12'd0) && ((sel & (sel - 12'd1)) == 12'd0);
+endfunction
+
+function automatic signed [23:0] settle(input signed [23:0] v, input signed [23:0] target, input [11:0] gain);
+	reg signed [24:0] diff;
+	/* verilator lint_off UNUSEDSIGNAL */
+	reg signed [37:0] step;
+	reg signed [25:0] sum;
+	/* verilator lint_on UNUSEDSIGNAL */
+	begin
+		diff = {target[23], target} - {v[23], v};
+		step = diff * $signed({1'b0, gain});
+		sum = {{2{v[23]}}, v} + {step[36], step[36:12]};
+		settle = sum[23:0];
+	end
+endfunction
+
+reg signed [23:0] target_a, target_b;
+reg [11:0] gain_a, gain_b;
+
+always @(posedge clk) begin
+	if (reset) begin
+		{target_a, gain_a} <= 36'd0;
+		{target_b, gain_b} <= 36'd0;
+	end else begin
+		if (onehot(dac_select_a)) {target_a, gain_a} <= tap(dac_select_a, tint);
+		if (onehot(dac_select_b)) {target_b, gain_b} <= tap(dac_select_b, tint);
+	end
+end
+
+wire signed [23:0] half_a = settle(voltage_b, target_a, gain_a);
+wire signed [23:0] half_b = settle(half_a, target_b, gain_b);
+
+always @(posedge clk) begin
+	if (reset) begin
+		voltage_a <= 24'sd0;
+		voltage_b <= 24'sd0;
+	end else begin
+		voltage_a <= half_a;
+		voltage_b <= half_b;
+	end
+end
+
+endmodule
