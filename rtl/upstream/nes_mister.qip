@@ -56,6 +56,7 @@ set_global_assignment -name VERILOG_FILE              [file join $::quartus(qip_
 set_global_assignment -name VHDL_FILE                 [file join $::quartus(qip_path) "dpram.vhd"]
 set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "ddram.sv"]
 set_global_assignment -name VERILOG_FILE              [file join $::quartus(qip_path) "compat.v"]
+set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "composite_board.sv"]
 set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "cheatcodes.sv"]
 set_global_assignment -name SYSTEMVERILOG_FILE        [file join $::quartus(qip_path) "cart.sv"]
 set_global_assignment -name VHDL_FILE                 [file join $::quartus(qip_path) "bus_savestates.vhd"]
