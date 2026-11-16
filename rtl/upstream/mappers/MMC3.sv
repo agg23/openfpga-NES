@@ -59,77 +59,94 @@ reg prg_rom_bank_mode;             // Mode for PRG banking
 reg chr_K;                         // Mode for CHR banking
 reg chr_a12_invert;                // Mode for CHR banking
 reg mirroring;                     // 0 = vertical, 1 = horizontal
-reg irq_enable, irq_reload;        // IRQ enabled, and IRQ reload requested
+reg irq_enable;                    // IRQ enabled ($E001), cleared by $E000
 reg [7:0] irq_latch, counter;      // IRQ latch value and current counter
-reg [1:0] irq_delay;
+reg irq_delay;                     // IRQ asserted at the end of the last cycle, seen from this one
 reg [7:0] chr_bank_0, chr_bank_1;  // Selected CHR banks
 reg [7:0] chr_bank_2, chr_bank_3, chr_bank_4, chr_bank_5;
 reg [7:0] chr_bank_8, chr_bank_9;
-reg [5:0] prg_bank_0, prg_bank_1, prg_bank_2;  // Selected PRG banks
-reg irq_cycle_mode, next_irq_cycle_mode;
-reg [1:0] cycle_counter;
+reg [4:0] prg_bank_0, prg_bank_1, prg_bank_2;  // Selected PRG banks
+reg irq_cycle_mode;                // Count CPU cycles instead of A12 rises
+reg [1:0] prescaler;               // Counts M2 rises for CPU cycle mode
+reg [4:0] a12_filter;              // M2 falls seen with A12 low, up to 16
+reg clock_src;                     // Counter clock source at the last M2 rise
+reg reload_pending, reload_armed;  // $C001 seen, and reload on the next counter clock
+reg zero_seen;                     // Counter was zero at the last M2 fall
 
 // Mapper has vram_a10 wired to CHR A17
 //wire mapper64 = (flags[7:0] == 64);//default
 wire mapper158 = (flags[7:0] == 158);
 
-// This code detects rising edges on a12.
-reg old_a12_edge, a12_edge_delayed;
-reg [4:0] a12_ctr;
-wire a12_edge = (chr_ain_o[12] && a12_ctr == 0) || old_a12_edge;
+wire reg_write = prg_write && prg_ain[15];
+wire c001_write = reg_write && prg_ain[14:13] == 2'b10 && prg_ain[0];
+wire e000_write = reg_write && prg_ain[14:13] == 2'b11;
+wire enable_now = e000_write ? prg_ain[0] : irq_enable;
 
-always @(posedge clk) begin
-	if (SaveStateBus_load) begin
-		old_a12_edge       <= SS_MAP1[   33];
-		a12_ctr            <= SS_MAP1[38:34];
-	end else begin
-		old_a12_edge <= a12_edge && !ce;
-		if (ce) begin
-			if (chr_ain_o[12]) begin
-				a12_ctr <= 5'd16;
-			end else if (a12_ctr > 0) begin
-				a12_ctr <= a12_ctr - 1'd1;
-			end
-		end
-	end
-end
+// The counter is clocked by the rising edge of its source, taken at each M2 rise. In A12 mode the source
+// is "A12 filter not full": the filter empties when A12 is high at an M2 fall and refills after 16 low
+// falls. In CPU cycle mode it is bit 1 of the prescaler, so the counter clocks every 4 cycles.
+wire a12 = chr_ain_o[12];
+wire a12_full = a12_filter == 5'd16;
+wire [1:0] prescaler_next = prescaler + 1'd1;
+wire clock_next = irq_cycle_mode ? prescaler_next[1] : !a12_full;
+wire counter_clock = clock_next && !clock_src;
+wire counter_arm = !clock_next && clock_src;
+
+// Reload from the latch when the counter is at zero or a $C001 reload is armed, else count down.
+wire [7:0] counter_step = (counter == 8'd0 || reload_armed) ? irq_latch : counter - 1'd1;
+
+// $C001 holds the counter at $FF and the prescaler at 0 during the write, then the new mode's source
+// takes over. Leaving A12 mode with the filter not full drops the source and arms the reload early;
+// entering it with the filter not full raises the source and clocks the cleared counter once.
+wire clock_held = irq_cycle_mode ? 1'b0 : clock_next;
+wire clock_end = prg_din[0] ? 1'b0 : !a12_full;
+wire [7:0] counter_cleared = (clock_end && !clock_held) ? 8'hFE : 8'hFF;
+wire [7:0] counter_now = c001_write ? counter_cleared : counter_clock ? counter_step : counter;
 
 always @(posedge clk)
 if (~enable) begin
+	// Power-on state: 1 KB CHR mode, PRG banks $1F, latch $FF, /IRQ asserted and the
+	// CPU cycle counter already running.
 	bank_select <= 0;
 	prg_rom_bank_mode <= 0;
-	chr_K <= 0;
+	chr_K <= 1;
 	chr_a12_invert <= 0;
 	mirroring <= 0;
-	{irq_enable, irq_reload} <= 0;
-	{irq_latch, counter} <= 0;
+	irq_enable <= 1;
+	irq_latch <= 8'hFF;
+	counter <= 8'hFF;                  // First expiry about 1018 cycles in
 	{chr_bank_0, chr_bank_1} <= 0;
 	{chr_bank_2, chr_bank_3, chr_bank_4, chr_bank_5} <= 0;
 	{chr_bank_8, chr_bank_9} <= 0;
-	{prg_bank_0, prg_bank_1, prg_bank_2} <= 6'b111111;
-	irq_cycle_mode <= 0;
-	next_irq_cycle_mode <= 0;
-	cycle_counter <= 0;
-	irq <= 0;
+	prg_bank_0 <= 5'h1F;
+	prg_bank_1 <= 5'h1F;
+	prg_bank_2 <= 5'h1F;
+	irq_cycle_mode <= 1;
+	prescaler <= 0;
+	clock_src <= 0;
+	reload_pending <= 0;
+	reload_armed <= 0;
+	zero_seen <= 0;
+	a12_filter <= 5'd16;
+	irq <= 1;
 	irq_delay <= 0;
-	a12_edge_delayed <= 0;
 end else if (SaveStateBus_load) begin
 	irq                <= SS_MAP1[    0];
-	cycle_counter      <= SS_MAP1[ 2: 1];
+	prescaler          <= SS_MAP1[ 2: 1];
 	irq_cycle_mode     <= SS_MAP1[    3];
-	next_irq_cycle_mode<= SS_MAP1[    4];
-	a12_edge_delayed   <= SS_MAP1[    5];
+	clock_src          <= SS_MAP1[    4];
+	reload_armed       <= SS_MAP1[    5];
 	bank_select        <= SS_MAP1[ 9: 6];
 	prg_rom_bank_mode  <= SS_MAP1[   10];
 	chr_a12_invert     <= SS_MAP1[   11];
 	mirroring          <= SS_MAP1[   12];
 	irq_enable         <= SS_MAP1[   13];
-	irq_reload         <= SS_MAP1[   14];
+	reload_pending     <= SS_MAP1[   14];
 	irq_latch          <= SS_MAP1[22:15];
 	counter            <= SS_MAP1[30:23];
-	irq_delay          <= SS_MAP1[32:31];
-//	old_a12_edge       <= SS_MAP1[   33];
-//	a12_ctr            <= SS_MAP1[38:34];
+	irq_delay          <= SS_MAP1[   31];
+	zero_seen          <= SS_MAP1[   32];
+	a12_filter         <= SS_MAP1[38:34];
 	chr_bank_0         <= SS_MAP1[46:39];
 	chr_bank_1         <= SS_MAP1[54:47];
 	chr_bank_2         <= SS_MAP1[62:55];
@@ -137,50 +154,27 @@ end else if (SaveStateBus_load) begin
 	chr_bank_3         <= SS_MAP2[ 7: 0];
 	chr_bank_4         <= SS_MAP2[15: 8];
 	chr_bank_5         <= SS_MAP2[23:16];
-	prg_bank_0         <= SS_MAP2[29:24];
-	prg_bank_1         <= SS_MAP2[35:30];
-	prg_bank_2         <= SS_MAP2[41:36];
+	prg_bank_0         <= SS_MAP2[28:24];
+	prg_bank_1         <= SS_MAP2[34:30];
+	prg_bank_2         <= SS_MAP2[40:36];
 	chr_bank_8         <= SS_MAP2[49:42];
 	chr_bank_9         <= SS_MAP2[57:50];
 end else if (ce) begin
-	// Process these before writes so irq_reload and cycle_counter register writes take precedence.
-	cycle_counter <= cycle_counter + 1'd1;
-	irq_cycle_mode <= next_irq_cycle_mode;
-	a12_edge_delayed <= a12_edge;
-
-	if (irq_cycle_mode ? (cycle_counter == 3) : a12_edge_delayed) begin
-		if (irq_reload) begin
-		    if (|irq_latch) begin
-				// Wiki and Nintendulator source: OR with 1 if not zero
-				counter <= irq_latch | 8'h01;
-			end else begin
-				counter <= 8'h00;
-			end
-			if (~|irq_latch && irq_enable) begin
-				irq_delay <= 1;
-			end
-			irq_reload <= 0;
-		end
-		else if (counter == 8'h00) begin
-			counter <= irq_latch;
-			if (~|irq_latch && irq_enable) begin
-				irq_delay <= 1;
-			end
-		end
-		else begin
-			counter <= counter - 1'd1;
-			if (counter == 8'h01 && irq_enable) begin
-				irq_delay <= 1;
-			end
-		end
-	end
-
-	if (irq_delay) begin
+	if (irq_delay)
 		irq <= 1;
-		irq_delay <= 0;
-	end
 
-	if (prg_write && prg_ain[15]) begin
+	// M2 rise
+	prescaler <= prescaler_next;
+	clock_src <= clock_next;
+	if (counter_clock) begin
+		counter <= counter_step;
+		if (reload_armed)
+			reload_pending <= 0;
+	end
+	if (counter_arm)
+		reload_armed <= reload_pending;
+
+	if (reg_write) begin
 		case({prg_ain[14:13], prg_ain[0]})
 			// Bank select ($8000-$9FFE, even)
 			3'b00_0: {chr_a12_invert, prg_rom_bank_mode, chr_K, bank_select} <= {prg_din[7:5], prg_din[3:0]};
@@ -193,41 +187,57 @@ end else if (ce) begin
 					3: chr_bank_3 <= prg_din;       // Select 1 KB CHR bank at PPU $1400-$17FF (or $0400-$07FF);
 					4: chr_bank_4 <= prg_din;       // Select 1 KB CHR bank at PPU $1800-$1BFF (or $0800-$0BFF);
 					5: chr_bank_5 <= prg_din;       // Select 1 KB CHR bank at PPU $1C00-$1FFF (or $0C00-$0FFF);
-					6: prg_bank_0 <= prg_din[5:0];  // Select 8 KB PRG ROM bank at $8000-$9FFF (or $C000-$DFFF);
-					7: prg_bank_1 <= prg_din[5:0];  // Select 8 KB PRG ROM bank at $A000-$BFFF
+					6: prg_bank_0 <= prg_din[4:0];  // Select 8 KB PRG ROM bank at $8000-$9FFF (or $C000-$DFFF);
+					7: prg_bank_1 <= prg_din[4:0];  // Select 8 KB PRG ROM bank at $A000-$BFFF
 					8: chr_bank_8 <= prg_din;       // If K=1, Select 1 KB CHR bank at PPU $0400 (or $1400);
 					9: chr_bank_9 <= prg_din;       // If K=1, Select 1 KB CHR bank at PPU $0C00 (or $1C00)
-					15: prg_bank_2 <= prg_din[5:0]; // Select 8 KB PRG ROM bank at $C000-$DFFF (or $8000-$9FFF);
+					15: prg_bank_2 <= prg_din[4:0]; // Select 8 KB PRG ROM bank at $C000-$DFFF (or $8000-$9FFF);
 				endcase
 			3'b01_0: mirroring <= prg_din[0];                   // Mirroring ($A000-$BFFE, even)
 			3'b01_1: begin end
 			3'b10_0: irq_latch <= prg_din;                      // IRQ latch ($C000-$DFFE, even)
-			3'b10_1: begin
-						{irq_reload, next_irq_cycle_mode} <= {1'b1, prg_din[0]}; // IRQ reload ($C001-$DFFF, odd)
-						cycle_counter <= 0;
-					end
+			3'b10_1: begin                                      // IRQ mode and restart ($C001-$DFFF, odd)
+				irq_cycle_mode <= prg_din[0];
+				prescaler <= 0;
+				clock_src <= clock_end;
+				counter <= counter_cleared;
+				reload_pending <= 1;
+				reload_armed <= clock_held && !clock_end;
+			end
 			3'b11_0: {irq_enable, irq} <= 2'b00;                 // IRQ disable ($E000-$FFFE, even)
-			3'b11_1: {irq_enable, irq} <= 2'b10;                 // IRQ enable ($E001-$FFFF, odd)
+			3'b11_1: irq_enable <= 1;                           // IRQ enable ($E001-$FFFF, odd), /IRQ stays as it is
 		endcase
 	end
+
+	// M2 fall: /IRQ is set when the counter is first seen at zero, if enabled.
+	irq_delay <= 0;
+	if (counter_now == 8'd0 && !zero_seen && enable_now)
+		irq_delay <= 1;
+	zero_seen <= counter_now == 8'd0;
+
+	if (a12)
+		a12_filter <= 0;
+	else if (!a12_full)
+		a12_filter <= a12_filter + 1'd1;
 end
 
 assign SS_MAP1_BACK[    0] = irq;
-assign SS_MAP1_BACK[ 2: 1] = cycle_counter;
+assign SS_MAP1_BACK[ 2: 1] = prescaler;
 assign SS_MAP1_BACK[    3] = irq_cycle_mode;
-assign SS_MAP1_BACK[    4] = next_irq_cycle_mode;
-assign SS_MAP1_BACK[    5] = a12_edge_delayed;
+assign SS_MAP1_BACK[    4] = clock_src;
+assign SS_MAP1_BACK[    5] = reload_armed;
 assign SS_MAP1_BACK[ 9: 6] = bank_select;
 assign SS_MAP1_BACK[   10] = prg_rom_bank_mode;
 assign SS_MAP1_BACK[   11] = chr_a12_invert;
 assign SS_MAP1_BACK[   12] = mirroring;
 assign SS_MAP1_BACK[   13] = irq_enable;
-assign SS_MAP1_BACK[   14] = irq_reload;
+assign SS_MAP1_BACK[   14] = reload_pending;
 assign SS_MAP1_BACK[22:15] = irq_latch;
 assign SS_MAP1_BACK[30:23] = counter;
-assign SS_MAP1_BACK[32:31] = irq_delay;
-assign SS_MAP1_BACK[   33] = old_a12_edge;
-assign SS_MAP1_BACK[38:34] = a12_ctr;
+assign SS_MAP1_BACK[   31] = irq_delay;
+assign SS_MAP1_BACK[   32] = zero_seen;
+assign SS_MAP1_BACK[   33] = 1'b0;
+assign SS_MAP1_BACK[38:34] = a12_filter;
 assign SS_MAP1_BACK[46:39] = chr_bank_0;
 assign SS_MAP1_BACK[54:47] = chr_bank_1;
 assign SS_MAP1_BACK[62:55] = chr_bank_2;
@@ -236,25 +246,25 @@ assign SS_MAP1_BACK[   63] = chr_K;
 assign SS_MAP2_BACK[ 7: 0] = chr_bank_3;
 assign SS_MAP2_BACK[15: 8] = chr_bank_4;
 assign SS_MAP2_BACK[23:16] = chr_bank_5;
-assign SS_MAP2_BACK[29:24] = prg_bank_0;
-assign SS_MAP2_BACK[35:30] = prg_bank_1;
-assign SS_MAP2_BACK[41:36] = prg_bank_2;
+assign SS_MAP2_BACK[29:24] = {1'b0, prg_bank_0};
+assign SS_MAP2_BACK[35:30] = {1'b0, prg_bank_1};
+assign SS_MAP2_BACK[41:36] = {1'b0, prg_bank_2};
 assign SS_MAP2_BACK[49:42] = chr_bank_8;
 assign SS_MAP2_BACK[57:50] = chr_bank_9;
 assign SS_MAP2_BACK[63:58] = 6'b0; // free to be used
 
-// The PRG bank to load. Each increment here is 8kb. So valid values are 0..63.
-reg [5:0] prgsel;
+// The PRG bank to load. Each increment here is 8kb. So valid values are 0..31.
+reg [4:0] prgsel;
 always @* begin
 	casez({prg_ain[14:13], prg_rom_bank_mode})
 		3'b00_0: prgsel = prg_bank_0;  // $8000 is R:6
 		3'b01_0: prgsel = prg_bank_1;  // $A000 is R:7
 		3'b10_0: prgsel = prg_bank_2;  // $C000 is R:F
-		3'b11_0: prgsel = 6'b111111;   // $E000 fixed to last bank
+		3'b11_0: prgsel = 5'b11111;    // $E000 fixed to last bank
 		3'b00_1: prgsel = prg_bank_2;  // $8000 is R:F
-		3'b01_1: prgsel = prg_bank_0;  // $A000 is R:6
-		3'b10_1: prgsel = prg_bank_1;  // $C000 is R:7
-		3'b11_1: prgsel = 6'b111111;   // $E000 fixed to last bank
+		3'b01_1: prgsel = prg_bank_1;  // $A000 is R:7
+		3'b10_1: prgsel = prg_bank_0;  // $C000 is R:6
+		3'b11_1: prgsel = 5'b11111;    // $E000 fixed to last bank
 	endcase
 end
 
@@ -276,7 +286,7 @@ always @* begin
 	endcase
 end
 
-assign prg_aout = {3'b00_0,  prgsel, prg_ain[12:0]};
+assign prg_aout = {4'b0000, prgsel, prg_ain[12:0]};
 assign {chr_allow, chr_aout} = {flags[15], 4'b10_00, chrsel, chr_ain[9:0]};
 assign prg_allow = prg_ain[15] && !prg_write;
 assign vram_a10 = mapper158 ? chrsel[7] :  // Mapper 158 controls mirroring by switching the top bits of the CHR address
