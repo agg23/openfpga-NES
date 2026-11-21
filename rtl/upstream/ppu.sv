@@ -1447,7 +1447,7 @@ assign render_ena_out = rendering_regs;
 
 // 2C02 has an "is_vblank" flag that is true from pixel 0 of line 241 to pixel 0 of line 0;
 wire is_rendering = rendering_enabled && (scanline < 240 || is_pre_render_line);
-wire is_rendering_d = re_sr[2] && (scanline < 240 || (is_pre_render_line && cycle != 0) || (scanline == 241 && cycle == 0));
+wire is_rendering_d = re_sr[2] && (scanline < 240 || (is_pre_render_line && cycle != 0) || (scanline == 240 && cycle == 0));
 wire is_vbe_sl;
 
 wire clear_signal = is_pre_render_line;
